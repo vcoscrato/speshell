@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Copies the text in an area the user drags out, read with Tesseract in the
+# languages of SPESHELL_OCR_LANGUAGES (Tesseract's codes joined by "+").
+set -euo pipefail
+source "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")/lib.sh"
+
+region="$(select_region)"
+[[ -n "$region" ]] || exit 0
+
+languages="${SPESHELL_OCR_LANGUAGES:-eng}"
+error_file="$runtime_dir/ocr.log"
+if ! text="$(grim -g "$region" -t png - | tesseract stdin stdout -l "$languages" --psm 6 2>"$error_file")"; then
+  notify "Couldn't read the text" "$(preview "$(grep -m1 -i 'error\|failed' "$error_file" || tail -n1 "$error_file")")"
+  exit 1
+fi
+# Tesseract ends its output with a form feed; the substitution drops the blank lines.
+text="$(printf '%s' "$text" | tr -d '\f')"
+
+if [[ -z "$text" ]]; then
+  notify "No text found" "Try a larger area or sharper text."
+  exit 0
+fi
+printf '%s' "$text" | wl-copy
+notify "Text copied" "$(preview "$text")"

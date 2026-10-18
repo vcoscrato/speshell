@@ -1,0 +1,305 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Run from a checkout when this script sits next to shell.qml; otherwise use
+# the packaged copy. SPESHELL_QML_DIR overrides both.
+script_dir="$(cd -- "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")" && pwd)"
+if [[ -r "$script_dir/../shell.qml" ]]; then
+  default_app_dir="$(cd -- "$script_dir/.." && pwd)"
+else
+  default_app_dir=/usr/share/speshell
+fi
+readonly app_dir="${SPESHELL_QML_DIR:-$default_app_dir}"
+readonly config_root="${XDG_CONFIG_HOME:-$HOME/.config}"
+readonly data_root="${XDG_DATA_HOME:-$HOME/.local/share}"
+readonly config_dir="$config_root/speshell"
+readonly data_dir="$data_root/speshell"
+readonly config_file="$config_dir/config.ini"
+
+if [[ ! -r "$app_dir/shell.qml" ]]; then
+  printf 'speshell: shell.qml not found in %s\n' "$app_dir" >&2
+  exit 1
+fi
+
+install -d -m755 "$config_root" "$data_root" "$config_dir" "$data_dir"
+
+if [[ ! -e "$config_file" && ! -L "$config_file" ]]; then
+  install -m644 "$app_dir/config.example.ini" "$config_file"
+fi
+
+# Prints the call's output. A frozen instance still accepts IPC connections but never
+# answers, so give up after a few seconds; that exits with status 124.
+ipc_try() {
+  local output
+  output="$(timeout 3 /usr/bin/quickshell ipc --any-display -p "$app_dir" call "$@" 2>/dev/null)" || return
+  if [[ -n "$output" ]]; then
+    printf '%s\n' "$output"
+  fi
+}
+
+stop_frozen_instances() {
+  local pid
+  for pid in $(/usr/bin/quickshell list -j -p "$app_dir" 2>/dev/null | sed -n 's/^ *"pid": \([0-9]*\).*/\1/p'); do
+    printf 'speshell: instance %s stopped responding; restarting it\n' "$pid" >&2
+    kill -TERM "$pid" 2>/dev/null || continue
+    for _ in $(seq 1 20); do
+      kill -0 "$pid" 2>/dev/null || continue 2
+      sleep 0.05
+    done
+    kill -KILL "$pid" 2>/dev/null || true
+  done
+}
+
+ipc_call() {
+  local status=0
+  ipc_try "$@" || status=$?
+  if (( status == 0 )); then
+    return 0
+  fi
+  if (( status == 124 )); then
+    stop_frozen_instances
+  fi
+
+  /usr/bin/quickshell -p "$app_dir" --no-duplicate --daemonize
+
+  for _ in $(seq 1 30); do
+    if ipc_try "$@"; then
+      return 0
+    fi
+    sleep 0.05
+  done
+
+  printf 'speshell: failed to contact IPC target %s\n' "${1:-unknown}" >&2
+  return 1
+}
+
+if [[ "${1:-}" == "launcher" ]]; then
+  shift
+  action="${1:-open}"
+  case "$action" in
+    open|close|toggle) ;;
+    *)
+      printf 'speshell: unknown launcher action: %s\n' "$action" >&2
+      printf 'usage: speshell launcher [open|close|toggle]\n' >&2
+      exit 2
+      ;;
+  esac
+
+  ipc_call launcher "$action" >/dev/null
+  exit 0
+fi
+
+if [[ "${1:-}" == "panel" ]]; then
+  shift
+  action="${1:-list}"
+  shift || true
+
+  case "$action" in
+    list)
+      ipc_call panel list
+      ;;
+    open|toggle)
+      if [[ $# -ne 1 ]]; then
+        printf 'usage: speshell panel %s NAME\n' "$action" >&2
+        exit 2
+      fi
+      if [[ "$(ipc_call panel "$action" "$1")" != "true" ]]; then
+        printf 'speshell: no %s panel here (see speshell panel list)\n' "$1" >&2
+        exit 1
+      fi
+      ;;
+    close)
+      ipc_call panel close >/dev/null
+      ;;
+    *)
+      printf 'speshell: unknown panel action: %s\n' "$action" >&2
+      printf 'usage: speshell panel [list | open NAME | toggle NAME | close]\n' >&2
+      exit 2
+      ;;
+  esac
+  exit 0
+fi
+
+if [[ "${1:-}" == "activity" ]]; then
+  shift
+  action="${1:-list}"
+  shift || true
+
+  case "$action" in
+    set)
+      if [[ $# -lt 3 || $# -gt 6 ]]; then
+        printf 'usage: speshell activity set ID STATE LABEL [DETAIL] [ICON] [TONE]\n' >&2
+        exit 2
+      fi
+      ipc_call activity publish "$1" "$2" "$3" "${4:-}" "${5:-info}" "${6:-neutral}" >/dev/null
+      ;;
+    clear)
+      if [[ $# -ne 1 ]]; then
+        printf 'usage: speshell activity clear ID\n' >&2
+        exit 2
+      fi
+      ipc_call activity clear "$1" >/dev/null
+      ;;
+    list)
+      if [[ $# -ne 0 ]]; then
+        printf 'usage: speshell activity list\n' >&2
+        exit 2
+      fi
+      ipc_call activity list
+      ;;
+    refresh)
+      if [[ $# -ne 0 ]]; then
+        printf 'usage: speshell activity refresh\n' >&2
+        exit 2
+      fi
+      # Hotkey scripts call this on every state change: never start Speshell for it.
+      ipc_try activity refresh >/dev/null || true
+      ;;
+    *)
+      printf 'speshell: unknown activity action: %s\n' "$action" >&2
+      printf 'usage: speshell activity [set|clear|list|refresh] ...\n' >&2
+      exit 2
+      ;;
+  esac
+  exit 0
+fi
+
+if [[ "${1:-}" == "tool" ]]; then
+  shift
+  case "${1:-}" in
+    ""|list)
+      ipc_call tool list
+      ;;
+    dictate|ocr|screenshot|record|qr|color)
+      if [[ $# -gt 2 ]]; then
+        printf 'usage: speshell tool NAME [MODE]\n' >&2
+        exit 2
+      fi
+      if [[ "$(ipc_call tool run "$1" "${2:-}")" != "true" ]]; then
+        printf 'speshell: %s is not installed (see speshell tool list)\n' "$1" >&2
+        exit 1
+      fi
+      ;;
+    *)
+      printf 'speshell: unknown tool: %s\n' "$1" >&2
+      printf 'usage: speshell tool [list | dictate [cancel] | ocr | screenshot [region|screen] | record [region|screen] | qr | color]\n' >&2
+      exit 2
+      ;;
+  esac
+  exit 0
+fi
+
+if [[ "${1:-}" == "timer" ]]; then
+  shift
+  action="${1:-get}"
+  shift || true
+
+  case "$action" in
+    start|add)
+      if [[ $# -lt 1 ]]; then
+        printf 'usage: speshell timer %s LENGTH (minutes, or like 1h30 or 90s)\n' "$action" >&2
+        exit 2
+      fi
+      if [[ "$(ipc_call timer "$action" "$*")" != "true" ]]; then
+        printf 'speshell: not a length: %s (minutes, or like 1h30 or 90s)\n' "$*" >&2
+        exit 1
+      fi
+      ;;
+    pause|resume|toggle|stop)
+      if [[ $# -ne 0 ]]; then
+        printf 'usage: speshell timer %s\n' "$action" >&2
+        exit 2
+      fi
+      if [[ "$(ipc_call timer "$action")" != "true" ]]; then
+        printf 'speshell: no timer to %s\n' "$action" >&2
+        exit 1
+      fi
+      ;;
+    get)
+      ipc_call timer get
+      ;;
+    *)
+      printf 'speshell: unknown timer action: %s\n' "$action" >&2
+      printf 'usage: speshell timer [get | start LENGTH | add LENGTH | pause | resume | toggle | stop]\n' >&2
+      exit 2
+      ;;
+  esac
+  exit 0
+fi
+
+if [[ "${1:-}" == "theme" ]]; then
+  shift
+  action="${1:-get}"
+  shift || true
+
+  case "$action" in
+    list|get)
+      if [[ $# -ne 0 ]]; then
+        printf 'usage: speshell theme %s\n' "$action" >&2
+        exit 2
+      fi
+      ipc_call theme "$action"
+      ;;
+    set)
+      if [[ $# -ne 1 ]]; then
+        printf 'usage: speshell theme set ID\n' >&2
+        exit 2
+      fi
+      if [[ "$(ipc_call theme set "$1")" != "true" ]]; then
+        printf 'speshell: unknown theme: %s (see speshell theme list)\n' "$1" >&2
+        exit 1
+      fi
+      ;;
+    shuffle)
+      if [[ $# -gt 1 ]]; then
+        printf 'usage: speshell theme shuffle [ID]\n' >&2
+        exit 2
+      fi
+      if [[ "$(ipc_call theme shuffle "${1:-*}")" != "true" ]]; then
+        printf 'speshell: no other wallpaper to shuffle to\n' >&2
+        exit 1
+      fi
+      ;;
+    rescan)
+      ipc_call theme rescan >/dev/null
+      ;;
+    *)
+      printf 'speshell: unknown theme action: %s\n' "$action" >&2
+      printf 'usage: speshell theme [list|get|set ID|shuffle [ID]|rescan]\n' >&2
+      exit 2
+      ;;
+  esac
+  exit 0
+fi
+
+if [[ "${1:-}" == "wallpaper" ]]; then
+  shift
+  action="${1:-get}"
+  shift || true
+
+  case "$action" in
+    set)
+      if [[ $# -ne 1 ]]; then
+        printf 'usage: speshell wallpaper set PATH\n' >&2
+        exit 2
+      fi
+      if [[ "$(ipc_call wallpaper set "$(realpath -s -- "$1")")" != "true" ]]; then
+        printf 'speshell: cannot show %s: it must be inside a theme folder in %s/themes\n' "$1" "$config_dir" >&2
+        printf 'or %s/extras/themes,\n' "$app_dir" >&2
+        printf 'and [Appearance] drawWallpaper must be true\n' >&2
+        exit 1
+      fi
+      ;;
+    get)
+      ipc_call wallpaper get
+      ;;
+    *)
+      printf 'speshell: unknown wallpaper action: %s\n' "$action" >&2
+      printf 'usage: speshell wallpaper [get|set PATH]\n' >&2
+      exit 2
+      ;;
+  esac
+  exit 0
+fi
+
+exec /usr/bin/quickshell -p "$app_dir" "$@"
