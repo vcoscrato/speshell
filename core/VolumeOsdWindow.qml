@@ -56,12 +56,12 @@ OsdWindow {
         id: osdCard
         anchors.fill: parent
 
-        // Bottom center of the screen: cut toward its center.
+        // Bottom center of the screen: rounded toward its center.
         Surface {
             anchors.fill: parent
-            cut: Theme.spacingMedium
-            cutTopLeft: true
-            cutTopRight: true
+            radius: Theme.spacingMedium
+            roundTopLeft: true
+            roundTopRight: true
         }
 
         Row {

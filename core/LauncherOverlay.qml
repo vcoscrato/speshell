@@ -191,12 +191,14 @@ PanelWindow {
         height: paletteColumn.implicitHeight + Theme.spacingLarge * 2
         clip: true
 
-        // Centered, so cut on a diagonal.
+        // Centered, so every corner faces the center.
         Surface {
             anchors.fill: parent
             backdrop: true
-            cutTopRight: true
-            cutBottomLeft: true
+            roundTopLeft: true
+            roundTopRight: true
+            roundBottomRight: true
+            roundBottomLeft: true
         }
 
         MouseArea {

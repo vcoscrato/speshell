@@ -1,6 +1,6 @@
 # Effects
 
-An effects directory animates the launcher, wallpaper changes, and Speshell's controls, paints the backdrop of its surfaces, and draws the clock panel's face and the face of its primary buttons, for any theme that names it with `effects = <name>` in its `theme.ini`. Speshell looks in `extras/effects` and `~/.local/share/speshell/effects`; a user directory replaces a shipped one of the same name. If effects fail to load, Speshell notifies and runs without them.
+An effects directory animates the launcher, wallpaper changes, and Speshell's controls, paints the backdrop of its surfaces, and draws the clock panel's face, for any theme that names it with `effects = <name>` in its `theme.ini`. Speshell looks in `extras/effects` and `~/.local/share/speshell/effects`; a user directory replaces a shipped one of the same name. If effects fail to load, Speshell notifies and runs without them.
 
 Every effect here has these files; a part that draws with a shader another part shares has no `.frag` of its own. Each shader sits beside the QML that draws it, under the same name:
 
@@ -13,10 +13,9 @@ Every effect here has these files; a part that draws with a shader another part 
 ├── Interactions.qml/.frag        the effects on Speshell's controls
 ├── Knob.qml/.frag                the thumb of Speshell's sliders and switches
 ├── Clock.qml/.frag               the clock panel's face
-├── Button.qml/.frag              the face of Speshell's primary buttons
 ├── <Part>.qml/.frag              pieces the transitions use (Flames, Wind, Whip, ...)
 ├── <Name>.js                     color recipes several parts share (Flame, Water, Stone, Bolt)
-├── common -> ../../lib           symlink that gives QML `import "common"` (EffectClock, ClockTime, ButtonFace, Particles) and `common/Colors.js`
+├── common -> ../../lib           symlink that gives QML `import "common"` (EffectClock, ClockTime, Particles) and `common/Colors.js`
 └── qsb/                          git-ignored: `just shaders` compiles each `<Name>.frag` to `qsb/<Name>.qsb`
 ```
 
@@ -37,7 +36,6 @@ QtObject {
     readonly property Component interactions: Component { Interactions {} }
     readonly property Component knob: Component { Knob {} }
     readonly property Component clock: Component { Clock {} }
-    readonly property Component button: Component { Button {} }
 }
 ```
 
@@ -64,7 +62,7 @@ Emit `closingFinished()` when the exit is done; Speshell hides the launcher anyw
 
 Emit `finished()` when done; Speshell removes it after 5 s otherwise. Without a wallpaper transition the old image fades out.
 
-**Backdrop.** Painted over the theme's base color and clipped to each surface's cut-corner shape, behind the bar, its dropdowns, and the launcher; the panels and text sit on it. Speshell paints it at least 1050 px tall (`Theme.backdropHeight`) and shows its top, so a short surface such as the bar or the launcher gets the top band of the painting: keep the busy parts low, below where text sits on a tall dropdown, and the top calm enough for a 28 px bar across a whole screen. It receives `theme`. Speshell renders it once into a texture and redraws it only when its properties change, so it must not animate. Keep it within a few percent of `theme.bg` wherever text may land: it sits behind every panel, including the calendar and the notes.
+**Backdrop.** Painted over the theme's base color and clipped to each surface's rounded shape, behind the bar, its dropdowns, and the launcher; the panels and text sit on it. Speshell paints it at least 1050 px tall (`Theme.backdropHeight`) and shows its top, so a short surface such as the bar or the launcher gets the top band of the painting: keep the busy parts low, below where text sits on a tall dropdown, and the top calm enough for a 28 px bar across a whole screen. It receives `theme`. Speshell renders it once into a texture and redraws it only when its properties change, so it must not animate. Keep it within a few percent of `theme.bg` wherever text may land: it sits behind every panel, including the calendar and the notes.
 
 **Interactions.** Small effects where the user's hand is on Speshell: dragging a slider, flipping a switch, picking something. Created over each screen's bar and its dropdown, above their content, and given no input. It receives `theme`, and Speshell calls its functions, with points and rects in its own coordinates:
 
@@ -81,9 +79,8 @@ Keep each effect brief (under a second) and small around the control; the panel 
 
 **Clock.** The clock panel's face, filling a square of about 160 to 200 px. It receives `theme` and the time as `hours` (0–23), `minutes`, and `seconds`, which change once a second, and `running`, which is false in power saver: then show hours and minutes, no seconds, and keep still, since the face is redrawn only when the minute changes. `lib/ClockTime.qml` turns them into what a face draws: each hand's turns from twelve, the hour and minute hands creeping with the time and the second hand ticking into each second over a fifth of a second; `clock`, the ambient time anything else moves by; and `sinceTick`, for anything that answers the tick. The face must read at a glance at its smallest: hour and minute hands told apart by length and weight, and the hours marked. Without a clock part, Speshell draws a plain dial in the theme's colors.
 
-**Button.** The face of Speshell's primary buttons, the one action a panel or prompt leads with (Finish on dictation, Keep changes on the displays, Connect on a Wi-Fi password). It fills the button, from about 60×24 to 160×32 px, and Speshell clips it to the button's cut-corner outline and sets the label over its middle in `theme.onAccent`, the base or text color, whichever reads better on the accent. It receives `theme`, `hovered`, `pressed`, `pointer` (where the pointer is, in the face's coordinates), and `running`, false in power saver. Paint it in the accent, and keep everything behind the label within a few percent of it, so the label reads in every theme; put the busy parts along the edges and the foot. Keep still at rest and while not `running`, and move only while hovered or pressed. `lib/ButtonFace.qml` does the bookkeeping: make the face one, give it a shader and colors, and it passes the shader `area`, `glow` (easing in on hover), `press`, `at` (the pointer), and `time`, which runs only while hovered or pressed and holds where it stopped. Without a button part, the accent fills the button.
 
-Speshell destroys a transition inside its finishing signal, so nothing may run after the emit. Take time from `EffectClock`, never from your own timers or `Date`. It ticks at the frame rate of the user's power mode (`[Power] mode`, exposed as `frameRate`: every frame the display shows at `maximum`, 60 Hz at `balanced`) and follows their speed for that kind of effect (`[Appearance] launcherTransitionSpeed`, `wallpaperTransitionSpeed`, or `controlEffectsSpeed`, exposed as `timeScale`; a clock face's runs at 1), so its `clock`, `simTime`, and `dt` already run fast or slow. Never assume a frame lasts 1/60 s: a simulation that steps once per frame should step by the time since its last step, as `fire/Flames.qml` does. With transitions off, or in power saver, Speshell does not create them; power saver also drops the interactions and the knob, keeping only the still backdrop, a still clock face, and still button faces.
+Speshell destroys a transition inside its finishing signal, so nothing may run after the emit. Take time from `EffectClock`, never from your own timers or `Date`. It ticks at the frame rate of the user's power mode (`[Power] mode`, exposed as `frameRate`: every frame the display shows at `maximum`, 60 Hz at `balanced`) and follows their speed for that kind of effect (`[Appearance] launcherTransitionSpeed`, `wallpaperTransitionSpeed`, or `controlEffectsSpeed`, exposed as `timeScale`; a clock face's runs at 1), so its `clock`, `simTime`, and `dt` already run fast or slow. Never assume a frame lasts 1/60 s: a simulation that steps once per frame should step by the time since its last step, as `fire/Flames.qml` does. With transitions off, or in power saver, Speshell does not create them; power saver also drops the interactions and the knob, keeping only the still backdrop, and a still clock face.
 
 ## Style
 
@@ -102,7 +99,6 @@ The backdrops are a nebula lane, banked flames, cloud banks with curling wind, a
 
 The clock faces are each one shader: an orrery whose planets, lit from the sun at the middle, are the hands, and a comet the seconds; a charcoal dial cracked with embers inside a ring of flames from flickering noise, with forged blades for hands; a sky of drifting cloud banks with dashes of wind along spiral streamlines, a compass rose, a leaf and a feather for hands, and a leaf that tumbles round with the seconds; a pool with drifting caustics, glassy currents for hands round a whirlpool, and rings that spread from each second's drop; a disc of bent strata with faceted jade at the hours, obelisks lit by which face turns to the light, and a pebble in a carved groove; and a tachometer with a redline, needles on a checkered cap, and a bolt that takes a new shape each second and crackles until the next.
 
-The button faces are each one shader too, cel bands over the accent: a lane of night with hashed stars and a planet's lit limb, crossed by a comet; nested flame tongues, each leaning and narrowing to a curved tip, standing on a bed of flame, with embers rising in columns; a band of sky and dashes of wind along wavering streamlines, with a tumbling leaf; caustics from warped Voronoi edges under a meniscus, with rings spreading from the pointer; Voronoi facets of jade, each tilted its own way and banded by how squarely it faces a swinging light; and racing paint with slanted stripes, a checkered flag, and a bolt of uneven runs that reshapes ten times a second.
 
 On the controls, each effect spawns particles from `lib/Particles.qml`, each a small `ShaderEffect` that draws one kind of bit by its age: star dust, glints, and constellations that draw themselves star by star; flames standing on a burning streak, sparks, embers, flashes of ignition, and smoke; streaks of wind that blow a dragged knob along, wisps, leaves, and curls of wind; drops that drip off, leap in, or fly off to land in ripples, and crown splashes with the jet that follows; rock chips, dust, and jade shards; sparks, arcs, discharges, lightning strikes, and tire smoke. Each knob is one small shader turned by its travel, clockwise as it moves right, as a ball rolls: a planet whose moon orbits, an ember, a ball of wind, a drop that stretches by how far a spring-damped copy of its travel lags behind, a faceted stone that rolls, and a racing wheel that reaches back to the track's start to draw a bolt along the fill.
 
@@ -110,13 +106,13 @@ On the controls, each effect spawns particles from `lib/Particles.qml`, each a s
 
 GPU time per frame at 1080p on an RTX 3070 (`just perf`):
 
-| Effects | Launcher open | Launcher entrance and exit | Wallpaper | Controls | Clock face | Buttons |
-|---|---|---|---|---|---|---|
-| Cosmos | 0.09 ms | 0.09 ms | 0.01 ms | 0.13 ms | 0.06 ms | 0.11 ms |
-| Fire | 0.33 ms | 0.29 ms | 0.20 ms | 0.21 ms | 0.10 ms | 0.10 ms |
-| Air | 0.19 ms | 0.26 ms | 0.26 ms | 0.08 ms | 0.09 ms | 0.10 ms |
-| Water | 0.41 ms | 0.31 ms | under 0.07 ms | 0.11 ms | 0.09 ms | 0.11 ms |
-| Earth | 0.39 ms | 0.48 ms | 0.23 ms | 0.10 ms | 0.02 ms | 0.10 ms |
-| Relâmpago | 0.08 ms | 0.08 ms | 0.19 ms | 0.08 ms | 0.02 ms | 0.11 ms |
+| Effects | Launcher open | Launcher entrance and exit | Wallpaper | Controls | Clock face |
+|---|---|---|---|---|---|
+| Cosmos | 0.09 ms | 0.09 ms | 0.01 ms | 0.13 ms | 0.06 ms |
+| Fire | 0.33 ms | 0.29 ms | 0.20 ms | 0.21 ms | 0.10 ms |
+| Air | 0.19 ms | 0.26 ms | 0.26 ms | 0.08 ms | 0.09 ms |
+| Water | 0.41 ms | 0.31 ms | under 0.07 ms | 0.11 ms | 0.09 ms |
+| Earth | 0.39 ms | 0.48 ms | 0.23 ms | 0.10 ms | 0.02 ms |
+| Relâmpago | 0.08 ms | 0.08 ms | 0.19 ms | 0.08 ms | 0.02 ms |
 
-The controls column is the whole controls scene, its backdrop included, while effects play; the clock face column is the clock scene, a face at the panel's size and one at twice it, ticking; the buttons column is the button scene, five primary buttons over the backdrop, three of them hovered. Nothing runs while the launcher is hidden, the wallpaper is still, no control effect is playing, the clock panel is closed, and no primary button is hovered. The backdrop renders once when a surface first shows or the theme changes. Re-measure after a change and update this table.
+The controls column is the whole controls scene, its backdrop included, while effects play; the clock face column is the clock scene, a face at the panel's size and one at twice it, ticking. Nothing runs while the launcher is hidden, the wallpaper is still, no control effect is playing, and the clock panel is closed. The backdrop renders once when a surface first shows or the theme changes. Re-measure after a change and update this table.

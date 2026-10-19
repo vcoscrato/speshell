@@ -6,12 +6,11 @@ import Quickshell.Wayland
 import qs.components
 import qs.services
 import qs.theme
-import "../services/TimerProvider.js" as TimerProvider
 
 // Speshell's bar, one per screen, along its top or bottom: the Speshell mark, which
 // opens the launcher, and the screen's workspaces; the clock between the playing track
-// and the weather and a running timer; the tray and the panel buttons. Buttons open
-// their panel in a dropdown: the timer opens Tools, where it is set.
+// and the weather, the timers, and what's running (dictation, a recording); the tray
+// and the panel buttons. Buttons open their panel in a dropdown, and each timer its own.
 //
 // The window covers the screen so dropdowns, menus, and labels can draw beside the
 // bar, and takes input only on the bar until one of them opens.
@@ -75,6 +74,9 @@ PanelWindow {
             return weatherButton.visible ? weatherButton : null;
         if (panel === "media")
             return media.visible ? media.coverButton : null;
+        // The newest timer.
+        if (panel === "timer")
+            return timerChips.count > 0 ? timerChips.itemAt(timerChips.count - 1) : null;
         for (let i = 0; i < panelButtons.count; i++) {
             const button = (panelButtons.itemAt(i) as Row).buttonFor(panel);
             if (button)
@@ -149,7 +151,7 @@ PanelWindow {
             id: strip
 
             // The clock stays centered unless a side crowds it, with the track's
-            // controls before it and the weather and a running timer after. Short of
+            // controls before it and the weather and the timers after. Short of
             // room, the bar grows wider than its setting rather than overlap or drop
             // anything.
             readonly property real gap: Theme.spacingMedium
@@ -226,7 +228,7 @@ PanelWindow {
             }
 
             // ── The clock, opening the clock panel, between the playing track and the
-            // weather and a running timer ──
+            // weather, the timers, and what's running ──
             SystemClock {
                 id: clock
                 precision: SystemClock.Minutes
@@ -269,28 +271,63 @@ PanelWindow {
                     id: weatherButton
                     size: root.itemSize
                     labelAbove: !root.atTop
-                    visible: WeatherService.ready
+                    // Also with an unknown location, to open the panel that changes it, and
+                    // while open, as a new location loads.
+                    visible: WeatherService.ready || WeatherService.status === "unknown" || open
                     open: root.dropdownButton === weatherButton
                     label: PanelService.status("weather")
                     iconName: PanelService.icon("weather")
-                    text: WeatherService.temperatureText(WeatherService.current.temperature)
+                    text: WeatherService.ready ? WeatherService.temperatureText(WeatherService.current.temperature) : ""
                     tabularDigits: true
                     onClicked: pointer => root.toggleDropdown("weather", weatherButton, pointer)
                 }
 
-                BarButton {
-                    id: timerButton
-                    size: root.itemSize
-                    labelAbove: !root.atTop
-                    visible: TimerService.running
-                    open: root.dropdownButton === timerButton
-                    label: TimerService.paused ? "Timer paused"
-                        : "Timer · ends at " + Qt.formatTime(new Date(TimerService.endsAtMs), "HH:mm")
-                    iconName: TimerService.paused ? "media-pause" : "timer"
-                    iconColor: Theme.accent
-                    text: TimerProvider.formatClock(TimerService.remainingSeconds)
-                    tabularDigits: true
-                    onClicked: pointer => root.toggleDropdown("tools", timerButton, pointer)
+                // The timers, each opening to set or control it, and what's running, in a
+                // well of their own.
+                Rectangle {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: timerChips.count + activityChips.count > 0
+                    width: timerRow.implicitWidth + Theme.spacingMicro * 2
+                    height: root.itemSize
+                    radius: Theme.borderRadius
+                    color: Theme.controlFill
+                    border.width: Theme.borderWidth
+                    border.color: Theme.controlBorder
+
+                    Row {
+                        id: timerRow
+                        anchors.centerIn: parent
+
+                        Repeater {
+                            id: timerChips
+                            model: TimerService.timers
+
+                            delegate: TimerChip {
+                                id: chip
+
+                                required property var modelData
+
+                                timer: chip.modelData
+                                size: root.itemSize - Theme.spacingMicro * 2
+                                labelAbove: !root.atTop
+                                open: root.dropdownButton === chip
+                                onClicked: pointer => root.toggleDropdown("timer", chip, pointer)
+                            }
+                        }
+
+                        Repeater {
+                            id: activityChips
+                            model: ActivityService.activities
+
+                            delegate: ActivityChip {
+                                required property var modelData
+
+                                activity: modelData
+                                size: root.itemSize - Theme.spacingMicro * 2
+                                labelAbove: !root.atTop
+                            }
+                        }
+                    }
                 }
             }
 
@@ -381,11 +418,6 @@ PanelWindow {
                                 open: root.dropdownButton === button
                                 label: PanelService.status(button.modelData)
                                 iconName: PanelService.icon(button.modelData)
-                                iconColor: button.open
-                                    ? Theme.accent
-                                    : (button.modelData === "tools" && ToolsService.statusTone !== ""
-                                        ? Theme.toneColor(ToolsService.statusTone)
-                                        : (button.pointerInside ? Theme.text : Theme.subtextBright))
                                 onClicked: pointer => root.toggleDropdown(button.modelData, button, pointer)
                                 onWheeled: delta => root.step(button.modelData, delta)
                                 onRightClicked: root.cycleDevice(button.modelData)

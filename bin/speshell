@@ -197,21 +197,21 @@ if [[ "${1:-}" == "timer" ]]; then
   case "$action" in
     start|add)
       if [[ $# -lt 1 ]]; then
-        printf 'usage: speshell timer %s LENGTH (minutes, or like 1h30 or 90s)\n' "$action" >&2
+        printf 'usage: speshell timer %s LENGTH [NAME] (minutes, or like 1h30 or 90s)\n' "$action" >&2
         exit 2
       fi
       if [[ "$(ipc_call timer "$action" "$*")" != "true" ]]; then
-        printf 'speshell: not a length: %s (minutes, or like 1h30 or 90s)\n' "$*" >&2
+        if [[ "$action" == "start" ]]; then
+          printf 'speshell: not a length: %s (minutes, or like 1h30 or 90s)\n' "$*" >&2
+        else
+          printf 'speshell: no timer to add to, or not a length: %s\n' "$*" >&2
+        fi
         exit 1
       fi
       ;;
     pause|resume|toggle|stop)
-      if [[ $# -ne 0 ]]; then
-        printf 'usage: speshell timer %s\n' "$action" >&2
-        exit 2
-      fi
-      if [[ "$(ipc_call timer "$action")" != "true" ]]; then
-        printf 'speshell: no timer to %s\n' "$action" >&2
+      if [[ "$(ipc_call timer "$action" "$*")" != "true" ]]; then
+        printf 'speshell: no timer to %s%s\n' "$action" "${*:+: $*}" >&2
         exit 1
       fi
       ;;
@@ -220,7 +220,7 @@ if [[ "${1:-}" == "timer" ]]; then
       ;;
     *)
       printf 'speshell: unknown timer action: %s\n' "$action" >&2
-      printf 'usage: speshell timer [get | start LENGTH | add LENGTH | pause | resume | toggle | stop]\n' >&2
+      printf 'usage: speshell timer [get | start LENGTH [NAME] | add LENGTH [NAME] | pause|resume|toggle|stop [NAME]]\n' >&2
       exit 2
       ;;
   esac

@@ -10,6 +10,8 @@ Card {
     id: root
 
     property bool presented: false
+    // The location field shows under the header.
+    property bool editingLocation: false
     // The time, so passing hours drop off between refreshes.
     property date now: new Date()
 
@@ -50,27 +52,66 @@ Card {
         onTriggered: root.now = new Date()
     }
 
-    headerActions: [
-        Row {
-            anchors.verticalCenter: parent.verticalCenter
-            visible: WeatherService.ready
-            spacing: Theme.spacingTiny
+    // Types a new location into the field under the header, starting from the saved one.
+    function editLocation() {
+        locationField.text = WeatherService.location;
+        root.editingLocation = true;
+    }
 
-            AppIcon {
-                anchors.verticalCenter: parent.verticalCenter
-                name: "location"
-                size: Theme.iconSizeTiny
-                iconColor: Theme.subtext
+    function saveLocation() {
+        const location = locationField.text.trim();
+        root.editingLocation = false;
+        if (location !== WeatherService.location)
+            ConfigService.setProperty("Weather", "location", location);
+    }
+
+    headerActions: [
+        // The place, which opens the location field.
+        Rectangle {
+            anchors.verticalCenter: parent.verticalCenter
+            width: placeRow.width + Theme.spacingSmall * 2
+            height: Theme.controlHeightSmall
+            radius: Theme.borderRadiusSmall
+            color: root.editingLocation ? Theme.selectedFill : (placeArea.containsMouse ? Theme.cardHover : "transparent")
+
+            Accessible.role: Accessible.Button
+            Accessible.name: "Change location"
+            Accessible.onPressAction: root.editLocation()
+
+            Row {
+                id: placeRow
+                anchors.centerIn: parent
+                spacing: Theme.spacingTiny
+
+                AppIcon {
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: "location"
+                    size: Theme.iconSizeTiny
+                    iconColor: root.editingLocation ? Theme.accent : Theme.subtext
+                }
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.min(implicitWidth, root.width * 0.5)
+                    text: WeatherService.place || WeatherService.location || "Automatic"
+                    elide: Text.ElideRight
+                    font.pixelSize: Theme.fontSizeCaption
+                    font.family: Theme.fontFamily
+                    color: placeArea.containsMouse ? Theme.text : Theme.subtext
+                }
             }
 
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                width: Math.min(implicitWidth, root.width * 0.55)
-                text: WeatherService.place
-                elide: Text.ElideRight
-                font.pixelSize: Theme.fontSizeCaption
-                font.family: Theme.fontFamily
-                color: Theme.subtext
+            MouseArea {
+                id: placeArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.editingLocation ? root.editingLocation = false : root.editLocation()
+            }
+
+            Tooltip {
+                visible: placeArea.containsMouse && !root.editingLocation
+                text: "Change location"
             }
         },
 
@@ -82,6 +123,16 @@ Card {
         }
     ]
 
+    pinnedContent: InlinePrompt {
+        id: locationField
+        visible: root.editingLocation
+        masked: false
+        showActions: false
+        placeholder: "A city, or empty to locate by IP address"
+        onAccepted: root.saveLocation()
+        onCancelled: root.editingLocation = false
+    }
+
     // ── Loading, or why there is no forecast ──
     EmptyState {
         visible: !WeatherService.ready
@@ -90,12 +141,14 @@ Card {
         title: WeatherService.status === "unknown" ? "No place called “" + WeatherService.location + "”"
             : WeatherService.status === "offline" ? "The weather is unavailable"
             : "Looking up the weather"
-        detail: WeatherService.status === "unknown" ? "Check the location in Settings › Weather."
+        detail: WeatherService.status === "unknown" ? "Try the nearest city."
             : WeatherService.status === "offline" ? "Speshell will try again in a few minutes."
             : ""
-        actionLabel: WeatherService.status === "offline" ? "Try again" : ""
-        actionIconName: "refresh"
-        onActivated: WeatherService.refresh()
+        actionLabel: WeatherService.status === "unknown" ? (root.editingLocation ? "" : "Change location")
+            : WeatherService.status === "offline" ? "Try again"
+            : ""
+        actionIconName: WeatherService.status === "unknown" ? "location" : "refresh"
+        onActivated: WeatherService.status === "unknown" ? root.editLocation() : WeatherService.refresh()
     }
 
     // ── Now ──

@@ -40,35 +40,27 @@ TestCase {
         compare(TimerProvider.formatClock(3723), "1:02:03");
     }
 
-    function test_bang() {
-        compare(TimerProvider.parseBang("!timer"), "");
-        compare(TimerProvider.parseBang("!timer 1h30"), "1h30");
-        compare(TimerProvider.parseBang("!TIMER 5"), "5");
-        compare(TimerProvider.parseBang("!timers"), null);
-        compare(TimerProvider.parseBang("timer 5"), null);
+    // 18 Oct 2026, 21:00.
+    readonly property double now: new Date(2026, 9, 18, 21, 0).getTime()
+
+    function test_lengthsAndNames_data() {
+        return [
+            { tag: "length", text: "25", seconds: 1500, name: "" },
+            { tag: "name after", text: "10 pasta", seconds: 600, name: "pasta" },
+            { tag: "name before", text: "tea 4m", seconds: 240, name: "tea" },
+            { tag: "spaced length", text: "1h 30 bread rise", seconds: 5400, name: "bread rise" },
+            { tag: "end time", text: "bread at 21:30", seconds: 1800, name: "bread" },
+            { tag: "end hour tomorrow", text: "at 7", seconds: 36000, name: "" },
+            { tag: "until", text: "until 20:00 call", seconds: 82800, name: "call" },
+            { tag: "not a time", text: "at 25:00", seconds: 0, name: "at 25:00" },
+            { tag: "name only", text: "pasta", seconds: 0, name: "pasta" },
+            { tag: "empty", text: "", seconds: 0, name: "" }
+        ];
     }
 
-    function test_idleOffersPresetsAndStartsTypedLengths() {
-        const idle = { running: false };
-        const presets = TimerProvider.timerResults("", idle);
-        compare(presets.length, TimerProvider.presets.length);
-        compare(presets[0].payload.action, "start");
-
-        const typed = TimerProvider.timerResults("1h30", idle);
-        compare(typed.length, 1);
-        compare(typed[0].payload.action, "start");
-        compare(typed[0].payload.seconds, 5400);
-
-        const invalid = TimerProvider.timerResults("soon", idle);
-        compare(invalid[0].activatable, false);
-    }
-
-    function test_runningTimerIsControlled() {
-        const running = { running: true, paused: false, remaining: 600, endsAt: Date.now() + 600000 };
-        compare(TimerProvider.timerResults("", running).map(result => result.payload.action), ["pause", "add", "stop"]);
-        const paused = Object.assign({}, running, { paused: true });
-        compare(TimerProvider.timerResults("", paused)[0].payload.action, "resume");
-        // A typed length extends it first, or replaces it.
-        compare(TimerProvider.timerResults("10", running).map(result => result.payload.action), ["add", "start"]);
+    function test_lengthsAndNames(data) {
+        const parsed = TimerProvider.parseTimer(data.text, now);
+        compare(parsed.seconds, data.seconds);
+        compare(parsed.name, data.name);
     }
 }

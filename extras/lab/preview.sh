@@ -1,5 +1,5 @@
 #!/bin/sh
-# usage: lab/preview.sh EFFECT SCENE  (SCENE: launcher | wallpaper | controls | picks | clock | button)
+# usage: lab/preview.sh EFFECT SCENE  (SCENE: launcher | wallpaper | controls | picks | clock)
 # Renders offscreen into ~/.cache/speshell-lab/EFFECT-SCENE.mp4 and EFFECT-SCENE-strip.png, and prints
 # the transition's lifecycle log. Env: CLOSE_AT, REOPEN_AT, SWITCH_AT, SPEED, WALL_A, WALL_B, THEME_INI,
 # SPESHELL_DIR, KEEP_FRAMES=1 to keep the frames in ~/.cache/speshell-lab/EFFECT-SCENE/ (about 700 MB per run), and
@@ -35,7 +35,6 @@ case "$SCENE" in
     controls) END=$(awk -v k="${SPEED:-1}" 'BEGIN { k = k > 0 ? k : 1; print 4.4 + 0.6 / k }'); CROP="crop=452:452:0:0,scale=904:904," ;;
     picks) END=$(awk -v k="${SPEED:-1}" 'BEGIN { k = k > 0 ? k : 1; print 3.0 + 0.9 / k }'); CROP="crop=452:332:0:0,scale=904:664," ;;
     clock) END=4.2; CROP="crop=740:480:0:0," ;;
-    button) END=4.2; CROP="crop=740:280:0:0," ;;
     *) echo "unknown scene: $SCENE" >&2; exit 2 ;;
 esac
 
@@ -61,8 +60,6 @@ case "$SCENE" in
         TILE="-crop 260x150+70+16 +repage -scale 200%" ;;
     clock) TIMES="0.5 1.5 3.5"
         TILE="-crop 740x480+0+0 +repage" ;;
-    button) TIMES="0.4 1.3 2.1 3.5"
-        TILE="-crop 740x280+0+0 +repage" ;;
 esac
 magick $(for t in $TIMES; do printf '%s/%04d.bmp ' "$OUT" "$(awk -v t="$t" -v f="$FPS" 'BEGIN { print int(t * f + 0.5) }')"; done) \
     $TILE +append "$LAB_OUT/$NAME-strip.png"

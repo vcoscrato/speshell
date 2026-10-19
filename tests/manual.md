@@ -20,16 +20,16 @@ every monitor:
   last focused window, current after a retitle. Off Hyprland, the workspaces and
   their separator don't show.
 - The mark opens and closes the launcher and stays lit while it's open.
-- Each panel button, the clock, the weather, a running timer (Tools), and the track's
+- Each panel button, the clock, the weather, each timer, and the track's
   cover open their panel under or over the button, kept on screen at either end, with the
   theme's backdrop, knobs, and control effects. A click outside, Escape, or the
   same button closes it; another button switches to its panel. Typing a Wi-Fi
   password works.
-- Play/pause and the track's cover sit left of the clock, and the weather and a
-  running timer right of it; the clock doesn't move when any appears. Play/pause
+- Play/pause and the track's cover sit left of the clock, and the weather and the
+  timers right of it; the clock doesn't move when any appears. Play/pause
   toggles without opening anything, the cover dims while paused, and hovering it
   names the track. Switching players, or pausing one while another plays, shows the
-  playing one. At `width = 20` with music, the weather, and a timer, the bar grows
+  playing one. At `width = 20` with music, the weather, and timers, the bar grows
   to fit and nothing overlaps.
 - Scrolling over the speaker, microphone, or (with a backlight) display button
   changes it; right-clicking the speaker or microphone switches device. Tray menus
@@ -50,17 +50,33 @@ every monitor:
 
 - With weather on, the bar shows its icon and temperature, and a moon after sunset.
   The panel shows the conditions now, the next hours, and the coming days. An unknown
-  location says so in the panel and in Settings › Weather; offline, it retries, and
-  Try again works. Reopened after a long sleep, the panel refreshes it.
+  location says so in the panel, and its bar button stays to open it. Clicking the
+  place in the panel's header changes the location: Enter saves, Escape cancels, and
+  an empty field locates by IP address. Offline, it retries, and Try again works.
+  Reopened after a long sleep, the panel refreshes it.
 
 ## Timer
 
-- The timer in Tools starts from a preset or a typed length (`25`, `1h30`, `90s`),
-  adds time, pauses, resumes, and stops. While it runs, the bar shows the time left,
-  with a pause icon while paused, and a click opens Tools under it.
-- `!timer` offers the presets, starts a typed length, and controls a running timer;
-  `speshell timer start 1m`, `toggle`, `add 1m`, `get`, and `stop` work.
-- At the end, a notification appears even with Do Not Disturb on.
+- Timer in Tools puts a "New timer" in the bar's timer well and opens it there with
+  the name field focused. A preset starts it under the typed name; so does a typed
+  length or end time (`25`, `1h30`, `bread at 21:30`) with Enter or Start, which
+  stays dimmed until the text is a length. Enter in the name field moves
+  to the length field while it is empty. Starting closes the panel; Escape, a click outside, or
+  another chip throws the unset timer away.
+- Several timers sit side by side in creation order, each showing its name and time
+  left, with a pause icon while paused. Opening one shows its name (click to edit;
+  the chip follows as you type, "Add a name" when empty), the time left and when it
+  ends, and a bar of the time left; paused, the time and bar grey out, "Paused"
+  replaces the end time, and Resume turns accent. +1, +5, and +10 min, scrolling
+  over the time, Pause/Resume, and the red Stop act on that timer only. Switching
+  chips shows each timer's own name.
+- Scrolling over a chip changes it by a minute, never below a second left;
+  right-clicking pauses or resumes it.
+- `!timer` is not a launcher bang; it searches like any unknown bang.
+  `speshell timer start 1m tea`, `start at 7`, `add 1m tea`, `toggle`, `get` (a line
+  each), and `stop tea` work; without a name they act on the timer that ends first.
+- At the end, a notification titled with the timer's name appears even with Do Not
+  Disturb on, and its chip goes; an open panel on it closes.
 
 ## Launcher
 
@@ -80,9 +96,6 @@ every monitor:
   including a theme without effects. Colors, wallpaper, the backdrop, the clock
   face, and transitions follow, and the old launcher exit finishes.
 - After a relaunch, the chosen theme's colors are there from the first frame.
-- Primary buttons (Finish on dictation, Keep changes, Connect) wear the theme's
-  button face, which stirs while hovered and keeps still in power saver; other
-  buttons follow the palette.
 - Tooltips, dropdown menus (Settings, Displays), a tray app's right-click menu
   with its submenus, scrollbars, and selected text all draw in the theme's
   colors, and so do the effects of a theme that borrows another theme's effects.
@@ -147,12 +160,15 @@ every monitor:
   in place.
 - Toasts open on the focused monitor. Long bodies and unbroken strings wrap, and
   the expanded list scrolls.
-- `speshell activity set test active Test` shows the activity OSD, and
-  `speshell activity clear test` hides it. Running `wf-recorder` shows the
-  recording activity, and **Stop** ends it.
-- `speshell tool dictate` shows Listening… and, run again, Transcribing…
-  without delay, then types the text into the focused window. **Discard** and
-  `speshell tool dictate cancel` drop it without typing.
+- `speshell activity set test active Test` shows a Test chip with its running
+  time in the bar's well beside the timers, on every monitor, and
+  `speshell activity clear test` removes it; the well goes when it's empty.
+  Running `wf-recorder` shows a red Recording chip, and clicking it stops it.
+- `speshell tool dictate` shows a Dictation chip with the microphone and, run
+  again, a spinning one without delay, then types the text into the focused
+  window; hovering it says which. Clicking the chip while it listens types it out
+  too; right-clicking it and `speshell tool dictate cancel` drop it without typing.
+- Nothing floats over the windows while dictating or recording.
 
 ## Tools
 
@@ -164,8 +180,8 @@ every monitor:
   result and toast it; cancelling the selection does nothing. A screen screenshot
   or recording takes the focused monitor. Screenshot's Annotate opens Swappy, and a
   link's Open opens the browser.
-- Record shows in the panel with its time and in the bar's icon; a click, the
-  OSD's **Stop**, or `speshell tool record` saves it and toasts Open.
+- Record shows in the panel with its time and in the bar's chip; a click on
+  either, or `speshell tool record`, saves it and toasts Open.
 - `speshell tool ocr` without tesseract toasts what to install.
 
 ## Power

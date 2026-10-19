@@ -12,7 +12,6 @@ Singleton {
     readonly property var activeStates: ["active", "busy", "paused", "error"]
     readonly property var inactiveStates: ["idle", "inactive", "stopped", "complete"]
     readonly property var tones: ["neutral", "accent", "success", "warning", "error"]
-    readonly property var actionKinds: ["secondary", "primary", "danger"]
 
     signal actionRequested(string provider, string activityId, string actionId)
 
@@ -55,17 +54,12 @@ Singleton {
             if (id === "" || seen[id])
                 continue;
             seen[id] = true;
-            result.push({
-                id: id,
-                label: String(supplied.label || id).trim(),
-                iconName: String(supplied.iconName || "").trim(),
-                kind: root.actionKinds.indexOf(supplied.kind) >= 0 ? supplied.kind : "secondary"
-            });
+            result.push({ id: id, label: String(supplied.label || id).trim() });
         }
         return result;
     }
 
-    // A published activity as the OSD reads it, or null when it is invalid or over.
+    // A published activity as the bar reads it, or null when it is invalid or over.
     // An activity that was already running keeps its start time.
     function normalizeEntry(provider, suppliedValue, previous, now) {
         var supplied = suppliedValue || ({});
@@ -203,15 +197,5 @@ Singleton {
             }
         }
         return false;
-    }
-
-    function elapsedText(startedAt, now) {
-        var seconds = Math.max(0, Math.floor((now - startedAt) / 1000));
-        if (seconds < 60)
-            return seconds + "s";
-        var minutes = Math.floor(seconds / 60);
-        if (minutes < 60)
-            return minutes + "m " + (seconds % 60) + "s";
-        return Math.floor(minutes / 60) + "h " + (minutes % 60) + "m";
     }
 }

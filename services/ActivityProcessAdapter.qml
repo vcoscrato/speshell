@@ -52,13 +52,12 @@ Scope {
             entries.push({
                 id: "screen-recording",
                 state: "active",
-                label: "Screen recording",
-                detail: "Recording display",
+                label: "Recording",
                 iconName: "screen-recording",
                 tone: "error",
                 priority: 10,
                 sortOrder: 0,
-                actions: [{ id: "stop", label: "Stop", iconName: "record-stop", kind: "danger" }]
+                actions: [{ id: "stop", label: "Stop and save" }]
             });
         }
         if (dictationTranscribing || (dictationToggle && !dictationRecording)) {
@@ -82,10 +81,7 @@ Scope {
                 tone: "accent",
                 priority: 10,
                 sortOrder: 1,
-                actions: [
-                    { id: "cancel", label: "Discard", iconName: "close" },
-                    { id: "finish", label: "Finish", iconName: "check", kind: "primary" }
-                ]
+                actions: [{ id: "finish", label: "Type it out" }, { id: "cancel", label: "Discard" }]
             });
         }
         return entries;

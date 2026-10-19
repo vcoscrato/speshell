@@ -5,7 +5,7 @@ import Quickshell
 // Loads the active theme's effects: a directory, shipped under extras/effects or
 // added under <dataDir>/effects, whose Effects.qml may provide the launcher and
 // wallpaper transitions, the backdrop of Speshell's surfaces, effects on its controls,
-// a knob for its sliders and switches, a clock face, and a face for primary buttons.
+// a knob for its sliders and switches, and a clock face.
 // See extras/effects/README.md.
 Singleton {
     id: root
@@ -41,10 +41,8 @@ Singleton {
     // The thumb of sliders and switches; moved only by the hand, so it stays with
     // control effects off. Power saver uses the plain thumb, which never animates.
     readonly property Component knob: root.enabled ? root.optional("knob") : null
-    // The clock panel's face, and the face of primary buttons. They stay in power
-    // saver, told to keep still.
+    // The clock panel's face. It stays in power saver, told to keep still.
     readonly property Component clock: root.optional("clock")
-    readonly property Component button: root.optional("button")
 
     // Controls report the user's hand on them here; InteractionsLayer passes these on
     // to the effects' interactions. `knob` is the thumb that moved `dx` px or was let go,

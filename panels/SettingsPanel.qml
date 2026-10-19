@@ -16,7 +16,6 @@ Card {
         { id: "appearance", label: "Appearance", icon: "palette" },
         { id: "bar", label: "Bar", icon: "bar" },
         { id: "launcher", label: "Launcher", icon: "search" },
-        { id: "weather", label: "Weather", icon: "cloud" },
         { id: "about", label: "About", icon: "info" }
     ]
     readonly property var pageComponents: ({
@@ -24,7 +23,6 @@ Card {
         appearance: appearancePage,
         bar: barPage,
         launcher: launcherPage,
-        weather: weatherPage,
         about: aboutPage
     })
 
@@ -236,11 +234,6 @@ Card {
     Component {
         id: launcherPage
         LauncherPage {}
-    }
-
-    Component {
-        id: weatherPage
-        WeatherPage {}
     }
 
     Component {

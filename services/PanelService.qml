@@ -25,6 +25,7 @@ Singleton {
         notifications: "Notifications",
         power: "Power",
         settings: "Settings",
+        timer: "Timer",
         tools: "Tools",
         weather: "Weather"
     })
@@ -52,6 +53,8 @@ Singleton {
             return MediaService.player !== null;
         if (panel === "weather")
             return WeatherService.enabled;
+        if (panel === "timer")
+            return TimerService.timers.length > 0;
         return root.has(panel);
     }
 
@@ -85,11 +88,9 @@ Singleton {
         }
         if (panel === "notifications")
             return NotificationService.dndEnabled ? "bell-off" : "bell";
-        if (panel === "tools")
-            return ToolsService.statusIcon;
         if (panel === "weather")
             return WeatherService.ready ? WeatherService.current.icon : "weather-cloudy";
-        return ({ clipboard: "clipboard", notes: "notes", settings: "config", power: "power" })[panel] || "missing";
+        return ({ tools: "tools", clipboard: "clipboard", notes: "notes", settings: "config", power: "power" })[panel] || "missing";
     }
 
     // A panel's state in a few words, for its bar button's label.
@@ -124,10 +125,8 @@ Singleton {
                 return "Do not disturb";
             return count > 0 ? count + " notification" + (count === 1 ? "" : "s") : "Notifications";
         }
-        if (panel === "tools")
-            return ToolsService.statusText;
         if (panel === "weather")
-            return WeatherService.summary || "Weather";
+            return WeatherService.status === "unknown" ? "Weather: location not found" : WeatherService.summary || "Weather";
         return root.labels[panel] || "";
     }
 

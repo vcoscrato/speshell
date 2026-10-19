@@ -5,7 +5,7 @@ LAB=$(cd "$(dirname "$0")" && pwd)
 LAB_OUT=${LAB_OUT:-${XDG_CACHE_HOME:-$HOME/.cache}/speshell-lab}
 status=0
 for effect in "$@"; do
-    for scene in launcher wallpaper controls clock button; do
+    for scene in launcher wallpaper controls clock; do
         "$LAB/preview.sh" "$effect" "$scene" >/dev/null 2>&1
         log="$LAB_OUT/$effect-$scene.log"
         problems=$(grep -E "rror|WARN" "$log" | grep -v "window masks")

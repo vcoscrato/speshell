@@ -3,8 +3,8 @@ import QtQuick.Shapes
 import qs.theme
 import qs.services
 
-// Speshell's floating surface: the theme's base color, cut on the corners that face
-// the screen's center, a thin frame, and an accent edge. With `backdrop`, the theme
+// Speshell's floating surface: the theme's base color, rounded on the corners that
+// face the screen's center, a thin frame, and an accent edge. With `backdrop`, the theme
 // effects' still backdrop is painted in; it renders once into a texture.
 Item {
     id: root
@@ -14,42 +14,15 @@ Item {
     // parts low, below where text sits on a tall surface, so a short surface full of
     // text, like the bar or the launcher, shows their calm top.
     property real backdropHeight: Theme.backdropHeight
-    property int cut: Theme.surfaceCornerCut
-    property bool cutTopLeft: false
-    property bool cutTopRight: false
-    property bool cutBottomRight: false
-    property bool cutBottomLeft: false
+    property int radius: Theme.surfaceRadius
+    property bool roundTopLeft: false
+    property bool roundTopRight: false
+    property bool roundBottomRight: false
+    property bool roundBottomLeft: false
     // "left", "right", or "" for none.
     property string edge: ""
     property color edgeColor: Theme.accent
     property color fillColor: Theme.bg
-
-    readonly property int topLeft: root.cutTopLeft ? root.cut : 0
-    readonly property int topRight: root.cutTopRight ? root.cut : 0
-    readonly property int bottomRight: root.cutBottomRight ? root.cut : 0
-    readonly property int bottomLeft: root.cutBottomLeft ? root.cut : 0
-    // The outline, clockwise from the top left; an uncut corner is one point.
-    readonly property var outline: {
-        var w = root.width;
-        var h = root.height;
-        var points = [Qt.point(root.topLeft, 0)];
-        if (root.topRight > 0)
-            points.push(Qt.point(w - root.topRight, 0), Qt.point(w, root.topRight));
-        else
-            points.push(Qt.point(w, 0));
-        if (root.bottomRight > 0)
-            points.push(Qt.point(w, h - root.bottomRight), Qt.point(w - root.bottomRight, h));
-        else
-            points.push(Qt.point(w, h));
-        if (root.bottomLeft > 0)
-            points.push(Qt.point(root.bottomLeft, h), Qt.point(0, h - root.bottomLeft));
-        else
-            points.push(Qt.point(0, h));
-        if (root.topLeft > 0)
-            points.push(Qt.point(0, root.topLeft));
-        points.push(points[0]);
-        return points;
-    }
 
     Item {
         id: material
@@ -89,7 +62,7 @@ Item {
 
     Shape {
         anchors.fill: parent
-        antialiasing: true
+        preferredRendererType: Shape.CurveRenderer
 
         ShapePath {
             strokeWidth: 2
@@ -101,15 +74,21 @@ Item {
             )
             fillColor: root.fillColor
             fillItem: material.visible ? materialTexture : null
-            capStyle: ShapePath.SquareCap
             joinStyle: ShapePath.MiterJoin
 
-            PathPolyline { path: root.outline }
+            PathRectangle {
+                width: root.width
+                height: root.height
+                topLeftRadius: root.roundTopLeft ? root.radius : 0
+                topRightRadius: root.roundTopRight ? root.radius : 0
+                bottomRightRadius: root.roundBottomRight ? root.radius : 0
+                bottomLeftRadius: root.roundBottomLeft ? root.radius : 0
+            }
         }
     }
 
     Rectangle {
-        readonly property real inset: Math.max(root.cut, Math.min(40, root.height * 0.2))
+        readonly property real inset: Math.max(root.radius, Math.min(40, root.height * 0.2))
 
         visible: root.edge !== ""
         x: root.edge === "left" ? 0 : root.width - width

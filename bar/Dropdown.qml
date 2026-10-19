@@ -27,9 +27,16 @@ Item {
     readonly property int padding: Theme.panelPadding
 
     signal closeRequested()
-    readonly property real anchorX: root.button
-        ? root.button.mapToItem(root.parent, root.button.width / 2, 0).x
-        : root.barRect.x + root.barRect.width / 2
+    // The button's middle, summed up its parents so it follows the button as the bar
+    // lays out around it, as when a new timer joins.
+    readonly property real anchorX: {
+        if (!root.button)
+            return root.barRect.x + root.barRect.width / 2;
+        let x = root.button.width / 2;
+        for (let item = root.button; item && item !== root.parent; item = item.parent)
+            x += item.x;
+        return x;
+    }
     readonly property real maxHeight: (root.atTop
             ? root.parent.height - root.barRect.y - root.barRect.height
             : root.barRect.y)
@@ -49,6 +56,7 @@ Item {
         notifications: notificationsPanel,
         power: powerPanel,
         settings: settingsPanel,
+        timer: timerPanel,
         tools: toolsPanel,
         weather: weatherPanel
     })
@@ -93,14 +101,14 @@ Item {
         anchors.fill: parent
     }
 
-    // Cut on the corners away from the bar.
+    // Rounded on the corners away from the bar.
     Surface {
         anchors.fill: parent
         backdrop: true
-        cutTopLeft: !root.atTop
-        cutTopRight: !root.atTop
-        cutBottomLeft: root.atTop
-        cutBottomRight: root.atTop
+        roundTopLeft: !root.atTop
+        roundTopRight: !root.atTop
+        roundBottomLeft: root.atTop
+        roundBottomRight: root.atTop
     }
 
     FocusScope {
@@ -214,6 +222,15 @@ Item {
     Component {
         id: settingsPanel
         SettingsPanel {}
+    }
+
+    // The timer of the chip it hangs from.
+    Component {
+        id: timerPanel
+        TimerPanel {
+            timer: (root.button as TimerChip)?.timer ?? null
+            onDone: root.closeRequested()
+        }
     }
 
     Component {

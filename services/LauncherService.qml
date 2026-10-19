@@ -6,7 +6,6 @@ import "AppProvider.js" as AppProvider
 import "CalculatorProvider.js" as CalculatorProvider
 import "BangProvider.js" as BangProvider
 import "ThemeProvider.js" as ThemeProvider
-import "TimerProvider.js" as TimerProvider
 import "Shell.js" as Shell
 
 Singleton {
@@ -95,13 +94,11 @@ Singleton {
 
     // The launcher's own actions that apply right now.
     function commandResults() {
-        var commands = [TimerProvider.suggestion()];
-        if (FeatureSupport.supportsDisplayControl && DisplayService.canMirror) {
-            commands.push(DisplayService.mirrored
-                ? BangProvider.commandResult("mirror", "Stop mirroring", "Extend the displays again", "display", "display monitor screen")
-                : BangProvider.commandResult("mirror", "Mirror displays", "Show this display on all of them", "display", "display monitor screen"));
-        }
-        return commands;
+        if (!FeatureSupport.supportsDisplayControl || !DisplayService.canMirror)
+            return [];
+        return [DisplayService.mirrored
+            ? BangProvider.commandResult("mirror", "Stop mirroring", "Extend the displays again", "display", "display monitor screen")
+            : BangProvider.commandResult("mirror", "Mirror displays", "Show this display on all of them", "display", "display monitor screen")];
     }
 
     function rebuild() {
@@ -109,16 +106,6 @@ Singleton {
         var wasBrowsing = root.browsingThemes;
         root.browsingThemes = "";
         if (trimmed.indexOf("!") === 0) {
-            var timerTerms = TimerProvider.parseBang(trimmed);
-            if (timerTerms !== null) {
-                root.results = TimerProvider.timerResults(timerTerms, {
-                    running: TimerService.running,
-                    paused: TimerService.paused,
-                    remaining: TimerService.remainingSeconds,
-                    endsAt: TimerService.endsAtMs
-                });
-                return;
-            }
             var themeBang = ThemeProvider.parseBang(trimmed, ThemeService.wallpaperEnabled);
             if (themeBang && themeBang.complete) {
                 // Rescan on entering the bang so new themes and wallpapers show up.
@@ -219,17 +206,6 @@ Singleton {
             // Keep or Revert waits in the Displays panel; unanswered, the change reverts.
             DisplayService.toggleMirror();
             return PanelService.open("display");
-        }
-        if (result.kind === "timer") {
-            if (payload.action === "start")
-                return TimerService.start(payload.seconds);
-            if (payload.action === "add")
-                return TimerService.add(payload.seconds);
-            if (payload.action === "pause")
-                return TimerService.pause();
-            if (payload.action === "resume")
-                return TimerService.resume();
-            return TimerService.stop();
         }
         if (result.kind === "theme") {
             if (payload.theme !== undefined)
@@ -344,15 +320,6 @@ Singleton {
     Connections {
         target: ConfigService
         function onConfigChanged() { root.rebuild(); }
-    }
-
-    // The time left shows only while paused, when it holds still.
-    Connections {
-        target: TimerService
-        function onRunningChanged() { root.rebuild(); }
-        function onPausedChanged() { root.rebuild(); }
-        function onEndsAtMsChanged() { root.rebuild(); }
-        function onTotalSecondsChanged() { root.rebuild(); }
     }
 
     Connections {

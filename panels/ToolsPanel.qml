@@ -5,11 +5,11 @@ import qs.components
 import qs.services
 import qs.theme
 
-// The timer, and the installed capture and input tools. A click on a tool closes the
-// dropdown and runs it: dictation starts listening and types into the focused window,
-// the others take an area the user drags out, or the whole screen from the row's
-// screen button. A running dictation or recording shows in its row, and another click
-// finishes it.
+// A new timer, set in the bar, and the installed capture and input tools. A click on a
+// tool closes the dropdown and runs it: dictation starts listening and types into the
+// focused window, the others take an area the user drags out, or the whole screen from
+// the row's screen button. A running dictation or recording shows in its row, and
+// another click finishes it.
 Card {
     id: root
 
@@ -39,8 +39,16 @@ Card {
         width: parent.width
         spacing: Theme.spacingSmall
 
-        TimerTile {
+        // Sets up a timer in the bar, where it then counts down.
+        ToolRow {
             width: parent.width
+            iconName: "timer"
+            label: "Timer"
+            detail: "Count down in the bar"
+            onActivated: {
+                TimerService.create();
+                PanelService.open("timer");
+            }
         }
 
         Repeater {

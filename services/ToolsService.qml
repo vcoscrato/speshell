@@ -43,13 +43,6 @@ Singleton {
     readonly property var dictation: root.activity("dictation")
     readonly property var recording: root.activity("screen-recording")
     readonly property bool listening: root.dictation !== null && root.dictation.state === "active"
-    // The most pressing of them, for the bar's icon and tooltip.
-    readonly property string statusIcon: root.recording !== null ? "record"
-        : (root.dictation !== null ? "dictation" : "tools")
-    readonly property string statusTone: root.recording !== null ? "error"
-        : (root.dictation !== null ? "accent" : "")
-    readonly property string statusText: root.recording !== null ? "Recording"
-        : (root.dictation !== null ? "Dictation: " + root.dictation.detail.replace(/…$/, "").toLowerCase() : "Tools")
 
     // A tool asked for before the probe finished.
     property var pendingRun: null

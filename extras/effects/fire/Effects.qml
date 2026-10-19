@@ -29,8 +29,4 @@ QtObject {
     readonly property Component clock: Component {
         Clock {}
     }
-
-    readonly property Component button: Component {
-        Button {}
-    }
 }

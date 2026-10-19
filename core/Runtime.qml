@@ -69,17 +69,26 @@ Scope {
     IpcHandler {
         target: "timer"
 
-        // Lengths as `!timer` takes them: minutes, or "1h30", "90s".
-        function start(length: string): bool { return TimerService.start(TimerProvider.parseDuration(length)); }
-        function add(length: string): bool { return TimerService.add(TimerProvider.parseDuration(length)); }
-        function pause(): bool { return TimerService.pause(); }
-        function resume(): bool { return TimerService.resume(); }
-        function toggle(): bool { return TimerService.paused ? TimerService.resume() : TimerService.pause(); }
-        function stop(): bool { return TimerService.stop(); }
+        // A length and a name: "25", "10 pasta", "bread at 21:30".
+        function start(text: string): bool {
+            const parsed = TimerProvider.parseTimer(text);
+            return TimerService.start(parsed.seconds, parsed.name) !== null;
+        }
+        // To the timer named, or the one that ends first.
+        function add(text: string): bool {
+            const parsed = TimerProvider.parseTimer(text);
+            return TimerService.add(TimerService.find(parsed.name), parsed.seconds);
+        }
+        function pause(name: string): bool { return TimerService.pause(TimerService.find(name)); }
+        function resume(name: string): bool { return TimerService.resume(TimerService.find(name)); }
+        function toggle(name: string): bool { return TimerService.toggle(TimerService.find(name)); }
+        function stop(name: string): bool { return TimerService.stop(TimerService.find(name)); }
+        // A line for each timer, "running 4:05 Tea", or "idle".
         function get(): string {
-            if (!TimerService.running)
-                return "idle";
-            return (TimerService.paused ? "paused " : "running ") + TimerProvider.formatClock(TimerService.remainingSeconds);
+            const lines = TimerService.timers.filter(timer => timer.isSet).map(timer =>
+                [timer.paused ? "paused" : "running", TimerProvider.formatClock(timer.remainingSeconds), timer.name]
+                    .join(" ").trim());
+            return lines.length > 0 ? lines.join("\n") : "idle";
         }
     }
 
@@ -155,8 +164,6 @@ Scope {
     }
 
     VolumeOsdWindow {}
-
-    ActivityOsdWindow {}
 
     NotificationToastWindow {}
 }

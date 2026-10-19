@@ -52,8 +52,10 @@ PanelWindow {
         anchors.centerIn: parent
         width: Math.min(720, parent.width - Theme.spacingXL * 2)
         height: Math.min(620, parent.height - Theme.spacingXL * 2)
-        cutTopRight: true
-        cutBottomLeft: true
+        roundTopLeft: true
+        roundTopRight: true
+        roundBottomRight: true
+        roundBottomLeft: true
         edge: "left"
         edgeColor: Theme.error
 

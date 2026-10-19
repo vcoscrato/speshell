@@ -12,13 +12,13 @@ A personal setup first, largely built with AI. Borrow whatever is useful.
 
 ## Features
 
-- A bar on every screen: workspaces, the clock with the weather and a running timer, the playing track, the tray, and a button for each panel
+- A bar on every screen: workspaces, the clock with the weather and your timers, the playing track, the tray, and a button for each panel
 - Clock panel: a clock face in the theme's style beside the month
 - Weather panel: the conditions now, the next hours, and the week
 - Panels for audio output and input, displays and brightness, network (Wi-Fi, and NetworkManager's VPN and WireGuard profiles), Bluetooth, battery, notifications with Do Not Disturb, media, power, Markdown notes, clipboard history, and tools
-- Launcher: apps, a calculator, web searches and your own bangs, a timer, themes and wallpapers
-- Tools: a timer, dictation, copy text from the screen (OCR), screenshots, screen recording, QR codes, color picker
-- Activity indicator for screen recording, dictation, and anything that publishes over IPC
+- Launcher: apps, a calculator, web searches and your own bangs, themes and wallpapers
+- Tools: timers, dictation, copy text from the screen (OCR), screenshots, screen recording, QR codes, color picker
+- What's running, as chips in the bar: screen recording, dictation, and anything that publishes over IPC
 - Themes with wallpapers and animated effects, and other apps themed to match
 
 Panels for missing hardware or tools hide themselves. Speshell runs on any Wayland compositor with layer-shell; on [Hyprland](https://hyprland.org/) it also shows workspaces in the bar and arranges displays.
@@ -54,7 +54,7 @@ The first run seeds `~/.config/speshell/config.ini`; upgrades never touch it or 
 
 ## The bar
 
-The Speshell mark at the left opens the launcher, followed by the screen's workspaces. The clock sits in the middle and opens the clock panel; the playing track sits before it, its cover opening the player, and the weather and a running timer after, opening the forecast and the timer in Tools. The tray and the panel buttons fill the right. Scroll over the speaker, microphone, or display button to change the volume or brightness, and right-click the speaker or microphone to switch devices.
+The Speshell mark at the left opens the launcher, followed by the screen's workspaces. The clock sits in the middle and opens the clock panel; the playing track sits before it, its cover opening the player, and the weather, your timers, and what's running after, opening the forecast and each timer. A dictation or a screen recording shows there as a chip with its running time: click it to finish, and right-click a dictation to discard it. The tray and the panel buttons fill the right. Scroll over the speaker, microphone, or display button to change the volume or brightness, and right-click the speaker or microphone to switch devices.
 
 `speshell panel open|toggle NAME` opens a panel from a keybinding; `speshell panel list` names them.
 
@@ -62,7 +62,7 @@ The Speshell mark at the left opens the launcher, followed by the screen's works
 
 Common options are in the **Settings** panel. Everything else is in `~/.config/speshell/config.ini`, documented by [`config.example.ini`](config.example.ini). Edits apply on save; an invalid file keeps the previous settings and shows the error.
 
-The weather comes from [Open-Meteo](https://open-meteo.com/) for `[Weather] location`, or, left empty, for where [ipinfo.io](https://ipinfo.io/) places your IP address. Units follow your locale's measurement system.
+The weather, on with `[Weather] enabled`, comes from [Open-Meteo](https://open-meteo.com/) for `[Weather] location`, or, left empty, for where [ipinfo.io](https://ipinfo.io/) places your IP address. Click the place in the weather panel's header to change it. Units follow your locale's measurement system.
 
 ## Launcher
 
@@ -74,7 +74,6 @@ The weather comes from [Open-Meteo](https://open-meteo.com/) for `[Weather] loca
 | `2 * (8 + 4)`, `= sqrt(144)` | Calculator; Enter copies the result |
 | `!yt query` | A bang from `[Launcher.Bangs]` |
 | `? query` | Search with `[Launcher] searchUrl` |
-| `!timer`, `!timer 25`, `!timer 1h30` | Start a timer, or pause, extend, or stop the running one |
 | `!theme`, `!wall` | Pick a theme or wallpaper |
 | `!mirror` | Mirror the displays, or extend them again |
 
@@ -82,9 +81,9 @@ Unknown bangs go to the search engine, so its own bangs work too.
 
 ## Tools
 
-The **Tools** panel holds the timer and runs each tool whose programs are installed; the others don't show. Areas are picked with a selection in the theme's colors, and results arrive as toasts.
+The **Tools** panel sets up timers and runs each tool whose programs are installed; the others don't show. Areas are picked with a selection in the theme's colors, and results arrive as toasts.
 
-The timer starts from a preset or a length like `25`, `1h30`, or `90s`, and shows in the bar until it ends, when a notification arrives even through Do Not Disturb. The launcher's `!timer` and `speshell timer` set it too.
+Its Timer row puts a new timer in the bar and opens it there: name it if you like, then pick a preset, or type a length like `25`, `1h30`, or `90s`, or an end time like `at 21:30`. Each timer stays in the bar until it ends, when a notification arrives even through Do Not Disturb. Click one to rename it, add 1, 5, or 10 minutes, pause, or stop it; scroll over it to change it by a minute, and right-click to pause or resume. `speshell timer` starts and controls timers too, acting on the one that ends first when given no name.
 
 | Tool | Does | Needs |
 |---|---|---|
@@ -108,7 +107,7 @@ hl.bind("SUPER + SHIFT + R", hl.dsp.exec_cmd("speshell tool record screen"))
 
 ## Themes
 
-Speshell ships Cosmos (the default), four elements (Fire, Air, Water, and Earth), and Relâmpago, a racing theme. Each has a palette, a wallpaper, launcher and wallpaper effects, a still painted backdrop behind the bar and its panels, themed slider and switch knobs with small effects as you use them, a clock face, and a face for the buttons that lead each panel (see [extras/](extras/README.md)). Pick one in Settings › Appearance or with `!theme`.
+Speshell ships Cosmos (the default), four elements (Fire, Air, Water, and Earth), and Relâmpago, a racing theme. Each has a palette, a wallpaper, launcher and wallpaper effects, a still painted backdrop behind the bar and its panels, themed slider and switch knobs with small effects as you use them, and a clock face (see [extras/](extras/README.md)). Pick one in Settings › Appearance or with `!theme`.
 
 Set `drawWallpaper = true` under `[Appearance]` to let Speshell draw the desktop background. It is off by default so another wallpaper tool can stay in charge. `launcherTransitionSpeed`, `wallpaperTransitionSpeed`, and `controlEffectsSpeed` (0–3, default 1) speed up or slow down each kind of effect, and 0 turns it off. `[Power] mode` sets their frame rate: `maximum` animates at the display's refresh rate, `balanced` (the default) at 60 fps, and `saver` turns the effects off along with the interface's own motion. `shuffleAtLaunch` picks at random each time Speshell starts: `wallpaper` (another wallpaper of the theme), `theme` (another theme), or `both`; the default is `off`. Settings › Appearance sets all of these.
 
@@ -146,7 +145,7 @@ speshell panel list | open NAME | toggle NAME | close
 speshell theme list | get | set ID | shuffle [ID] | rescan
 speshell wallpaper get | set PATH
 speshell tool list | dictate [cancel] | ocr | screenshot [region|screen] | record [region|screen] | qr | color
-speshell timer get | start LENGTH | add LENGTH | pause | resume | toggle | stop
+speshell timer get | start LENGTH [NAME] | add LENGTH [NAME] | pause|resume|toggle|stop [NAME]
 speshell activity set ID STATE LABEL [DETAIL] [ICON] [TONE]
 speshell activity list | clear ID | refresh
 ```

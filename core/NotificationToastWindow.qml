@@ -68,11 +68,11 @@ PanelWindow {
                 width: parent.width
                 height: toastContent.height + (Theme.spacingMedium * 2)
 
-                // Top right of the screen: cut toward its center, accent edge on the left.
+                // Top right of the screen: rounded toward its center, accent edge on the left.
                 Surface {
                     anchors.fill: parent
-                    cut: Theme.spacingMedium
-                    cutBottomLeft: true
+                    radius: Theme.spacingMedium
+                    roundBottomLeft: true
                     edge: "left"
                     edgeColor: toastCard.toneColor
                     fillColor: toastMouse.containsMouse ? Theme.card : Theme.bg

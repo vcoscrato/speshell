@@ -25,6 +25,7 @@ Item {
     property bool tabularDigits: false
     property int horizontalPadding: Theme.spacingSmall
     property bool pointerInside: false
+    readonly property alias icon: icon
     default property alias content: contentItem.data
 
     // `pointer`: the MouseArea clicked, or null from the keyboard.
@@ -56,6 +57,7 @@ Item {
         visible: root.iconName !== "" || root.text !== ""
 
         AppIcon {
+            id: icon
             anchors.verticalCenter: parent.verticalCenter
             visible: root.iconName !== ""
             name: root.iconName

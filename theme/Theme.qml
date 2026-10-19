@@ -109,7 +109,7 @@ QtObject {
     // ── Geometry ────────────────────────────────────────────
     readonly property int borderRadius:      4
     readonly property int borderRadiusSmall: 3
-    readonly property int surfaceCornerCut:  16
+    readonly property int surfaceRadius:     16
     readonly property int borderWidth:       1
 
     // ── Interaction states ──────────────────────────────────
