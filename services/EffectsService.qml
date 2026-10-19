@@ -13,7 +13,7 @@ Singleton {
     readonly property int apiVersion: 1
 
     // Effects directory, from the active theme. "" disables effects.
-    property string dir: ""
+    readonly property string dir: ThemeService.activeEffectsDir
     readonly property string name: root.dir.substring(root.dir.lastIndexOf("/") + 1)
 
     property var current: null
@@ -23,9 +23,9 @@ Singleton {
 
     // Speeds from config, one per kind of effect: a multiple of normal speed; 0 turns
     // that kind off. Hosts pass them on as `timeScale`, which EffectClock follows.
-    property real launcherSpeed: 1
-    property real wallpaperSpeed: 1
-    property real controlsSpeed: 1
+    readonly property real launcherSpeed: ConfigService.settings.appearance.launcherTransitionSpeed
+    readonly property real wallpaperSpeed: ConfigService.settings.appearance.wallpaperTransitionSpeed
+    readonly property real controlsSpeed: ConfigService.settings.appearance.controlEffectsSpeed
     // Frames per second of effects, passed on as `frameRate`: 0 ticks with every frame
     // the display shows.
     readonly property int frameRate: PowerService.mode === "maximum" ? 0 : 60

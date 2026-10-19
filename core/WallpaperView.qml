@@ -74,6 +74,12 @@ Item {
         root.transitionRunning = false;
     }
 
+    // Optional for effects; the new image cannot change while a transition runs.
+    function offerIncoming(item) {
+        if ("incoming" in item)
+            item.incoming = root.shown;
+    }
+
     // Deferred so a wallpaper change sees its new effects' transition.
     onPathChanged: Qt.callLater(root.change)
     Component.onCompleted: root.change()
@@ -140,12 +146,6 @@ Item {
         target: transitionLoader.item
         property: "theme"
         value: root.theme
-    }
-
-    // Optional for effects; the new image cannot change while a transition runs.
-    function offerIncoming(item) {
-        if ("incoming" in item)
-            item.incoming = root.shown;
     }
 
     Connections {

@@ -33,21 +33,18 @@ Item {
         width: parent.width
         height: valueText.implicitHeight
 
-        Text {
+        Label {
+            role: "caption"
             width: parent.width - valueText.implicitWidth - Theme.spacingTiny
             text: root.label
             elide: Text.ElideRight
-            font.pixelSize: Theme.fontSizeCaption
-            font.family: Theme.fontFamily
-            color: Theme.subtext
         }
 
-        Text {
+        Label {
             id: valueText
+            role: "caption"
             anchors.right: parent.right
             text: root.format(root.snap(slider.value))
-            font.pixelSize: Theme.fontSizeCaption
-            font.family: Theme.fontFamily
             color: Theme.text
         }
     }

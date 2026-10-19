@@ -1,7 +1,7 @@
 import QtQuick
 import qs.services
 import qs.theme
-import "../services/TimerProvider.js" as TimerProvider
+import "../components/Format.js" as Format
 
 // Something running, in the bar: its icon in its tone, its name, and how long it has
 // run, the icon spinning while it's busy. A click takes its first action (Finish,
@@ -23,7 +23,7 @@ BarButton {
     iconColor: root.activity.tone !== "neutral" ? Theme.toneColor(root.activity.tone)
         : (root.pointerInside ? Theme.text : Theme.subtextBright)
     text: root.activity.label + "  "
-        + TimerProvider.formatClock(Math.max(0, Math.floor((root.nowMs - root.activity.startedAt) / 1000)))
+        + Format.clock((root.nowMs - root.activity.startedAt) / 1000)
     tabularDigits: true
     label: [root.activity.label, root.activity.detail,
         root.actions.length === 0 ? ""
@@ -40,14 +40,9 @@ BarButton {
         onTriggered: root.nowMs = Date.now()
     }
 
-    // It stops wherever it is; set the icon upright again.
-    RotationAnimator {
+    Binding {
         target: root.icon
-        from: 0
-        to: 360
-        duration: 900
-        loops: Animation.Infinite
-        running: root.activity.state === "busy" && Theme.motion
-        onRunningChanged: if (!running) root.icon.rotation = 0
+        property: "spinning"
+        value: root.activity.state === "busy"
     }
 }

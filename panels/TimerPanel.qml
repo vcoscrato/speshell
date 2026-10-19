@@ -4,6 +4,7 @@ import qs.components
 import qs.services
 import qs.theme
 import "../services/TimerProvider.js" as TimerProvider
+import "../components/Format.js" as Format
 
 // A timer, opened from its chip in the bar. New, it takes a name and starts from a
 // preset or a typed length. Running, it shows its name, the time left and when it ends
@@ -64,12 +65,9 @@ Card {
     iconName: "timer"
 
     // ── New: a name, then a preset or a typed length ──
-    InlinePrompt {
+    Field {
         id: nameField
         visible: !root.isSet
-        masked: false
-        showActions: false
-        autoFocus: false
         placeholder: "Name it, like Pasta"
         onAccepted: root.typed.seconds > 0 ? root.beginTyped() : lengthField.focusInput()
         onCancelled: root.done()
@@ -98,12 +96,9 @@ Card {
         width: parent.width
         spacing: Theme.spacingTiny
 
-        InlinePrompt {
+        Field {
             id: lengthField
             width: parent.width - startButton.width - parent.spacing
-            masked: false
-            showActions: false
-            autoFocus: false
             placeholder: "Or a length, like 1h30"
             onAccepted: root.beginTyped()
             onCancelled: root.done()
@@ -114,7 +109,7 @@ Card {
             text: "Start"
             iconName: "media-play"
             enabled: root.typed.seconds > 0
-            tooltipText: root.typed.seconds > 0 ? TimerProvider.formatLength(root.typed.seconds) : "Type a length"
+            tooltipText: root.typed.seconds > 0 ? Format.duration(root.typed.seconds) : "Type a length"
             onClicked: root.beginTyped()
         }
     }
@@ -154,25 +149,21 @@ Card {
         width: parent.width
         height: countdown.implicitHeight
 
-        Text {
+        Label {
             id: countdown
-            text: root.isSet ? TimerProvider.formatClock(root.timer.remainingSeconds) : ""
+            role: "display"
+            text: root.isSet ? Format.clock(root.timer.remainingSeconds) : ""
             color: root.paused ? Theme.subtext : Theme.accent
-            font.pixelSize: Theme.fontSizeHuge
-            font.family: Theme.fontFamily
-            font.weight: Font.Medium
             font.features: { "tnum": 1 }
         }
 
-        Text {
+        Label {
             anchors.right: parent.right
             anchors.baseline: countdown.baseline
             text: !root.isSet ? ""
                 : root.paused ? "Paused"
-                : "Ends at " + Qt.formatTime(new Date(root.timer.endsAtMs), "HH:mm")
+                : "Ends at " + Format.time(new Date(root.timer.endsAtMs))
             color: Theme.subtext
-            font.pixelSize: Theme.fontSizeSmall
-            font.family: Theme.fontFamily
         }
 
         // Scrolling changes it by a minute.

@@ -4,25 +4,49 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Networking
+import "../components/Format.js" as Format
 
+// Wi-Fi and wired networking through NetworkManager: the devices, the connected and
+// nearby networks, scans, and connecting with a password typed in the panel. Networks
+// seen in a scan stay listed for a while, out of range once they go.
 Singleton {
     id: root
 
-    property int scanDurationMs: 30000
-    property int cacheMaxAgeMs: 10 * 60 * 1000
+    readonly property int scanDurationMs: 30000
+    readonly property int cacheMaxAgeMs: 10 * 60 * 1000
     property var cachedNetworks: []
     // Millisecond timestamps exceed the 32-bit int range; keep them as doubles.
     property double cacheUpdatedAtMs: 0
     property double nowMs: Date.now()
-    property int networkListRevision: 0
     // Whether the user scanned this session, so an empty list can say what it means.
     property bool scanRequested: false
+
+    // The password prompt, on the row of the network named; the last connection error
+    // and the network it's for.
+    property string passwordRowName: ""
+    property string passwordText: ""
+    property string connectErrorName: ""
+    property string connectError: ""
+    property var pendingNetwork: null
+    property string pendingNetworkName: ""
+
+    readonly property bool wifiOn: Networking.wifiEnabled
+    readonly property var wifiDevice: root.findWifiDevice()
+    readonly property var wiredDevice: root.findWiredDevice()
+    readonly property var connectedWifi: root.wifiNetworks(function(network) { return network.connected; })[0] || null
+    readonly property var connectingNetwork: root.wifiNetworks(function(network) {
+        return network.state === ConnectionState.Connecting;
+    })[0] || null
+    readonly property var otherNetworks: root.wifiNetworks(function(network) {
+        return !network.connected && network.state !== ConnectionState.Connecting;
+    })
+    readonly property var displayedNetworks: root.buildDisplayedNetworks()
+    readonly property bool isScanning: root.wifiDevice ? root.wifiDevice.scannerEnabled : false
 
     function setWifiEnabled(on) {
         Networking.wifiEnabled = on;
     }
 
-    // ── Native API helpers ──
     function findWifiDevice() {
         for (var i = 0; i < Networking.devices.values.length; i++) {
             var dev = Networking.devices.values[i];
@@ -146,7 +170,6 @@ Singleton {
         var connectedKey = root.connectedNetworkKey();
         var connectedName = root.connectedWifi ? root.connectedWifi.name : "";
         var now = root.nowMs;
-        var revision = root.networkListRevision;
 
         for (var i = 0; i < root.cachedNetworks.length; i++) {
             var cached = root.cachedNetworks[i];
@@ -179,27 +202,12 @@ Singleton {
         return root.sortNetworks(result);
     }
 
-    function cacheAgeText() {
-        if (root.cacheUpdatedAtMs <= 0) {
-            return "";
-        }
-
-        var elapsed = Math.max(0, root.nowMs - root.cacheUpdatedAtMs);
-        if (elapsed < 15000) {
-            return "just now";
-        }
-        if (elapsed < 60000) {
-            return Math.floor(elapsed / 1000) + "s ago";
-        }
-        return Math.floor(elapsed / 60000) + "m ago";
-    }
-
     // The nearby list's status, beside its title.
     function nearbyStatusText() {
         if (root.isScanning)
             return "Scanning…";
         if (root.cacheUpdatedAtMs > 0 && (root.scanRequested || root.displayedNetworks.length > 0))
-            return "Updated " + root.cacheAgeText();
+            return "Updated " + Format.ago(root.cacheUpdatedAtMs, root.nowMs);
         return "";
     }
 
@@ -232,7 +240,9 @@ Singleton {
                 root.signalPercent(network.signalStrength) + "%"].join(" · ");
     }
 
-    function onNetworkItemPrimary(item) {
+    // A click on a nearby network's row: connects to a saved or open one, or asks for
+    // the password.
+    function activate(item) {
         var network = root.findLiveNetwork(item);
         if (!network) {
             root.startWifiScan();
@@ -255,7 +265,7 @@ Singleton {
             root.passwordRowName = network.name;
     }
 
-    function requestConnectForItem(item, psk) {
+    function connectWithPassword(item, psk) {
         var network = root.findLiveNetwork(item);
         if (!network) {
             root.startWifiScan();
@@ -263,14 +273,6 @@ Singleton {
         }
         root.requestConnect(network, psk);
     }
-
-    // ── Local state for password entry ──
-    property string passwordRowName: ""
-    property string passwordText: ""
-    property string connectErrorName: ""
-    property string connectError: ""
-    property var pendingNetwork: null
-    property string pendingNetworkName: ""
 
     function cancelPasswordPrompt() {
         root.passwordRowName = "";
@@ -359,20 +361,6 @@ Singleton {
         }
     }
 
-    // ── Derived bindings ──
-    readonly property bool wifiOn: Networking.wifiEnabled
-    readonly property var wifiDevice: root.findWifiDevice()
-    readonly property var wiredDevice: root.findWiredDevice()
-    readonly property var connectedWifi: root.wifiNetworks(function(network) { return network.connected; })[0] || null
-    readonly property var connectingNetwork: root.wifiNetworks(function(network) {
-        return network.state === ConnectionState.Connecting;
-    })[0] || null
-    readonly property var otherNetworks: root.wifiNetworks(function(network) {
-        return !network.connected && network.state !== ConnectionState.Connecting;
-    })
-    readonly property var displayedNetworks: root.buildDisplayedNetworks()
-    readonly property bool isScanning: root.wifiDevice ? root.wifiDevice.scannerEnabled : false
-
     onWifiOnChanged: {
         if (!root.wifiOn) {
             root.stopWifiScan();
@@ -404,10 +392,7 @@ Singleton {
         }
     }
 
-    onOtherNetworksChanged: {
-        root.networkListRevision++;
-        root.refreshNetworkCache();
-    }
+    onOtherNetworksChanged: root.refreshNetworkCache()
 
     onIsScanningChanged: {
         if (!root.isScanning)
@@ -415,6 +400,7 @@ Singleton {
     }
 
     Component.onCompleted: root.refreshNetworkCache()
+
     Timer {
         id: wifiScanTimeoutTimer
         interval: root.scanDurationMs

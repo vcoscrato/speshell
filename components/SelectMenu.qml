@@ -47,7 +47,7 @@ Rectangle {
             selectMenu.open();
     }
 
-    Text {
+    Label {
         id: valueText
 
         anchors.left: parent.left
@@ -56,10 +56,7 @@ Rectangle {
         anchors.rightMargin: Theme.spacingTiny
         anchors.verticalCenter: parent.verticalCenter
         text: root.currentLabel
-        font.pixelSize: Theme.fontSizeSmall
-        font.family: Theme.fontFamily
-        font.bold: true
-        color: Theme.text
+        font.weight: Font.Bold
         elide: Text.ElideRight
     }
 

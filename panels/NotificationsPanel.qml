@@ -5,7 +5,9 @@ import Quickshell
 import qs.components
 import qs.services
 import qs.theme
+import "../components/Format.js" as Format
 
+// The notification history, Do Not Disturb, and clearing it.
 Card {
     id: root
     title: "Notifications" + (notifList.length > 0 ? " (" + notifList.length + ")" : "")
@@ -14,17 +16,32 @@ Card {
     property var notifList: NotificationService.notificationHistory
     readonly property int maxVisibleNotifications: 3
     property bool presented: false
-    property int refreshTick: 0
+
+    // Now, to the half minute, for how long ago each notification came.
+    property double now: Date.now()
     property string expandedNotificationId: ""
     readonly property int notificationRowHeight: Math.max(48,
-        Math.ceil((Theme.fontSizeSupporting + Theme.fontSizeCaption) * 1.25)
+        Math.ceil((Theme.fontSizeNormal + Theme.fontSizeCaption) * 1.25)
             + Theme.spacingMedium)
 
-    onPresentedChanged: {
-        if (root.presented)
-            root.refreshTick++;
-        else
-            root.expandedNotificationId = "";
+    headerActions: Row {
+        spacing: Theme.spacingSmall
+
+        HeaderButton {
+            anchors.verticalCenter: parent.verticalCenter
+            visible: root.notifList.length > 0
+            iconName: "bell-clear"
+            tooltipText: "Clear notifications"
+            onClicked: NotificationService.clearHistory()
+        }
+
+        ActionButton {
+            text: "Do not disturb"
+            iconName: NotificationService.dndEnabled ? "bell-off" : "bell"
+            compact: true
+            checked: NotificationService.dndEnabled
+            onClicked: NotificationService.setDndEnabled(!NotificationService.dndEnabled)
+        }
     }
 
     function notificationKey(notification) {
@@ -34,13 +51,6 @@ Card {
     function toggleExpanded(notification) {
         var key = root.notificationKey(notification);
         root.expandedNotificationId = root.expandedNotificationId === key ? "" : key;
-    }
-
-    Timer {
-        interval: 30000
-        running: root.presented
-        repeat: true
-        onTriggered: root.refreshTick++
     }
 
     function listHeightForRows(rows) {
@@ -79,24 +89,18 @@ Card {
         return String(notification.id).indexOf("internal:") === 0;
     }
 
-    headerActions: Row {
-        spacing: Theme.spacingSmall
+    onPresentedChanged: {
+        if (root.presented)
+            root.now = Date.now();
+        else
+            root.expandedNotificationId = "";
+    }
 
-        ActionButton {
-            visible: root.notifList.length > 0
-            text: "Clear"
-            iconName: "bell-clear"
-            compact: true
-            onClicked: NotificationService.clearHistory()
-        }
-
-        ActionButton {
-            text: "Do not disturb"
-            iconName: NotificationService.dndEnabled ? "bell-off" : "bell"
-            compact: true
-            checked: NotificationService.dndEnabled
-            onClicked: NotificationService.setDndEnabled(!NotificationService.dndEnabled)
-        }
+    Timer {
+        interval: 30000
+        running: root.presented
+        repeat: true
+        onTriggered: root.now = Date.now()
     }
 
     Column {
@@ -137,7 +141,7 @@ Card {
                     ? Math.max(root.notificationRowHeight,
                         rowContent.implicitHeight + Theme.spacingSmall * 2)
                     : root.notificationRowHeight
-                radius: Theme.borderRadiusSmall
+                radius: Theme.borderRadius
                 clip: true
                 color: notifMouse.containsMouse ? Theme.cardHover : Theme.controlFill
 
@@ -210,40 +214,32 @@ Card {
                         width: parent.width
                         height: summaryText.implicitHeight
 
-                        Text {
+                        Label {
                             id: summaryText
+                            role: "title"
                             anchors.left: parent.left
                             anchors.right: ageText.left
                             anchors.rightMargin: Theme.spacingSmall
                             text: root.primaryText(notificationRow.modelData)
-                            textFormat: Text.PlainText
-                            font.pixelSize: Theme.fontSizeSupporting
-                            font.family: Theme.fontFamily
-                            font.bold: true
-                            color: Theme.text
                             elide: Text.ElideRight
                             wrapMode: notificationRow.expanded ? Text.Wrap : Text.NoWrap
                         }
 
-                        Text {
+                        Label {
                             id: ageText
+                            role: "caption"
                             anchors.right: parent.right
                             anchors.baseline: summaryText.baseline
-                            text: root.formatTimeAgo(notificationRow.modelData.time, root.refreshTick)
-                            font.pixelSize: Theme.fontSizeCaption
-                            font.family: Theme.fontFamily
+                            text: Format.ago(notificationRow.modelData.time, root.now)
                             color: Theme.overlay
                         }
                     }
 
-                    Text {
+                    Label {
                         width: parent.width
                         text: notificationRow.expanded
                             ? String(notificationRow.modelData.body || root.compactText(notificationRow.modelData.appName)).trim()
                             : root.detailText(notificationRow.modelData)
-                        textFormat: Text.PlainText
-                        font.pixelSize: Theme.fontSizeSmall
-                        font.family: Theme.fontFamily
                         color: Theme.subtext
                         elide: notificationRow.expanded ? Text.ElideNone : Text.ElideRight
                         wrapMode: notificationRow.expanded ? Text.Wrap : Text.NoWrap
@@ -251,13 +247,11 @@ Card {
                         visible: text !== ""
                     }
 
-                    Text {
+                    Label {
+                        role: "caption"
                         width: parent.width
                         visible: notificationRow.expanded && root.compactText(notificationRow.modelData.body) !== ""
                         text: root.compactText(notificationRow.modelData.appName)
-                        textFormat: Text.PlainText
-                        font.pixelSize: Theme.fontSizeCaption
-                        font.family: Theme.fontFamily
                         color: Theme.overlay
                         elide: Text.ElideRight
                     }
@@ -300,17 +294,5 @@ Card {
                 ? "Only critical ones pop up; the rest wait here."
                 : "New notifications will show up here."
         }
-    }
-
-    function formatTimeAgo(date, tick) {
-        // 'tick' parameter is unused but creates a QML binding dependency
-        // that forces periodic re-evaluation of the time-ago string.
-        if (!date) return "";
-        var now = new Date();
-        var diff = Math.floor((now - date) / 1000);
-        if (diff < 60) return "just now";
-        if (diff < 3600) return Math.floor(diff / 60) + "m ago";
-        if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
-        return Math.floor(diff / 86400) + "d ago";
     }
 }

@@ -21,13 +21,13 @@ Singleton {
     readonly property int inputVolumePercent: root.sourceAudio ? root.clampPercent(root.sourceAudio.volume * 100) : 0
     readonly property bool inputMuted: root.sourceAudio ? root.sourceAudio.muted : false
 
-    property int scrollStep: 5
+    readonly property int scrollStep: ConfigService.settings.audio.scrollStep
     // [Audio.QuickSwitch] and friends: the devices to offer, in order, as name
     // substrings (all devices when empty), and display names by PipeWire name or description.
-    property var outputQuickSwitch: []
-    property var outputDeviceNames: ({})
-    property var inputQuickSwitch: []
-    property var inputDeviceNames: ({})
+    readonly property var outputQuickSwitch: ConfigService.settings.audio.quickSwitch
+    readonly property var outputDeviceNames: ConfigService.settings.audio.deviceNames
+    readonly property var inputQuickSwitch: ConfigService.settings.audio.inputQuickSwitch
+    readonly property var inputDeviceNames: ConfigService.settings.audio.inputDeviceNames
 
     readonly property string outputDeviceLabel: root.defaultSink ? root.deviceLabel(root.defaultSink, true) : ""
     readonly property string inputDeviceLabel: root.defaultSource ? root.deviceLabel(root.defaultSource, false) : ""

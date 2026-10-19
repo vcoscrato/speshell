@@ -3,6 +3,9 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
+// Clipboard history through cliphist: Speshell runs the wl-paste watcher that stores
+// each copy, lists the history with image thumbnails, copies an entry or text back,
+// and clears it.
 Singleton {
     id: root
 
@@ -71,20 +74,6 @@ Singleton {
         thumbnailProc.running = true;
     }
 
-    Process {
-        id: thumbnailProc
-        running: false
-        onExited: function(exitCode) {
-            if (exitCode !== 0)
-                return;
-            root.history = root.history.map(function(entry) {
-                return entry.kind === "image" && entry.thumbnail === ""
-                    ? Object.assign({}, entry, { "thumbnail": root.thumbnailDir + "/" + root.thumbnailName(entry) })
-                    : entry;
-            });
-        }
-    }
-
     function setViewPresented(presented) {
         var next = !!presented;
         if (root.viewPresented === next)
@@ -100,6 +89,61 @@ Singleton {
                 root.refresh();
         } else {
             clipboardChangeDebounce.stop();
+        }
+    }
+
+    function refresh() {
+        if (cliphistListProc.running) {
+            root.refreshQueued = true;
+            return;
+        }
+
+        root.historyDirty = false;
+        cliphistListProc.running = true;
+    }
+
+    function copyEntry(entry) {
+        if (!entry || !entry.id || copyProc.running) {
+            return;
+        }
+
+        root.pendingCopyId = entry.id;
+        root.feedbackText = "Copying…";
+        root.feedbackTone = "neutral";
+        copyProc.command = [
+            "sh", "-c", "cliphist decode \"$1\" | wl-copy", "speshell-copy", String(entry.id)
+        ];
+        copyProc.running = true;
+    }
+
+    function copyText(text) {
+        var value = String(text || "");
+        if (value === "" || copyProc.running) {
+            return;
+        }
+
+        root.pendingCopyId = "";
+        root.feedbackText = "Copying…";
+        root.feedbackTone = "neutral";
+        copyProc.command = ["sh", "-c", "printf '%s' \"$1\" | wl-copy", "speshell-copy", value];
+        copyProc.running = true;
+    }
+
+    function clearHistory() {
+        clearProc.running = true;
+    }
+
+    Process {
+        id: thumbnailProc
+        running: false
+        onExited: function(exitCode) {
+            if (exitCode !== 0)
+                return;
+            root.history = root.history.map(function(entry) {
+                return entry.kind === "image" && entry.thumbnail === ""
+                    ? Object.assign({}, entry, { "thumbnail": root.thumbnailDir + "/" + root.thumbnailName(entry) })
+                    : entry;
+            });
         }
     }
 
@@ -158,16 +202,6 @@ Singleton {
         }
     }
 
-    function refresh() {
-        if (cliphistListProc.running) {
-            root.refreshQueued = true;
-            return;
-        }
-
-        root.historyDirty = false;
-        cliphistListProc.running = true;
-    }
-
     Process {
         id: cliphistListProc
         command: ["sh", "-c", "cliphist list | head -n \"$1\"", "speshell-cliphist", String(root.maxItems)]
@@ -215,33 +249,6 @@ Singleton {
         }
     }
 
-    function copyEntry(entry) {
-        if (!entry || !entry.id || copyProc.running) {
-            return;
-        }
-
-        root.pendingCopyId = entry.id;
-        root.feedbackText = "Copying…";
-        root.feedbackTone = "neutral";
-        copyProc.command = [
-            "sh", "-c", "cliphist decode \"$1\" | wl-copy", "speshell-copy", String(entry.id)
-        ];
-        copyProc.running = true;
-    }
-
-    function copyText(text) {
-        var value = String(text || "");
-        if (value === "" || copyProc.running) {
-            return;
-        }
-
-        root.pendingCopyId = "";
-        root.feedbackText = "Copying…";
-        root.feedbackTone = "neutral";
-        copyProc.command = ["sh", "-c", "printf '%s' \"$1\" | wl-copy", "speshell-copy", value];
-        copyProc.running = true;
-    }
-
     Process {
         id: copyProc
         running: false
@@ -259,10 +266,6 @@ Singleton {
             }
             root.pendingCopyId = "";
         }
-    }
-
-    function clearHistory() {
-        clearProc.running = true;
     }
 
     Process {

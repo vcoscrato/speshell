@@ -23,6 +23,8 @@ Item {
     property string edge: ""
     property color edgeColor: Theme.accent
     property color fillColor: Theme.bg
+    // Laid over the fill and the backdrop, as for a hovered surface.
+    property color tint: "transparent"
 
     Item {
         id: material
@@ -75,6 +77,20 @@ Item {
             fillColor: root.fillColor
             fillItem: material.visible ? materialTexture : null
             joinStyle: ShapePath.MiterJoin
+
+            PathRectangle {
+                width: root.width
+                height: root.height
+                topLeftRadius: root.roundTopLeft ? root.radius : 0
+                topRightRadius: root.roundTopRight ? root.radius : 0
+                bottomRightRadius: root.roundBottomRight ? root.radius : 0
+                bottomLeftRadius: root.roundBottomLeft ? root.radius : 0
+            }
+        }
+
+        ShapePath {
+            strokeWidth: -1
+            fillColor: root.tint
 
             PathRectangle {
                 width: root.width

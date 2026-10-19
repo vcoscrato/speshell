@@ -34,7 +34,8 @@ Column {
         width: parent.width
         height: Theme.controlHeightSmall
 
-        Caption {
+        Label {
+            role: "section"
             anchors.verticalCenter: parent.verticalCenter
             text: "Themes"
         }
@@ -44,18 +45,16 @@ Column {
             anchors.verticalCenter: parent.verticalCenter
             spacing: Theme.spacingTiny
 
-            IconButton {
+            HeaderButton {
                 visible: root.wallpapersShown && root.ownWallpapers.length > 1
                 iconName: "shuffle"
-                iconSize: Theme.iconSizeSmall
-                size: Theme.controlHeightSmall
-                iconColor: Theme.subtextBright
                 tooltipText: "Another wallpaper from this theme"
                 onClicked: ThemeService.shuffle("")
             }
 
-            RefreshButton {
-                active: ThemeService.scanning
+            HeaderButton {
+                iconName: "refresh"
+                busy: ThemeService.scanning
                 tooltipText: "Look for new themes"
                 onClicked: ThemeService.scan()
             }
@@ -85,7 +84,8 @@ Column {
         visible: wallpaperGrid.visible
     }
 
-    Caption {
+    Label {
+        role: "section"
         visible: wallpaperGrid.visible
         text: ThemeService.theme.name + " wallpapers"
     }
@@ -110,7 +110,7 @@ Column {
 
                 width: wallpaperGrid.cellWidth
                 height: Math.round(wallpaperGrid.cellWidth * 10 / 16)
-                radius: Theme.borderRadiusSmall
+                radius: Theme.borderRadius
                 color: Theme.controlFill
                 clip: true
 
@@ -220,12 +220,6 @@ Column {
         }
     }
 
-    component Caption: Text {
-        font.pixelSize: Theme.fontSizeCaption
-        font.family: Theme.fontFamily
-        color: Theme.subtext
-    }
-
     // A theme, previewed in its own colors over the wallpaper it comes with: a bar
     // across the top and a dropdown under it.
     component ThemeTile: Rectangle {
@@ -260,7 +254,7 @@ Column {
             y: Theme.spacingTiny + 1
             width: tile.width - x * 2
             height: Math.round(preview.width * 10 / 16)
-            radius: Theme.borderRadiusSmall
+            radius: Theme.borderRadius
             clip: true
             gradient: Gradient {
                 GradientStop { position: 0; color: tile.colors.base }
@@ -463,7 +457,7 @@ Column {
                 color: tile.colors.accent
             }
 
-            Text {
+            Label {
                 id: nameText
                 anchors.left: accentDot.right
                 anchors.leftMargin: Theme.spacingSmall - 2
@@ -471,10 +465,7 @@ Column {
                 anchors.rightMargin: Theme.spacingTiny
                 anchors.verticalCenter: parent.verticalCenter
                 text: tile.modelData.name
-                font.pixelSize: Theme.fontSizeSmall
-                font.family: Theme.fontFamily
                 font.weight: tile.current ? Font.DemiBold : Font.Normal
-                color: Theme.text
                 elide: Text.ElideRight
             }
 

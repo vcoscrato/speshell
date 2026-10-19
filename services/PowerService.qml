@@ -4,6 +4,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
+// Locking, sleep, logout, restart, and power off, and the [Power] mode that sets how
+// much power Speshell's motion may use.
 Singleton {
     id: root
 
@@ -13,18 +15,17 @@ Singleton {
     // - "balanced": theme effects tick at 60 fps, and that check runs every 10 s.
     // - "saver": no theme effects, no interface motion, and that check every minute.
     // Speshell's own tools report their recordings at once in every mode.
-    property string mode: "balanced"
+    readonly property string mode: ConfigService.settings.power.mode
 
-    property var lockCommand: ["hyprlock"]
-    property bool lockerAvailable: false
-    property bool lockerChecking: true
+    readonly property var lockCommand: ConfigService.settings.power.lockCommand
+    readonly property string lockerExecutable: String(root.lockCommand[0] || "").trim()
+    readonly property bool lockerChecking: !FeatureSupport.commandsKnown
+    readonly property bool lockerAvailable: FeatureSupport.hasCommand(root.lockerExecutable)
     property bool busy: false
     property string activeAction: ""
     property string errorMessage: ""
 
     property string lockerPurpose: ""
-    property string lockerProbeTarget: ""
-    property string checkedLockerExecutable: ""
 
     function actionLabel(action) {
         if (action === "lock") return "Lock";
@@ -55,35 +56,6 @@ Singleton {
         root.busy = false;
         root.activeAction = "";
         root.lockerPurpose = "";
-    }
-
-    function probeLocker() {
-        var command = root.lockCommand || [];
-        var executable = command.length > 0 ? String(command[0]).trim() : "";
-
-        if (executable === "") {
-            root.checkedLockerExecutable = "";
-            root.lockerAvailable = false;
-            root.lockerChecking = false;
-            return;
-        }
-
-        if (!lockerProbe.running && root.checkedLockerExecutable === executable) {
-            root.lockerChecking = false;
-            return;
-        }
-
-        root.lockerChecking = true;
-        if (root.checkedLockerExecutable !== executable)
-            root.lockerAvailable = false;
-
-        // A running probe checks again for this one when it ends.
-        if (lockerProbe.running)
-            return;
-
-        root.lockerProbeTarget = executable;
-        lockerProbe.command = ["which", executable];
-        lockerProbe.running = true;
     }
 
     function startLocker(purpose) {
@@ -137,8 +109,6 @@ Singleton {
         return true;
     }
 
-    onLockCommandChanged: probeLocker()
-
     Timer {
         id: lockerReadyTimer
         interval: 750
@@ -161,27 +131,6 @@ Singleton {
             if (purpose === "sleep") {
                 suspendProcess.running = true;
             }
-        }
-    }
-
-    Process {
-        id: lockerProbe
-        running: false
-        onExited: function(exitCode) {
-            var completedTarget = root.lockerProbeTarget;
-            var command = root.lockCommand || [];
-            var desiredTarget = command.length > 0 ? String(command[0]).trim() : "";
-            root.lockerProbeTarget = "";
-
-            if (completedTarget === desiredTarget) {
-                root.checkedLockerExecutable = completedTarget;
-                root.lockerAvailable = exitCode === 0;
-            }
-
-            if (desiredTarget !== completedTarget)
-                Qt.callLater(root.probeLocker);
-            else
-                root.lockerChecking = false;
         }
     }
 
@@ -233,5 +182,4 @@ Singleton {
         }
     }
 
-    Component.onCompleted: probeLocker()
 }

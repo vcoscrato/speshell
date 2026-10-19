@@ -3,7 +3,9 @@ import QtQuick
 import qs.components
 import qs.services
 import qs.theme
+import "../components/Format.js" as Format
 
+// The playing track: its cover, title and artist, position, and the player's controls.
 Card {
     id: root
     title: "Now playing"
@@ -30,10 +32,8 @@ Card {
             opacity: Theme.disabledOpacity
             anchors.verticalCenter: parent.verticalCenter
         }
-        Text {
+        Label {
             text: "No media playing"
-            font.pixelSize: Theme.fontSizeSmall
-            font.family: Theme.fontFamily
             color: Theme.overlay
             anchors.verticalCenter: parent.verticalCenter
         }
@@ -62,7 +62,7 @@ Card {
                 width: wide ? 128 : 80
                 height: wide ? Math.round(128 / Math.min(aspect, 16 / 9)) : 80
                 anchors.verticalCenter: parent.verticalCenter
-                radius: Theme.borderRadiusSmall
+                radius: Theme.borderRadius
                 color: Theme.surface2
                 clip: true
 
@@ -94,7 +94,7 @@ Card {
                 FontMetrics {
                     id: titleMetrics
                     font.pixelSize: Theme.fontSizeNormal
-                    font.bold: true
+                    font.weight: Font.Medium
                     font.family: Theme.fontFamily
                 }
 
@@ -112,15 +112,13 @@ Card {
                         elide: Text.ElideRight
                     }
 
-                    Text {
+                    Label {
                         id: artistText
                         text: root.player
                             ? [root.player.trackArtist, root.player.trackAlbum].filter(function(part) {
                                 return !!part;
                             }).join(" · ")
                             : ""
-                        font.pixelSize: Theme.fontSizeSmall
-                        font.family: Theme.fontFamily
                         color: Theme.subtext
                         width: parent.width
                         elide: Text.ElideRight
@@ -181,8 +179,8 @@ Card {
                 Accessible.role: Accessible.Slider
                 Accessible.name: "Track position"
                 Accessible.description: root.player
-                    ? root.formatTime(MediaService.displayedPosition)
-                        + " of " + root.formatTime(root.player.length)
+                    ? Format.clock(MediaService.displayedPosition)
+                        + " of " + Format.clock(root.player.length)
                     : ""
 
                 Rectangle {
@@ -209,11 +207,9 @@ Card {
             Row {
                 width: parent.width
 
-                Text {
+                Label {
                     id: elapsedText
-                    text: root.player ? root.formatTime(MediaService.displayedPosition) : "0:00"
-                    font.pixelSize: Theme.fontSizeSmall
-                    font.family: Theme.fontFamily
+                    text: root.player ? Format.clock(MediaService.displayedPosition) : "0:00"
                     font.features: { "tnum": 1 }
                     color: Theme.subtext
                 }
@@ -223,25 +219,13 @@ Card {
                     height: 1
                 }
 
-                Text {
+                Label {
                     id: totalText
-                    text: root.player ? root.formatTime(root.player.length) : "0:00"
-                    font.pixelSize: Theme.fontSizeSmall
-                    font.family: Theme.fontFamily
+                    text: root.player ? Format.clock(root.player.length) : "0:00"
                     font.features: { "tnum": 1 }
                     color: Theme.subtext
                 }
             }
         }
-    }
-
-    // Quickshell's MprisPlayer reports position and length in seconds.
-    function formatTime(seconds) {
-        var totalSec = Math.max(0, Math.floor(Number(seconds) || 0));
-        var hours = Math.floor(totalSec / 3600);
-        var min = Math.floor(totalSec / 60) % 60;
-        var sec = totalSec % 60;
-        var pad = function(value) { return (value < 10 ? "0" : "") + value; };
-        return hours > 0 ? hours + ":" + pad(min) + ":" + pad(sec) : min + ":" + pad(sec);
     }
 }

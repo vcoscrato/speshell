@@ -20,40 +20,35 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         spacing: Theme.spacingSmall
 
-        Text {
+        Label {
+            role: "section"
             text: root.title
-            font.pixelSize: Theme.fontSizeSmall
-            font.family: Theme.fontFamily
-            font.bold: true
-            color: Theme.subtext
             anchors.verticalCenter: parent.verticalCenter
         }
 
         Rectangle {
             visible: root.count > 0
-            radius: Theme.borderRadiusSmall
+            radius: Theme.borderRadius
             height: Math.max(16, countText.implicitHeight + Theme.spacingTiny)
             width: countText.width + 10
             color: Theme.alpha(Theme.overlay, Theme.tintStrong)
             anchors.verticalCenter: parent.verticalCenter
 
-            Text {
+            Label {
                 id: countText
                 anchors.centerIn: parent
                 text: root.count
                 font.pixelSize: Theme.fontSizeMicro
-                font.family: Theme.fontFamily
                 color: Theme.subtext
             }
         }
     }
 
-    Text {
+    Label {
+        role: "caption"
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
         text: root.status
-        font.pixelSize: Theme.fontSizeCaption
-        font.family: Theme.fontFamily
         color: root.statusActive ? Theme.accent : Theme.overlay
         visible: text !== ""
     }

@@ -61,6 +61,8 @@ just preview earth controls              # sliders, switches, and picks, at twic
 just preview earth picks                 # picks up close: a bar's clock clicked near its end, a row, a button
 just check                               # every effect in every scene but picks
 just perf fire launcher                  # GPU time per frame at 1080p
+just shot fire                           # the real bar with each panel open, and a contact sheet
+just shot earth network settings         # only those panels (or `launcher`)
 ```
 
 Scenes drive `EffectClock` with virtual time, 1/60 s per frame, so captures match real playback, and every scene draws in the colors of the theme named like the effect. The wallpaper scene hosts this checkout's `core/WallpaperView.qml`. The clock scene shows the face over the backdrop, at the clock panel's size and at twice it, ticking from 10:09:30 and keeping still from 3 s, as in power saver. The controls scene plays a script on mock controls in those colors: a slider dragged and let go twice, another stepped by the wheel, an audio device and a segment picked, a switch turned on and off, and a square button picked. Env knobs:
@@ -69,6 +71,7 @@ Scenes drive `EffectClock` with virtual time, 1/60 s per frame, so captures matc
 - `CLOSE_AT`, `REOPEN_AT`, `SWITCH_AT`, and `SPEED` for the scenes.
 - `THEME_INI`: another theme's `theme.ini`, to see the effect in its colors.
 - `KEEP_FRAMES=1` keeps the frames, about 700 MB per run; `EVERY_FRAME=1` captures at 60 fps instead of 30.
+- For shot, `SHOT_CONFIG`: another `config.ini` than yours, `SHOT_QUERY`: what to type into the launcher, and `SHOT_MEDIA=1` to show the playing track, hidden by default since its cover is someone else's art. Shots run from a copy of the tree with a fresh data directory, with a timer and a screen recording running, and land in `~/.cache/speshell-lab/shots/<theme>/`.
 - For perf, `PERF_FROM` and `DURATION`. For example, `CLOSE_AT=30 PERF_FROM=1.5 DURATION=4.5 just perf air` measures only the open launcher.
 
 `just clean` removes compiled shaders and all lab output.

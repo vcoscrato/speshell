@@ -6,6 +6,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Bluetooth
 
+// The default Bluetooth adapter: on and off, discovery with a timeout, and an icon
+// for each kind of device.
 Singleton {
     id: root
 

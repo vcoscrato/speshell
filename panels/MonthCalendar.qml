@@ -50,14 +50,11 @@ Item {
             width: parent.width
             height: Theme.controlHeightSmall
 
-            Text {
+            Label {
+                role: "heading"
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
                 text: Qt.formatDate(root.month, "MMMM yyyy")
-                font.pixelSize: Theme.fontSizeLarge
-                font.family: Theme.fontFamily
-                font.weight: Font.DemiBold
-                color: Theme.text
             }
 
             Row {
@@ -74,18 +71,14 @@ Item {
                     onClicked: root.goToToday()
                 }
 
-                IconButton {
+                HeaderButton {
                     iconName: "chevron-left"
-                    size: Theme.controlHeightSmall
-                    iconSize: Theme.iconSizeSmall
                     tooltipText: "Previous month"
                     onClicked: root.shift(-1)
                 }
 
-                IconButton {
+                HeaderButton {
                     iconName: "chevron-right"
-                    size: Theme.controlHeightSmall
-                    iconSize: Theme.iconSizeSmall
                     tooltipText: "Next month"
                     onClicked: root.shift(1)
                 }
@@ -98,15 +91,14 @@ Item {
             Repeater {
                 model: 7
 
-                delegate: Text {
+                delegate: Label {
                     required property int index
 
                     width: parent.width / 7
                     // Named as the rest of the shell's dates are; 4 January 1970 was a Sunday.
                     text: Qt.formatDate(new Date(1970, 0, 4 + (root.firstWeekday + index) % 7), "ddd").substring(0, 2)
                     horizontalAlignment: Text.AlignHCenter
-                    font.pixelSize: Theme.fontSizeCaption
-                    font.family: Theme.fontFamily
+                    role: "caption"
                     font.weight: Font.DemiBold
                     color: Theme.overlay
                 }
@@ -138,16 +130,14 @@ Item {
                         visible: cell.isToday
                         width: Math.min(cell.width, cell.height) - Theme.spacingTiny
                         height: width
-                        radius: Theme.borderRadiusSmall
+                        radius: Theme.borderRadius
                         color: Theme.accent
                     }
 
-                    Text {
+                    Label {
                         anchors.centerIn: parent
                         visible: cell.day > 0 && cell.day <= root.dayCount
                         text: cell.day
-                        font.pixelSize: Theme.fontSizeSmall
-                        font.family: Theme.fontFamily
                         font.weight: cell.isToday ? Font.Bold : Font.Normal
                         font.features: { "tnum": 1 }
                         color: cell.isToday

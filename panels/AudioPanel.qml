@@ -64,11 +64,9 @@ Card {
             onWheelAdjusted: function(nextValue) { root.setVolume(nextValue); }
         }
 
-        Text {
+        Label {
             id: volumeText
             text: !root.device ? "—" : (root.hasVolume ? root.volumePercent + "%" : "…")
-            font.pixelSize: Theme.fontSizeSmall
-            font.family: Theme.fontFamily
             color: Theme.subtext
             width: 40
             horizontalAlignment: Text.AlignRight
@@ -89,7 +87,7 @@ Card {
                 readonly property bool selected: root.device === devDelegate.modelData.node
                 width: parent.width
                 height: Theme.controlHeight
-                radius: Theme.borderRadiusSmall
+                radius: Theme.borderRadius
                 color: devDelegate.selected
                     ? Theme.selectedFill
                     : (devMouse.containsMouse ? Theme.controlFill : "transparent")
@@ -114,18 +112,17 @@ Card {
                         color: devDelegate.selected ? Theme.accent : "transparent"
                     }
 
-                    Text {
+                    Label {
+                        width: Math.min(implicitWidth, devDelegate.width - devDot.width - Theme.spacingSmall * 3)
                         text: devDelegate.modelData.label
-                        font.pixelSize: Theme.fontSizeSmall
-                        font.family: Theme.fontFamily
-                        font.weight: devDelegate.selected ? Font.DemiBold : Font.Normal
-                        color: Theme.text
+                        elide: Text.ElideRight
                         anchors.verticalCenter: parent.verticalCenter
                     }
                 }
 
                 // A renamed device shows its hardware name on hover.
-                Text {
+                Label {
+                    role: "caption"
                     anchors.right: parent.right
                     anchors.rightMargin: Theme.spacingSmall
                     anchors.verticalCenter: parent.verticalCenter
@@ -133,8 +130,6 @@ Card {
                     visible: devDelegate.modelData.label !== devDelegate.modelData.rawLabel
                     opacity: devMouse.containsMouse ? 1 : 0
                     text: devDelegate.modelData.rawLabel
-                    font.pixelSize: Theme.fontSizeCaption
-                    font.family: Theme.fontFamily
                     color: Theme.overlay
                     elide: Text.ElideRight
                 }

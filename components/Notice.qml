@@ -11,7 +11,7 @@ Rectangle {
 
     width: parent ? parent.width : 0
     implicitHeight: noticeText.implicitHeight + Theme.spacingSmall * 2
-    radius: Theme.borderRadiusSmall
+    radius: Theme.borderRadius
     color: Theme.alpha(root.toneColor, Theme.tintSubtle)
     border.width: Theme.borderWidth
     border.color: Theme.alpha(root.toneColor, Theme.tintOutline)
@@ -40,22 +40,18 @@ Rectangle {
         y: Theme.spacingSmall
         spacing: Theme.spacingMicro
 
-        Text {
+        Label {
             width: parent.width
             visible: root.heading !== ""
             text: root.heading
-            font.pixelSize: Theme.fontSizeSmall
-            font.family: Theme.fontFamily
-            font.bold: true
+            font.weight: Font.Bold
             color: root.toneColor
             wrapMode: Text.WordWrap
         }
 
-        Text {
+        Label {
             width: parent.width
             text: root.detail
-            font.pixelSize: Theme.fontSizeSmall
-            font.family: Theme.fontFamily
             color: root.heading !== "" ? Theme.text : root.toneColor
             wrapMode: Text.Wrap
         }

@@ -54,7 +54,7 @@ Item {
     Rectangle {
         anchors.fill: parent
         color: root.pointerInside ? Theme.cardHover : "transparent"
-        radius: Theme.borderRadiusSmall
+        radius: Theme.borderRadius
 
         Image {
             id: trayImage

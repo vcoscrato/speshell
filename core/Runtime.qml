@@ -7,11 +7,13 @@ import Quickshell.Services.Notifications
 import qs.bar
 import qs.services
 import "../services/TimerProvider.js" as TimerProvider
+import "../components/Format.js" as Format
 
+// The running shell, once config.ini is valid: the notification server, the IPC
+// targets behind `speshell`, and the windows on each screen.
 Scope {
     id: root
 
-    property var config: null
     property bool startupAssessmentComplete: false
 
     function reportStartupIssues() {
@@ -86,7 +88,7 @@ Scope {
         // A line for each timer, "running 4:05 Tea", or "idle".
         function get(): string {
             const lines = TimerService.timers.filter(timer => timer.isSet).map(timer =>
-                [timer.paused ? "paused" : "running", TimerProvider.formatClock(timer.remainingSeconds), timer.name]
+                [timer.paused ? "paused" : "running", Format.clock(timer.remainingSeconds), timer.name]
                     .join(" ").trim());
             return lines.length > 0 ? lines.join("\n") : "idle";
         }
@@ -154,14 +156,10 @@ Scope {
     Variants {
         model: Quickshell.screens
 
-        Bar {
-            config: root.config
-        }
+        Bar {}
     }
 
-    LauncherOverlay {
-        config: root.config
-    }
+    LauncherOverlay {}
 
     VolumeOsdWindow {}
 

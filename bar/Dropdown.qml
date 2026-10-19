@@ -71,8 +71,27 @@ Item {
     height: Math.min(root.maxHeight, panelLoader.height + root.padding * 2)
     opacity: 0
 
+    // Follows its panel's content as it grows and shrinks. A panel arriving takes its
+    // size at once, whichever of it and this handler sees the change first.
+    property bool followsContent: true
+
+    Behavior on height {
+        enabled: root.followsContent
+        NumberAnimation {
+            id: resize
+            duration: Theme.animDuration
+            easing.type: Theme.animEasing
+        }
+    }
+
     // Each panel enters, whether the dropdown opens with it or switches to it.
-    onPanelChanged: if (root.panel !== "") entrance.restart()
+    onPanelChanged: {
+        root.followsContent = false;
+        resize.complete();
+        if (root.panel !== "")
+            entrance.restart();
+        Qt.callLater(() => root.followsContent = true);
+    }
 
     ParallelAnimation {
         id: entrance

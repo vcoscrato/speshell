@@ -68,7 +68,7 @@ T.MenuItem {
     }
 
     background: Rectangle {
-        radius: Theme.borderRadiusSmall
+        radius: Theme.borderRadius
         color: root.highlighted && root.enabled ? Theme.cardHover : "transparent"
     }
 }

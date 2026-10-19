@@ -1,6 +1,7 @@
 import QtQuick
 import QtTest
 import "../services/TimerProvider.js" as TimerProvider
+import "../components/Format.js" as Format
 
 TestCase {
     name: "Timer"
@@ -33,11 +34,11 @@ TestCase {
     }
 
     function test_formats() {
-        compare(TimerProvider.formatLength(5400), "1 h 30 min");
-        compare(TimerProvider.formatLength(1500), "25 min");
-        compare(TimerProvider.formatLength(45), "45 s");
-        compare(TimerProvider.formatClock(245), "4:05");
-        compare(TimerProvider.formatClock(3723), "1:02:03");
+        compare(Format.duration(5400), "1 h 30 min");
+        compare(Format.duration(1500), "25 min");
+        compare(Format.duration(45), "45 s");
+        compare(Format.clock(245), "4:05");
+        compare(Format.clock(3723), "1:02:03");
     }
 
     // 18 Oct 2026, 21:00.

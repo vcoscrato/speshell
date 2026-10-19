@@ -5,6 +5,7 @@ import qs.components
 import qs.services
 import qs.theme
 
+// Markdown notes: tabs for each note, and the open one, shown rendered and edited in place.
 Card {
     id: root
     title: "Notes"
@@ -25,13 +26,16 @@ Card {
     readonly property real editorPreferredHeight: (root.previewMode
         ? markdownText.implicitHeight
         : notesInput.implicitHeight) + editorPadding * 2
+
     readonly property bool canDeleteNote: NotesService.noteList.length > 1
         && NotesService.pendingDeleteNote === ""
         && NotesService.managementEnabled
 
-    Item {
-        id: focusSink
-        focus: true
+    headerActions: HeaderButton {
+        iconName: "copy"
+        enabled: NotesService.loaded && notesInput.text !== ""
+        tooltipText: "Copy notes"
+        onClicked: ClipboardService.copyText(notesInput.text)
     }
 
     // Qt leaves almost no room between Markdown paragraphs. Put a short spacer
@@ -136,11 +140,6 @@ Card {
         newNoteInput.forceActiveFocus();
     }
 
-    onPreviewModeChanged: {
-        if (root.previewMode)
-            root.updateRenderedMarkdown();
-    }
-
     function syncFromService() {
         if (notesInput.text === NotesService.text)
             return;
@@ -161,6 +160,11 @@ Card {
             notesInput.forceActiveFocus();
     }
 
+    onPreviewModeChanged: {
+        if (root.previewMode)
+            root.updateRenderedMarkdown();
+    }
+
     onPresentedChanged: {
         if (root.presented) {
             NotesService.read();
@@ -173,6 +177,11 @@ Card {
         root.syncFromService();
     }
     Component.onDestruction: NotesService.flush(true)
+
+    Item {
+        id: focusSink
+        focus: true
+    }
 
     Connections {
         target: NotesService
@@ -191,23 +200,11 @@ Card {
         }
     }
 
-    headerActions: IconButton {
-        size: Theme.controlHeightSmall
-        iconName: "copy"
-        iconSize: Theme.iconSizeSmall
-        iconColor: enabled ? Theme.subtextBright : Theme.overlay
-        enabled: NotesService.loaded && notesInput.text !== ""
-        tooltipText: "Copy notes"
-        onClicked: ClipboardService.copyText(notesInput.text)
-    }
-
-    Text {
+    Label {
         width: parent.width
         visible: NotesService.errorText !== ""
         text: NotesService.errorText
         color: Theme.error
-        font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontSizeSmall
     }
 
     FontMetrics {
@@ -226,59 +223,21 @@ Card {
 
         Row {
             id: tabsRow
-            spacing: Theme.spacingSmall
+            spacing: Theme.spacingTiny
             height: parent.height
 
             Repeater {
                 model: NotesService.noteList
-                delegate: Rectangle {
+                delegate: Tab {
                     id: tabItem
                     required property string modelData
-                    readonly property bool isSelected: NotesService.currentNote === tabItem.modelData
-                    height: Theme.controlHeightSmall
-                    width: tabText.implicitWidth + (root.canDeleteNote ? 28 : Theme.spacingLarge)
-                    radius: Theme.borderRadiusSmall
+                    text: tabItem.modelData
+                    current: NotesService.currentNote === tabItem.modelData
+                    trailingSpace: root.canDeleteNote ? deleteButton.size - Theme.spacingTiny : 0
                     enabled: NotesService.managementEnabled
-                    opacity: tabItem.enabled ? 1.0 : Theme.disabledOpacity
-                    color: tabItem.isSelected
-                        ? Theme.alpha(Theme.accent, Theme.tintStrong)
-                        : (tabHover.hovered ? Theme.cardHover : Theme.controlFill)
-                    border.width: Theme.borderWidth
-                    border.color: tabItem.isSelected
-                        ? Theme.selectedBorder
-                        : "transparent"
-
-                    Accessible.role: Accessible.PageTab
-                    Accessible.name: tabItem.modelData
-                    Accessible.description: tabItem.isSelected ? "Current note" : "Switch note"
-                    Accessible.onPressAction: tabItem.activate()
-
-                    function activate() {
-                        if (!tabItem.enabled)
-                            return;
+                    onClicked: {
                         root.exitEditMode();
                         NotesService.selectNote(tabItem.modelData);
-                    }
-
-                    HoverHandler {
-                        id: tabHover
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: tabItem.activate()
-                    }
-
-                    Text {
-                        id: tabText
-                        text: tabItem.modelData
-                        anchors.left: parent.left
-                        anchors.leftMargin: Theme.spacingSmall
-                        anchors.verticalCenter: parent.verticalCenter
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSmall
-                        color: tabItem.isSelected ? Theme.text : Theme.subtext
                     }
 
                     IconButton {
@@ -286,14 +245,12 @@ Card {
                         anchors.right: parent.right
                         anchors.rightMargin: Theme.spacingMicro
                         anchors.verticalCenter: parent.verticalCenter
-                        size: 18
+                        size: Theme.controlHeightSmall - Theme.spacingTiny * 2
                         iconName: "trash"
                         iconSize: Theme.iconSizeTiny
-                        iconColor: deleteButton.containsMouse
-                            ? Theme.error
-                            : Theme.subtext
+                        iconColor: deleteButton.containsMouse ? Theme.error : Theme.subtext
                         enabled: root.canDeleteNote
-                        visible: root.canDeleteNote && tabHover.hovered
+                        visible: root.canDeleteNote && (tabItem.hovered || deleteButton.containsMouse)
                         tooltipText: "Delete " + tabItem.modelData
                         onClicked: {
                             root.exitEditMode();
@@ -307,7 +264,7 @@ Card {
                 id: newTabButton
                 height: Theme.controlHeightSmall
                 width: root.creatingNote ? 110 : Theme.controlHeightSmall
-                radius: Theme.borderRadiusSmall
+                radius: Theme.borderRadius
                 color: root.creatingNote
                     ? Theme.card
                     : (newTabHover.hovered ? Theme.cardHover : Theme.controlFill)
@@ -395,7 +352,7 @@ Card {
         visible: pendingName !== ""
         width: parent.width
         height: visible ? Theme.controlHeight : 0
-        radius: Theme.borderRadiusSmall
+        radius: Theme.borderRadius
         color: Theme.alpha(Theme.warning, Theme.tintSubtle)
         border.width: Theme.borderWidth
         border.color: Theme.alpha(Theme.warning, Theme.tintOutline)
@@ -427,16 +384,13 @@ Card {
                 anchors.verticalCenter: parent.verticalCenter
             }
 
-            Text {
+            Label {
                 width: Math.max(0, deleteUndoBar.width
                     - undoDeleteButton.width
                     - Theme.spacingSmall * 4
                     - Theme.iconSizeSmall)
                 text: deleteUndoBar.pendingName + " deleted"
                 elide: Text.ElideRight
-                color: Theme.text
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeSmall
                 anchors.verticalCenter: parent.verticalCenter
             }
 
@@ -468,14 +422,14 @@ Card {
             property: "progress"
             from: 1
             to: 0
-            duration: 5000
+            duration: NotesService.undoMs
         }
     }
 
     Rectangle {
         width: parent.width
         height: Math.min(root.editorMaximumHeight, Math.max(root.editorMinimumHeight, root.editorPreferredHeight))
-        radius: Theme.borderRadiusSmall
+        radius: Theme.borderRadius
         color: Theme.controlFill
         border.width: Theme.borderWidth
         border.color: (!root.previewMode && notesInput.activeFocus)
@@ -563,7 +517,7 @@ Card {
                 TextEdit {
                     id: markdownText
                     width: parent.width
-                    text: root.renderedMarkdown !== "" ? root.renderedMarkdown : "*No note content. Click anywhere in box to add notes.*"
+                    text: root.renderedMarkdown
                     textFormat: TextEdit.MarkdownText
                     wrapMode: TextEdit.Wrap
                     readOnly: true
@@ -571,6 +525,15 @@ Card {
                     color: Theme.text
                     font.pixelSize: Theme.fontSizeSmall
                     font.family: Theme.fontFamily
+                }
+
+                // Worded as the editor's placeholder.
+                Label {
+                    width: parent.width
+                    visible: root.renderedMarkdown === ""
+                    text: "Keep notes, prompts, commands, or text you want nearby.\nClick to start writing."
+                    color: Theme.subtext
+                    wrapMode: Text.WordWrap
                 }
 
                 MouseArea {

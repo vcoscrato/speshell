@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import qs.services
+import qs.components
 import qs.theme
 
 // The bar's screen's Hyprland workspaces: those with windows and the active one. A
@@ -35,7 +36,7 @@ Row {
             anchors.verticalCenter: parent.verticalCenter
             width: Math.max(root.itemSize, nameText.implicitWidth + Theme.spacingMedium * 2)
             height: Math.min(Theme.controlHeightSmall + Theme.spacingTiny, root.itemSize)
-            radius: Theme.borderRadiusSmall
+            radius: Theme.borderRadius
             color: workspace.info.active
                 ? Theme.selectedFill
                 : (workspace.pointerInside ? Theme.cardHover : "transparent")
@@ -46,13 +47,10 @@ Row {
             Accessible.name: "Workspace " + workspace.info.name
             Accessible.onPressAction: WorkspaceService.focus(workspace.modelData)
 
-            Text {
+            Label {
                 id: nameText
                 anchors.centerIn: parent
                 text: workspace.info.name
-                textFormat: Text.PlainText
-                font.pixelSize: Theme.fontSizeSmall
-                font.family: Theme.fontFamily
                 font.weight: workspace.info.active ? Font.DemiBold : Font.Normal
                 color: workspace.info.active
                     ? Theme.accent

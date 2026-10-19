@@ -83,7 +83,6 @@ QtObject {
     readonly property int fontSizeSupporting: Math.round(12 * root.textScale)
     readonly property int fontSizeNormal:     Math.round(13 * root.textScale)
     readonly property int fontSizeLarge:      Math.round(16 * root.textScale)
-    readonly property int fontSizeTitle:      Math.round(20 * root.textScale)
     readonly property int fontSizeHuge:       Math.round(40 * root.textScale)
 
     // Icons are geometry, not typography. Keep them stable when only text scales.
@@ -107,10 +106,10 @@ QtObject {
     readonly property int controlHeight:      32   // rows, fields, sliders, buttons
 
     // ── Geometry ────────────────────────────────────────────
-    readonly property int borderRadius:      4
-    readonly property int borderRadiusSmall: 3
-    readonly property int surfaceRadius:     16
-    readonly property int borderWidth:       1
+    // Controls, rows, and popups share one radius; floating surfaces have their own.
+    readonly property int borderRadius:  3
+    readonly property int surfaceRadius: 16
+    readonly property int borderWidth:   1
 
     // ── Interaction states ──────────────────────────────────
     // Neutral controls rest on controlFill/controlBorder and use cardHover on hover.
@@ -126,6 +125,11 @@ QtObject {
     readonly property color controlBorder:  root.alpha(root.overlay, 0.24)
     readonly property color selectedFill:   root.alpha(root.accent, root.tintSubtle)
     readonly property color selectedBorder: root.alpha(root.accent, root.tintOutline)
+    // Buttons and tabs shrink to this while pressed; rows don't.
+    readonly property real pressScale: 0.96
+    // Menus, tooltips, and hover labels: small popups over a surface.
+    readonly property color popupFill:   root.card
+    readonly property color popupBorder: root.surface2
 
     // ── Animation ───────────────────────────────────────────
     // Off in power saver: transitions jump to their end and nothing pulses or blinks.
@@ -134,6 +138,8 @@ QtObject {
     readonly property int animDuration:     root.motion ? 200 : 0
     readonly property int animDurationSlow: root.motion ? 350 : 0
     readonly property int animEasing:       Easing.OutCubic
+    // One turn of a busy spinner.
+    readonly property int spinDuration:     1000
 
     // ── Layout ──────────────────────────────────────────────
     // A bar dropdown's content; wider text gets wider panels.

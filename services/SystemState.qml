@@ -5,10 +5,13 @@ import Quickshell
 import Quickshell.Io
 import "Shell.js" as Shell
 
+// Speshell itself: its version and Quickshell's, and relaunching.
 Singleton {
     id: root
 
+    // Speshell's version: the checkout's revision, or the package's.
     property string appVersion: "Unknown"
+    property string quickshellVersion: ""
     readonly property string appDir: Qt.resolvedUrl("..").toString().replace(/^file:\/\//, "")
     property bool relaunching: false
     readonly property bool canRelaunch: !root.relaunching && !ConfigService.savingConfig
@@ -44,6 +47,18 @@ Singleton {
         onRunningChanged: if (!running) {
             var version = (appVersionOutput.text || "").trim();
             root.appVersion = version !== "" ? version : "Unknown";
+        }
+    }
+
+    Process {
+        running: true
+        command: ["quickshell", "--version"]
+        stdout: SplitParser {
+            onRead: line => {
+                const match = String(line || "").match(/^Quickshell\s+(\S+)/i);
+                if (match)
+                    root.quickshellVersion = match[1];
+            }
         }
     }
 

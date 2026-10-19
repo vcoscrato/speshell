@@ -98,6 +98,11 @@ check: shaders
 perf effect="cosmos" scene="launcher": shaders
     lab/perf.sh "{{ effect }}" "{{ scene }}"
 
+# Render the real bar in a theme with each panel open (all, or those named, or `launcher`) into ~/.cache/speshell-lab/shots/ (needs Wayland).
+[working-directory: 'extras']
+shot theme="cosmos" *shots: shaders
+    lab/shot.sh "{{ theme }}" {{ shots }}
+
 # Remove compiled shaders and lab output.
 [working-directory: 'extras']
 clean:

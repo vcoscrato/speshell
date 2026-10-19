@@ -85,6 +85,8 @@ every monitor:
   all work with mouse and keyboard. **Tab** completes a bang, and `vsc` finds Visual
   Studio Code.
 - A `Terminal=true` app such as `btop` opens in a terminal.
+- The search field stays where it is while typing changes the results, from many to
+  one to none.
 - Launch counts still order the results after a relaunch.
 - With a launcher transition, typing works during the entrance. Closing with
   **Escape** or by launching an app plays the exit, clicks pass through during
@@ -96,6 +98,8 @@ every monitor:
   including a theme without effects. Colors, wallpaper, the backdrop, the clock
   face, and transitions follow, and the old launcher exit finishes.
 - After a relaunch, the chosen theme's colors are there from the first frame.
+- Toasts, the volume OSD, and the config error window show the theme's backdrop,
+  as the bar and its dropdowns do; a hovered toast still lightens.
 - Tooltips, dropdown menus (Settings, Displays), a tray app's right-click menu
   with its submenus, scrollbars, and selected text all draw in the theme's
   colors, and so do the effects of a theme that borrows another theme's effects.
@@ -120,6 +124,9 @@ every monitor:
 ## Settings and config
 
 - Changing a toggle, a choice or a dropdown applies at once and flashes **Saved**.
+- A panel whose content grows or shrinks while open (a Settings page, a Wi-Fi scan,
+  a notification expanding) resizes smoothly; opening or switching panels shows
+  each at its size at once.
 - At 150 % text size, the bar's dropdowns widen, wide controls move under their
   labels, and tooltips stay on screen.
 - Editing `config.ini` in an editor applies on save without Reload. An invalid
@@ -174,8 +181,10 @@ every monitor:
 
 - The panel lists only installed tools; one installed while Speshell runs appears
   the next time the panel opens.
-- Each tool closes the bar's dropdown before it selects or captures, so it doesn't
-  show in the result. The selection uses the theme's accent.
+- A tool run from the Tools panel closes it before it selects or captures, so it
+  doesn't show in the result. Run from a keybinding (`speshell tool screenshot`)
+  with a panel open, the panel stays and shows in the screenshot; dictation still
+  closes it, so it types into the window. The selection uses the theme's accent.
 - Copy text, Scan code, Screenshot (area and screen) and Pick color copy their
   result and toast it; cancelling the selection does nothing. A screen screenshot
   or recording takes the focused monitor. Screenshot's Annotate opens Swappy, and a

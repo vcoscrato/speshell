@@ -8,14 +8,29 @@ import Quickshell.Io
 import Quickshell.Bluetooth
 import Quickshell.Services.UPower
 
+// What this machine has for Speshell: a battery, a backlight, Bluetooth, display
+// control, and the commands Speshell runs; and the setup problems worth telling the
+// user about.
 Singleton {
     id: root
-
-    property bool brightnessHelperAvailable: false
     property bool backlightProbeComplete: false
-    property bool helperProbeComplete: false
     property var backlightDevices: []
-    property string configuredBacklightDevice: ""
+
+    // The commands Speshell may run: brightnessctl, the screen locker, and the tools'.
+    readonly property var wantedCommands: ["brightnessctl", PowerService.lockerExecutable]
+        .concat(ToolsService.commands)
+        .filter((command, index, all) => command !== "" && all.indexOf(command) === index)
+
+    // Those found installed by the last probe, and the list it looked for.
+    property var installedCommands: []
+
+    property string probedCommands: ""
+
+    // Whether the last probe covered every command wanted now.
+    readonly property bool commandsKnown: root.probedCommands === root.wantedCommands.join(" ")
+
+    readonly property bool brightnessHelperAvailable: root.hasCommand("brightnessctl")
+    readonly property string configuredBacklightDevice: ConfigService.settings.backlight.device
     readonly property string backlightDeviceName: {
         if (root.configuredBacklightDevice !== ""
                 && root.backlightDevices.indexOf(root.configuredBacklightDevice) !== -1)
@@ -28,14 +43,15 @@ Singleton {
         && root.battery.ready
         && root.battery.isLaptopBattery
         && root.battery.isPresent
+
     readonly property bool supportsBrightness: root.backlightDevices.length > 0 && root.brightnessHelperAvailable
     readonly property bool supportsBluetooth: Bluetooth.defaultAdapter !== null
     // Displays are arranged through Hyprland.
     readonly property bool supportsDisplayControl: HyprlandService.running
     readonly property bool issuesReady: ConfigService.valid
         && root.backlightProbeComplete
-        && root.helperProbeComplete
-        && !PowerService.lockerChecking
+        && root.commandsKnown
+
     readonly property var issues: {
         if (!root.issuesReady)
             return [];
@@ -54,7 +70,7 @@ Singleton {
                 detail: "A backlight device is configured, but brightnessctl is not installed."
             });
         }
-        var locker = String((PowerService.lockCommand || [])[0] || "");
+        const locker = PowerService.lockerExecutable;
         if (locker !== "" && !PowerService.lockerAvailable) {
             result.push({
                 id: "power-locker",
@@ -64,6 +80,26 @@ Singleton {
         }
         return result;
     }
+
+    function hasCommand(command) {
+        return root.installedCommands.indexOf(command) >= 0;
+    }
+
+    // Looks for the wanted commands again, so one installed since shows up.
+    function probeCommands() {
+        if (commandProbe.running) {
+            commandProbe.queued = true;
+            return;
+        }
+        commandProbe.looking = root.wantedCommands.join(" ");
+        commandProbe.command = ["sh", "-c", "for c; do command -v \"$c\" >/dev/null 2>&1 && echo \"$c\"; done", "sh"]
+            .concat(root.wantedCommands);
+        commandProbe.running = true;
+    }
+
+    onWantedCommandsChanged: root.probeCommands()
+
+    Component.onCompleted: root.probeCommands()
 
     Process {
         running: true
@@ -78,11 +114,19 @@ Singleton {
     }
 
     Process {
-        running: true
-        command: ["sh", "-c", "command -v brightnessctl"]
-        onExited: exitCode => {
-            root.brightnessHelperAvailable = exitCode === 0;
-            root.helperProbeComplete = true;
+        id: commandProbe
+
+        property string looking: ""
+        property bool queued: false
+
+        stdout: StdioCollector { id: commandOutput }
+        onExited: {
+            root.installedCommands = commandOutput.text.split("\n").filter(line => line !== "");
+            root.probedCommands = commandProbe.looking;
+            if (commandProbe.queued) {
+                commandProbe.queued = false;
+                root.probeCommands();
+            }
         }
     }
 }

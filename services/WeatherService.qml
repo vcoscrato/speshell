@@ -8,8 +8,8 @@ import Quickshell
 Singleton {
     id: root
 
-    property bool enabled: false
-    property string location: ""
+    readonly property bool enabled: ConfigService.settings.weather.enabled
+    readonly property string location: ConfigService.settings.weather.location
 
     // "", "loading", "ready", "offline" (no answer; retried soon), or "unknown" (no
     // place by that name).

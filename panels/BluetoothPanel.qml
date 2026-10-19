@@ -6,11 +6,11 @@ import qs.components
 import qs.services
 import qs.theme
 
+// Bluetooth on and off, and the connected, paired, and nearby devices.
 Card {
     id: root
     title: "Bluetooth"
     iconName: "bluetooth"
-    visible: FeatureSupport.supportsBluetooth
     property bool presented: false
 
     readonly property var adapter: BluetoothService.adapter
@@ -62,9 +62,10 @@ Card {
     headerActions: Row {
         spacing: Theme.spacingSmall
 
-        RefreshButton {
+        HeaderButton {
+            iconName: "refresh"
             visible: root.btOn
-            active: root.presented && root.scanning
+            busy: root.presented && root.scanning
             tooltipText: root.scanning ? "Stop Bluetooth scan" : "Scan for Bluetooth devices"
             onClicked: BluetoothService.toggleDiscovery()
         }

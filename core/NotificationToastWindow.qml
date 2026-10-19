@@ -7,6 +7,7 @@ import qs.services
 import qs.theme
 import qs.components
 
+// Toasts in the focused screen's top right corner.
 PanelWindow {
     id: root
 
@@ -71,24 +72,25 @@ PanelWindow {
                 // Top right of the screen: rounded toward its center, accent edge on the left.
                 Surface {
                     anchors.fill: parent
-                    radius: Theme.spacingMedium
+                    backdrop: true
                     roundBottomLeft: true
                     edge: "left"
                     edgeColor: toastCard.toneColor
-                    fillColor: toastMouse.containsMouse ? Theme.card : Theme.bg
+                    tint: toastMouse.containsMouse ? Theme.controlFill : "transparent"
 
-                    Behavior on fillColor {
+                    Behavior on tint {
                         ColorAnimation { duration: Theme.animDuration }
                     }
                 }
 
-                scale: 0.95
+                // Pops in as the OSD does.
+                scale: 0.96
                 opacity: 0
                 Component.onCompleted: entranceAnim.start()
 
                 ParallelAnimation {
                     id: entranceAnim
-                    NumberAnimation { target: toastCard; property: "scale"; to: 1.0; duration: Theme.animDuration; easing.type: Easing.OutBack }
+                    NumberAnimation { target: toastCard; property: "scale"; to: 1.0; duration: Theme.animDuration; easing.type: Theme.animEasing }
                     NumberAnimation { target: toastCard; property: "opacity"; to: 1.0; duration: Theme.animDuration }
                 }
 
@@ -131,36 +133,24 @@ PanelWindow {
                             visible: toastCard.internal && toastCard.notificationIcon === ""
                         }
 
-                        Text {
+                        Label {
+                            role: "section"
                             text: toastCard.modelData.appName || "App"
-                            textFormat: Text.PlainText
                             anchors.verticalCenter: parent.verticalCenter
-                            font.pixelSize: Theme.fontSizeCaption
-                            font.family: Theme.fontFamily
-                            font.bold: true
-                            font.capitalization: Font.AllUppercase
-                            font.letterSpacing: 0.8
                             color: toastCard.toneColor
                         }
                     }
 
-                    Text {
+                    Label {
+                        role: "title"
                         text: (toastCard.live ? toastCard.live.summary : toastCard.modelData.summary) || ""
-                        textFormat: Text.PlainText
-                        font.pixelSize: Theme.fontSizeNormal
-                        font.family: Theme.fontFamily
-                        font.bold: true
-                        color: Theme.text
                         width: parent.width
                         elide: Text.ElideRight
                         visible: text !== ""
                     }
 
-                    Text {
+                    Label {
                         text: (toastCard.live ? toastCard.live.body : toastCard.modelData.body) || ""
-                        textFormat: Text.PlainText
-                        font.pixelSize: Theme.fontSizeSmall
-                        font.family: Theme.fontFamily
                         color: Theme.subtext
                         width: parent.width
                         elide: Text.ElideRight

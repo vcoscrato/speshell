@@ -225,50 +225,19 @@ function bangsValue(document, errors) {
     return result;
 }
 
-function parseAndValidate(iniText) {
-    var source = String(iniText || "");
-    if (source.trim() === "")
-        return { ok: false, config: null, errors: [{ kind: "validation", path: "$", line: 1, column: 1, message: "The configuration file is empty." }] };
-
-    var document = parseIni(source);
-    var errors = document.errors.slice();
-
+// The settings in `document`, by section as config.ini has them, with every value
+// checked and every missing one at its default.
+function build(document, errors) {
     var lockCommand = stringValue(document, "Power", "lockCommand", "hyprlock", errors, false);
-    var lockArguments = sectionList(document, "Power.Arguments", errors);
     var maxVisibleEntry = entry(document, "Notifications", "maxVisible");
-    var maxVisible = maxVisibleEntry && maxVisibleEntry.value === "-1"
-        ? -1
-        : integerValue(document, "Notifications", "maxVisible", 3, 1, 50, errors);
-
-    var config = {
-        drawWallpaper: booleanValue(document, "Appearance", "drawWallpaper", false, errors),
-        textScale: realValue(document, "Appearance", "textScale", 1.0, 0.8, 1.5, errors),
-        launcherTransitionSpeed: realValue(document, "Appearance", "launcherTransitionSpeed", 1.0, 0, 3, errors),
-        controlEffectsSpeed: realValue(document, "Appearance", "controlEffectsSpeed", 1.0, 0, 3, errors),
-        wallpaperTransitionSpeed: realValue(document, "Appearance", "wallpaperTransitionSpeed", 1.0, 0, 3, errors),
-        shuffleAtLaunch: enumValue(document, "Appearance", "shuffleAtLaunch", "off", ["off", "wallpaper", "theme", "both"], errors),
-        audioScrollStep: integerValue(document, "Audio", "scrollStep", 5, 1, 100, errors),
-        audioQuickSwitch: sectionList(document, "Audio.QuickSwitch", errors),
-        audioDeviceNames: sectionMap(document, "Audio.DeviceNames", errors),
-        audioInputQuickSwitch: sectionList(document, "Audio.InputQuickSwitch", errors),
-        audioInputDeviceNames: sectionMap(document, "Audio.InputDeviceNames", errors),
-        launcher: {
-            width: integerValue(document, "Launcher", "width", 540, 280, 1200, errors),
-            visibleRows: integerValue(document, "Launcher", "visibleRows", 5, 1, 20, errors),
-            searchUrl: urlValue(document, "Launcher", "searchUrl", "https://duckduckgo.com/?q={query}", errors),
-            bangs: bangsValue(document, errors)
-        },
-        backlightDevice: stringValue(document, "Backlight", "device", "", errors, true),
-        powerMenu: { lockCommand: [lockCommand].concat(lockArguments) },
-        powerMode: enumValue(document, "Power", "mode", "balanced", ["maximum", "balanced", "saver"], errors),
-        weatherEnabled: booleanValue(document, "Weather", "enabled", false, errors),
-        weatherLocation: stringValue(document, "Weather", "location", "", errors, true),
-        maxVisibleNotification: maxVisible,
-        tools: {
-            ocrLanguages: codesValue(document, "Tools", "ocrLanguages", "eng", /^[A-Za-z0-9_]+$/, "+", errors) || "eng",
-            dictationLanguages: codesValue(document, "Tools", "dictationLanguages", "", /^[a-z]{2,3}$/, ",", errors),
-            dictationVocabulary: stringValue(document, "Tools", "dictationVocabulary", "", errors, true),
-            dictationModel: stringValue(document, "Tools", "dictationModel", "", errors, true)
+    return {
+        appearance: {
+            drawWallpaper: booleanValue(document, "Appearance", "drawWallpaper", false, errors),
+            textScale: realValue(document, "Appearance", "textScale", 1.0, 0.8, 1.5, errors),
+            launcherTransitionSpeed: realValue(document, "Appearance", "launcherTransitionSpeed", 1.0, 0, 3, errors),
+            controlEffectsSpeed: realValue(document, "Appearance", "controlEffectsSpeed", 1.0, 0, 3, errors),
+            wallpaperTransitionSpeed: realValue(document, "Appearance", "wallpaperTransitionSpeed", 1.0, 0, 3, errors),
+            shuffleAtLaunch: enumValue(document, "Appearance", "shuffleAtLaunch", "off", ["off", "wallpaper", "theme", "both"], errors)
         },
         bar: {
             position: enumValue(document, "Bar", "position", "top", ["top", "bottom"], errors),
@@ -277,9 +246,59 @@ function parseAndValidate(iniText) {
             margin: integerValue(document, "Bar", "margin", 0, 0, 64, errors),
             gap: integerValue(document, "Bar", "gap", 0, 0, 64, errors),
             outline: enumValue(document, "Bar", "outline", "edges", ["edges", "full"], errors)
+        },
+        audio: {
+            scrollStep: integerValue(document, "Audio", "scrollStep", 5, 1, 100, errors),
+            quickSwitch: sectionList(document, "Audio.QuickSwitch", errors),
+            inputQuickSwitch: sectionList(document, "Audio.InputQuickSwitch", errors),
+            deviceNames: sectionMap(document, "Audio.DeviceNames", errors),
+            inputDeviceNames: sectionMap(document, "Audio.InputDeviceNames", errors)
+        },
+        launcher: {
+            width: integerValue(document, "Launcher", "width", 540, 280, 1200, errors),
+            visibleRows: integerValue(document, "Launcher", "visibleRows", 5, 1, 20, errors),
+            searchUrl: urlValue(document, "Launcher", "searchUrl", "https://duckduckgo.com/?q={query}", errors),
+            bangs: bangsValue(document, errors)
+        },
+        weather: {
+            enabled: booleanValue(document, "Weather", "enabled", false, errors),
+            location: stringValue(document, "Weather", "location", "", errors, true)
+        },
+        notifications: {
+            // -1 shows every toast.
+            maxVisible: maxVisibleEntry && maxVisibleEntry.value === "-1"
+                ? -1
+                : integerValue(document, "Notifications", "maxVisible", 3, 1, 50, errors)
+        },
+        power: {
+            mode: enumValue(document, "Power", "mode", "balanced", ["maximum", "balanced", "saver"], errors),
+            lockCommand: [lockCommand].concat(sectionList(document, "Power.Arguments", errors))
+        },
+        backlight: {
+            device: stringValue(document, "Backlight", "device", "", errors, true)
+        },
+        tools: {
+            ocrLanguages: codesValue(document, "Tools", "ocrLanguages", "eng", /^[A-Za-z0-9_]+$/, "+", errors) || "eng",
+            dictationLanguages: codesValue(document, "Tools", "dictationLanguages", "", /^[a-z]{2,3}$/, ",", errors),
+            dictationVocabulary: stringValue(document, "Tools", "dictationVocabulary", "", errors, true),
+            dictationModel: stringValue(document, "Tools", "dictationModel", "", errors, true)
         }
     };
+}
 
+// Every setting at its default, for before config.ini loads.
+function defaults() {
+    return build(parseIni(""), []);
+}
+
+function parseAndValidate(iniText) {
+    var source = String(iniText || "");
+    if (source.trim() === "")
+        return { ok: false, config: null, errors: [{ kind: "validation", path: "$", line: 1, column: 1, message: "The configuration file is empty." }] };
+
+    var document = parseIni(source);
+    var errors = document.errors.slice();
+    var config = build(document, errors);
     return errors.length > 0
         ? { ok: false, config: null, errors: errors }
         : { ok: true, config: config, errors: [] };

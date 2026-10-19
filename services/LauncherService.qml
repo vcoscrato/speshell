@@ -8,6 +8,8 @@ import "BangProvider.js" as BangProvider
 import "ThemeProvider.js" as ThemeProvider
 import "Shell.js" as Shell
 
+// The launcher's state and results: apps, the calculator, bangs, web searches, themes
+// and wallpapers, and what activating each does. Launch counts order the apps.
 Singleton {
     id: root
 
@@ -27,12 +29,7 @@ Singleton {
     readonly property string usagePath: ConfigService.dataDir !== ""
         ? ConfigService.dataDir + "/launcher-usage.json"
         : ""
-    readonly property var launcherConfig: ConfigService.config && ConfigService.config.launcher
-        ? ConfigService.config.launcher
-        : ({
-            searchUrl: "https://duckduckgo.com/?q={query}",
-            bangs: ({})
-        })
+    readonly property var launcherConfig: ConfigService.settings.launcher
 
     function open() {
         root.shown = true;
@@ -319,7 +316,7 @@ Singleton {
 
     Connections {
         target: ConfigService
-        function onConfigChanged() { root.rebuild(); }
+        function onSettingsChanged() { root.rebuild(); }
     }
 
     Connections {

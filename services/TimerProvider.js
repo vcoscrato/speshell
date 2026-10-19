@@ -1,6 +1,6 @@
 .pragma library
 
-// Timer lengths as typed and shown.
+// Timer lengths and names as typed.
 
 var presets = [5, 10, 25, 45];
 var longest = 24 * 3600;
@@ -32,30 +32,6 @@ function parseDuration(text) {
     }
     total = Math.round(total);
     return total > 0 && total <= longest ? total : 0;
-}
-
-// "1 h 30 min", "25 min", "45 s".
-function formatLength(seconds) {
-    var hours = Math.floor(seconds / 3600);
-    var minutes = Math.floor(seconds % 3600 / 60);
-    var rest = seconds % 60;
-    var parts = [];
-    if (hours > 0)
-        parts.push(hours + " h");
-    if (minutes > 0)
-        parts.push(minutes + " min");
-    if (rest > 0 || parts.length === 0)
-        parts.push(rest + " s");
-    return parts.join(" ");
-}
-
-// "4:05", or "1:02:03" past an hour.
-function formatClock(seconds) {
-    var hours = Math.floor(seconds / 3600);
-    var minutes = Math.floor(seconds % 3600 / 60);
-    var rest = seconds % 60;
-    var pad = function(value) { return (value < 10 ? "0" : "") + value; };
-    return (hours > 0 ? hours + ":" + pad(minutes) : String(minutes)) + ":" + pad(rest);
 }
 
 // A length and a name, as the timer panel and `speshell timer` take them: the length

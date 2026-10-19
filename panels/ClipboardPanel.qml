@@ -4,6 +4,7 @@ import qs.components
 import qs.services
 import qs.theme
 
+// Clipboard history to search and copy back from.
 Card {
     id: root
     title: "Clipboard"
@@ -30,11 +31,8 @@ Card {
     Component.onCompleted: ClipboardService.setViewPresented(root.presented)
     Component.onDestruction: ClipboardService.setViewPresented(false)
 
-    headerActions: IconButton {
+    headerActions: HeaderButton {
         iconName: "trash"
-        iconSize: Theme.iconSizeSmall
-        size: Theme.controlHeightSmall
-        iconColor: Theme.subtextBright
         visible: root.history.length > 0
         tooltipText: "Clear clipboard history"
         onClicked: ClipboardService.clearHistory()
@@ -44,83 +42,20 @@ Card {
         width: parent.width
         spacing: Theme.spacingSmall
 
-        Rectangle {
-            width: parent.width
-            height: Theme.controlHeight
+        Field {
             visible: root.history.length > 0
-            radius: Theme.borderRadiusSmall
-            color: Theme.controlFill
-            border.width: Theme.borderWidth
-            border.color: searchInput.activeFocus ? Theme.selectedBorder : Theme.controlBorder
-
-            AppIcon {
-                id: searchIcon
-                anchors.left: parent.left
-                anchors.leftMargin: Theme.spacingSmall
-                anchors.verticalCenter: parent.verticalCenter
-                name: "search"
-                size: Theme.iconSizeSmall
-                iconColor: searchInput.activeFocus ? Theme.accent : Theme.subtext
-            }
-
-            TextInput {
-                id: searchInput
-                anchors.left: searchIcon.right
-                anchors.leftMargin: Theme.spacingSmall
-                anchors.right: clearSearch.visible ? clearSearch.left : parent.right
-                anchors.rightMargin: Theme.spacingSmall
-                anchors.verticalCenter: parent.verticalCenter
-                text: root.query
-                color: Theme.text
-                selectionColor: Theme.accent
-                selectedTextColor: Theme.onAccent
-                font.pixelSize: Theme.fontSizeSmall
-                font.family: Theme.fontFamily
-                clip: true
-                onTextEdited: root.query = text
-                Keys.onEscapePressed: function(event) {
-                    if (root.query === "") {
-                        event.accepted = false;
-                        return;
-                    }
-                    root.query = "";
-                }
-
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "Search " + root.history.length + (root.history.length === 1 ? " item" : " items")
-                    color: Theme.overlay
-                    font: searchInput.font
-                    visible: searchInput.text === "" && !searchInput.preeditText
-                }
-            }
-
-            IconButton {
-                id: clearSearch
-                anchors.right: parent.right
-                anchors.rightMargin: Theme.spacingTiny
-                anchors.verticalCenter: parent.verticalCenter
-                visible: root.query !== ""
-                iconName: "close"
-                iconSize: Theme.iconSizeTiny
-                size: Theme.controlHeightSmall
-                iconColor: Theme.subtext
-                tooltipText: "Clear search"
-                onClicked: root.query = ""
-            }
+            iconName: "search"
+            clearable: true
+            placeholder: "Search " + root.history.length + (root.history.length === 1 ? " item" : " items")
+            text: root.query
+            onEdited: root.query = text
         }
 
-        Text {
+        Label {
+            role: "caption"
             width: parent.width
             text: ClipboardService.feedbackText
-            font.pixelSize: Theme.fontSizeCaption
-            font.family: Theme.fontFamily
-            color: {
-                if (ClipboardService.feedbackTone === "success") return Theme.success;
-                if (ClipboardService.feedbackTone === "warning") return Theme.warning;
-                if (ClipboardService.feedbackTone === "error") return Theme.error;
-                return Theme.subtext;
-            }
+            color: ClipboardService.feedbackTone === "neutral" ? Theme.subtext : Theme.toneColor(ClipboardService.feedbackTone)
             elide: Text.ElideRight
             visible: text !== ""
         }
@@ -144,7 +79,7 @@ Card {
                         ? thumbnailFrame.height + Theme.spacingSmall * 2
                         : Math.max(Theme.controlHeight + Theme.spacingSmall,
                             previewText.implicitHeight + Theme.spacingSmall * 2)
-                    radius: Theme.borderRadiusSmall
+                    radius: Theme.borderRadius
                     color: clipMouse.containsMouse
                         ? Theme.cardHover
                         : (clipRow.lastCopied ? Theme.selectedFill : Theme.controlFill)
@@ -164,7 +99,7 @@ Card {
                         anchors.verticalCenter: parent.verticalCenter
                         width: 112
                         height: 64
-                        radius: Theme.borderRadiusSmall
+                        radius: Theme.borderRadius
                         color: Theme.crust
                         clip: true
 
@@ -187,7 +122,7 @@ Card {
                         }
                     }
 
-                    Text {
+                    Label {
                         id: previewText
                         anchors.left: clipRow.image ? thumbnailFrame.right : parent.left
                         anchors.right: parent.right
@@ -196,7 +131,6 @@ Card {
                         anchors.rightMargin: Theme.spacingSmall
                         text: clipRow.modelData.preview
                         font.pixelSize: clipRow.image ? Theme.fontSizeCaption : Theme.fontSizeSmall
-                        font.family: Theme.fontFamily
                         color: clipRow.image || clipRow.modelData.kind === "binary"
                             ? Theme.subtext
                             : (clipRow.modelData.kind === "link" ? Theme.accent : Theme.text)

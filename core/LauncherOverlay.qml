@@ -12,10 +12,10 @@ import qs.services
 import "../services/ThemeProvider.js" as ThemeProvider
 import qs.theme
 
+// The launcher window: the search field and results over a dimmed screen, entering and
+// leaving with the theme's launcher transition.
 PanelWindow {
     id: root
-
-    property var config: null
     property bool opened: false
     // Mapped on screen; outlives `opened` while an effects transition plays the exit.
     property bool presenting: false
@@ -29,16 +29,32 @@ PanelWindow {
     readonly property bool transitionReady: transitionLoader.status === Loader.Ready
     readonly property var results: LauncherService.results || []
     readonly property int resultCount: root.results.length
-    readonly property var launcherConfig: root.config && root.config.launcher ? root.config.launcher : ({})
-    readonly property int configuredWidth: root.launcherConfig.width || 540
-    readonly property int configuredVisibleRows: root.launcherConfig.visibleRows || 5
+    readonly property int configuredWidth: ConfigService.settings.launcher.width
+    readonly property int configuredVisibleRows: ConfigService.settings.launcher.visibleRows
     readonly property int paletteWidth: Math.min(root.configuredWidth, Math.max(320, root.width - Theme.spacingXL * 2))
     readonly property int resultRowHeight: Math.max(56,
         Math.ceil((Theme.fontSizeNormal + Theme.fontSizeSmall) * 1.25)
             + Theme.spacingMedium * 2)
+
     readonly property int resultSpacing: Theme.spacingTiny
     readonly property int resultViewportHeight: root.configuredVisibleRows * root.resultRowHeight
         + Math.max(0, root.configuredVisibleRows - 1) * root.resultSpacing
+
+    visible: root.presenting && root.targetScreen !== null
+    screen: root.targetScreen
+    color: "transparent"
+    focusable: true
+    aboveWindows: true
+    exclusionMode: ExclusionMode.Ignore
+    updatesEnabled: root.visible
+
+    WlrLayershell.namespace: "speshell-launcher"
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.keyboardFocus: root.visible && root.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    // Click-through while the exit transition plays.
+    mask: root.opened ? null : passThrough
+
+    anchors { left: true; right: true; top: true; bottom: true }
 
     function clampSelected() {
         root.selectedIndex = root.resultCount <= 0
@@ -86,17 +102,6 @@ PanelWindow {
         root.selectedIndex = 0;
     }
 
-    Connections {
-        target: LauncherService
-
-        function onShownChanged() {
-            if (LauncherService.shown)
-                root.openLauncher();
-            else
-                root.closeLauncher();
-        }
-    }
-
     function activateSelected() {
         if (root.resultCount <= 0)
             return;
@@ -110,21 +115,28 @@ PanelWindow {
         return Quickshell.iconPath(result.iconSource, true);
     }
 
-    visible: root.presenting && root.targetScreen !== null
-    screen: root.targetScreen
-    color: "transparent"
-    focusable: true
-    aboveWindows: true
-    exclusionMode: ExclusionMode.Ignore
-    updatesEnabled: root.visible
+    onResultCountChanged: root.clampSelected()
+    onVisibleChanged: {
+        if (root.visible) {
+            resultsList.contentY = 0;
+            focusTimer.restart();
+        } else {
+            focusTimer.stop();
+            root.focusGrabActive = false;
+        }
+    }
+    onBackingWindowVisibleChanged: if (root.mapped) focusTimer.restart()
 
-    WlrLayershell.namespace: "speshell-launcher"
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: root.visible && root.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-    // Click-through while the exit transition plays.
-    mask: root.opened ? null : passThrough
+    Connections {
+        target: LauncherService
 
-    anchors { left: true; right: true; top: true; bottom: true }
+        function onShownChanged() {
+            if (LauncherService.shown)
+                root.openLauncher();
+            else
+                root.closeLauncher();
+        }
+    }
 
     Region { id: passThrough }
 
@@ -139,18 +151,6 @@ PanelWindow {
         interval: Math.round(2500 / Math.max(0.25, transitionLoader.timeScale))
         onTriggered: root.finishPresentation()
     }
-
-    onResultCountChanged: root.clampSelected()
-    onVisibleChanged: {
-        if (root.visible) {
-            resultsList.contentY = 0;
-            focusTimer.restart();
-        } else {
-            focusTimer.stop();
-            root.focusGrabActive = false;
-        }
-    }
-    onBackingWindowVisibleChanged: if (root.mapped) focusTimer.restart()
 
     Timer {
         id: focusTimer
@@ -183,10 +183,15 @@ PanelWindow {
 
     Item {
         id: launcherPanel
+
+        // As tall as every result row makes it. Placed by that, the search field stays
+        // put while the results come and go below it.
+        readonly property real fullHeight: searchBox.height + paletteColumn.spacing
+            + root.resultViewportHeight + Theme.spacingLarge * 2
+
         z: 1
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.verticalCenter: parent.verticalCenter
-        anchors.verticalCenterOffset: -Math.round(parent.height * 0.10)
+        y: Math.max(Theme.spacingXL, Math.round((parent.height - fullHeight) / 2 - parent.height * 0.10))
         width: root.paletteWidth
         height: paletteColumn.implicitHeight + Theme.spacingLarge * 2
         clip: true
@@ -216,14 +221,16 @@ PanelWindow {
             spacing: Theme.spacingMedium
 
             Rectangle {
+                id: searchBox
                 width: parent.width
                 height: Math.max(48,
                     Math.ceil(Theme.fontSizeLarge * 1.35)
                         + Theme.spacingMedium * 2)
-                radius: Theme.borderRadiusSmall
-                color: Theme.card
+                // Field's look, at the launcher's size.
+                radius: Theme.borderRadius
+                color: Theme.controlFill
                 border.width: Theme.borderWidth
-                border.color: searchField.activeFocus ? Theme.accent : Theme.cardHover
+                border.color: searchField.activeFocus ? Theme.accent : Theme.controlBorder
 
                 AppIcon {
                     anchors.left: parent.left
@@ -279,14 +286,13 @@ PanelWindow {
                     }
                 }
 
-                Text {
+                Label {
                     anchors.left: searchField.left
                     anchors.right: searchField.right
                     anchors.verticalCenter: parent.verticalCenter
                     text: "Search apps, calculate, ! for commands, ? for the web"
                     elide: Text.ElideRight
                     color: Theme.subtext
-                    font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSizeNormal
                     visible: searchField.text === "" && !searchField.preeditText
                 }
@@ -318,7 +324,7 @@ PanelWindow {
 
                     width: resultsList.width - resultsList.scrollGutter
                     height: root.resultRowHeight
-                    radius: Theme.borderRadiusSmall
+                    radius: Theme.borderRadius
                     opacity: modelData.activatable === false ? 0.72 : 1.0
                     color: resultRow.index === root.selectedIndex
                         ? Theme.selectedFill
@@ -372,39 +378,35 @@ PanelWindow {
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 2
 
-                        Text {
+                        Label {
                             width: parent.width
                             text: resultRow.modelData.title || ""
                             color: Theme.text
-                            font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeNormal
                             font.bold: resultRow.modelData.kind === "calculator"
                             elide: Text.ElideRight
                         }
 
-                        Text {
+                        Label {
                             width: parent.width
                             text: resultRow.modelData.subtitle || ""
                             color: resultRow.modelData.kind === "error"
                                 ? Theme.error
                                 : Theme.subtext
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeSmall
                             elide: Text.ElideRight
                             visible: text !== ""
                         }
                     }
 
-                    Text {
+                    Label {
                         id: resultKind
                         anchors.right: parent.right
                         anchors.rightMargin: Theme.spacingMedium
                         anchors.verticalCenter: parent.verticalCenter
                         text: resultRow.modelData.badge || ""
                         color: resultRow.index === root.selectedIndex ? Theme.accent : Theme.overlay
-                        font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeMicro
-                        font.bold: true
+                        font.weight: Font.Bold
                         font.letterSpacing: 0.8
                     }
 
@@ -441,22 +443,19 @@ PanelWindow {
                         anchors.verticalCenter: parent.verticalCenter
                     }
 
-                    Text {
+                    Label {
                         text: LauncherService.emptyMessage()
                         color: Theme.subtext
-                        font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeNormal
                         anchors.verticalCenter: parent.verticalCenter
                     }
                 }
             }
 
-            Text {
+            Label {
                 width: parent.width
                 text: LauncherService.activationError
                 color: Theme.error
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeSmall
                 wrapMode: Text.WordWrap
                 visible: text !== ""
             }

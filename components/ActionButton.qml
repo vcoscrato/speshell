@@ -33,7 +33,7 @@ Item {
     implicitHeight: Math.max(root.compact ? Theme.controlHeightSmall : Theme.controlHeight,
         labelMetrics.height + Theme.spacingSmall * 2)
     opacity: root.enabled ? 1 : Theme.disabledOpacity
-    scale: root.pressed ? 0.96 : 1
+    scale: root.pressed ? Theme.pressScale : 1
 
     Behavior on scale {
         NumberAnimation { duration: Theme.animDurationFast; easing.type: Theme.animEasing }
@@ -73,7 +73,7 @@ Item {
             PathRectangle {
                 width: root.width
                 height: root.height
-                radius: Theme.borderRadiusSmall
+                radius: Theme.borderRadius
                 strokeAdjustment: Theme.borderWidth
             }
         }

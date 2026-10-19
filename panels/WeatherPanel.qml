@@ -3,6 +3,7 @@ import QtQuick
 import qs.components
 import qs.services
 import qs.theme
+import "../components/Format.js" as Format
 
 // The weather: the conditions now, the next hours, and the coming days, each day's
 // range drawn on the week's.
@@ -18,9 +19,11 @@ Card {
     readonly property var hours: WeatherService.hours
         .filter(hour => hour.time.getTime() + 3600 * 1000 > root.now.getTime())
         .slice(1, 9)
+
     readonly property var days: WeatherService.days
         .filter(day => day.date.getTime() + 24 * 3600 * 1000 > root.now.getTime())
         .slice(0, 7)
+
     readonly property var today: root.days.length > 0 ? root.days[0] : null
     // The next sunrise or sunset: { sunrise: bool, time: Date }, or null.
     readonly property var nextSun: {
@@ -39,39 +42,13 @@ Card {
     title: "Weather"
     iconName: "cloud"
 
-    onPresentedChanged: {
-        root.now = new Date();
-        if (root.presented)
-            WeatherService.refreshIfStale();
-    }
-
-    Timer {
-        interval: 60 * 1000
-        repeat: true
-        running: root.presented
-        onTriggered: root.now = new Date()
-    }
-
-    // Types a new location into the field under the header, starting from the saved one.
-    function editLocation() {
-        locationField.text = WeatherService.location;
-        root.editingLocation = true;
-    }
-
-    function saveLocation() {
-        const location = locationField.text.trim();
-        root.editingLocation = false;
-        if (location !== WeatherService.location)
-            ConfigService.setProperty("Weather", "location", location);
-    }
-
     headerActions: [
         // The place, which opens the location field.
         Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             width: placeRow.width + Theme.spacingSmall * 2
             height: Theme.controlHeightSmall
-            radius: Theme.borderRadiusSmall
+            radius: Theme.borderRadius
             color: root.editingLocation ? Theme.selectedFill : (placeArea.containsMouse ? Theme.cardHover : "transparent")
 
             Accessible.role: Accessible.Button
@@ -90,13 +67,12 @@ Card {
                     iconColor: root.editingLocation ? Theme.accent : Theme.subtext
                 }
 
-                Text {
+                Label {
+                    role: "caption"
                     anchors.verticalCenter: parent.verticalCenter
                     width: Math.min(implicitWidth, root.width * 0.5)
                     text: WeatherService.place || WeatherService.location || "Automatic"
                     elide: Text.ElideRight
-                    font.pixelSize: Theme.fontSizeCaption
-                    font.family: Theme.fontFamily
                     color: placeArea.containsMouse ? Theme.text : Theme.subtext
                 }
             }
@@ -115,22 +91,92 @@ Card {
             }
         },
 
-        RefreshButton {
-            active: WeatherService.status === "loading"
-            enabled: !active
+        HeaderButton {
+            iconName: "refresh"
+            busy: WeatherService.status === "loading"
+            enabled: !busy
             tooltipText: "Refresh the weather"
             onClicked: WeatherService.refresh()
         }
     ]
 
-    pinnedContent: InlinePrompt {
+    pinnedContent: Field {
         id: locationField
         visible: root.editingLocation
-        masked: false
-        showActions: false
+        autoFocus: true
         placeholder: "A city, or empty to locate by IP address"
         onAccepted: root.saveLocation()
         onCancelled: root.editingLocation = false
+    }
+
+    component Separator: Rectangle {
+        visible: WeatherService.ready
+        width: parent ? parent.width : 0
+        height: Theme.separatorThickness
+        color: Theme.separator
+    }
+
+    // A small icon and its value over what it measures.
+    component Stat: Column {
+        id: stat
+
+        property string iconName: ""
+        property string text: ""
+        property string label: ""
+
+        spacing: Theme.spacingMicro
+
+        Row {
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: Theme.spacingTiny
+
+            AppIcon {
+                anchors.verticalCenter: parent.verticalCenter
+                name: stat.iconName
+                size: Theme.iconSizeSmall
+                iconColor: Theme.subtextBright
+            }
+
+            Label {
+                anchors.verticalCenter: parent.verticalCenter
+                text: stat.text
+                font.weight: Font.DemiBold
+                font.features: { "tnum": 1 }
+            }
+        }
+
+        Label {
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: stat.label
+            font.pixelSize: Theme.fontSizeMicro
+            color: Theme.subtext
+        }
+    }
+
+    // Types a new location into the field under the header, starting from the saved one.
+    function editLocation() {
+        locationField.text = WeatherService.location;
+        root.editingLocation = true;
+    }
+
+    function saveLocation() {
+        const location = locationField.text.trim();
+        root.editingLocation = false;
+        if (location !== WeatherService.location)
+            ConfigService.setProperty("Weather", "location", location);
+    }
+
+    onPresentedChanged: {
+        root.now = new Date();
+        if (root.presented)
+            WeatherService.refreshIfStale();
+    }
+
+    Timer {
+        interval: 60 * 1000
+        repeat: true
+        running: root.presented
+        onTriggered: root.now = new Date()
     }
 
     // ── Loading, or why there is no forecast ──
@@ -168,14 +214,11 @@ Card {
                 iconColor: Theme.accent
             }
 
-            Text {
+            Label {
+                role: "display"
                 anchors.verticalCenter: parent.verticalCenter
                 text: WeatherService.temperatureText(WeatherService.current.temperature)
-                font.pixelSize: Theme.fontSizeHuge
-                font.family: Theme.fontFamily
-                font.weight: Font.DemiBold
                 font.features: { "tnum": 1 }
-                color: Theme.text
             }
         }
 
@@ -186,33 +229,26 @@ Card {
             anchors.verticalCenter: parent.verticalCenter
             spacing: Theme.spacingMicro
 
-            Text {
+            Label {
+                role: "title"
                 width: parent.width
                 text: WeatherService.current.condition
                 elide: Text.ElideRight
-                font.pixelSize: Theme.fontSizeNormal
-                font.family: Theme.fontFamily
-                font.weight: Font.DemiBold
-                color: Theme.text
             }
 
-            Text {
+            Label {
                 width: parent.width
                 text: "Feels like " + WeatherService.temperatureText(WeatherService.current.apparent)
                 elide: Text.ElideRight
-                font.pixelSize: Theme.fontSizeSmall
-                font.family: Theme.fontFamily
                 color: Theme.subtextBright
             }
 
-            Text {
+            Label {
                 visible: root.today !== null
                 width: parent.width
                 text: root.today ? "High " + WeatherService.temperatureText(root.today.high)
                     + " · Low " + WeatherService.temperatureText(root.today.low) : ""
                 elide: Text.ElideRight
-                font.pixelSize: Theme.fontSizeSmall
-                font.family: Theme.fontFamily
                 font.features: { "tnum": 1 }
                 color: Theme.subtext
             }
@@ -247,7 +283,7 @@ Card {
         Stat {
             width: parent.width / 4
             iconName: root.nextSun && root.nextSun.sunrise ? "weather-sunrise" : "weather-sunset"
-            text: root.nextSun ? Qt.formatTime(root.nextSun.time, "HH:mm") : "–"
+            text: root.nextSun ? Format.time(root.nextSun.time) : "–"
             label: root.nextSun && root.nextSun.sunrise ? "Sunrise" : "Sunset"
         }
     }
@@ -255,6 +291,7 @@ Card {
     Separator {}
 
     // ── The next hours ──
+
     Row {
         visible: WeatherService.ready
         width: parent.width
@@ -270,13 +307,11 @@ Card {
                 width: parent.width / Math.max(1, root.hours.length)
                 spacing: Theme.spacingTiny
 
-                Text {
+                Label {
+                    role: "caption"
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: Qt.formatTime(hour.modelData.time, "HH:mm")
-                    font.pixelSize: Theme.fontSizeCaption
-                    font.family: Theme.fontFamily
+                    text: Format.time(hour.modelData.time)
                     font.features: { "tnum": 1 }
-                    color: Theme.subtext
                 }
 
                 AppIcon {
@@ -286,23 +321,19 @@ Card {
                     iconColor: Theme.subtextBright
                 }
 
-                Text {
+                Label {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: WeatherService.temperatureText(hour.modelData.temperature)
-                    font.pixelSize: Theme.fontSizeSmall
-                    font.family: Theme.fontFamily
                     font.weight: Font.DemiBold
                     font.features: { "tnum": 1 }
-                    color: Theme.text
                 }
 
                 // Kept for every hour, so the row stays level.
-                Text {
+                Label {
                     anchors.horizontalCenter: parent.horizontalCenter
                     opacity: hour.modelData.rain >= 10 ? 1 : 0
                     text: hour.modelData.rain + "%"
                     font.pixelSize: Theme.fontSizeMicro
-                    font.family: Theme.fontFamily
                     font.features: { "tnum": 1 }
                     color: Theme.sky
                 }
@@ -329,13 +360,11 @@ Card {
                 width: parent.width
                 height: Math.max(Theme.controlHeightSmall + Theme.spacingTiny, dayName.implicitHeight + Theme.spacingSmall)
 
-                Text {
+                Label {
                     id: dayName
                     anchors.verticalCenter: parent.verticalCenter
                     width: 48
                     text: day.index === 0 ? "Today" : Qt.formatDate(day.modelData.date, "ddd")
-                    font.pixelSize: Theme.fontSizeSmall
-                    font.family: Theme.fontFamily
                     font.weight: day.index === 0 ? Font.DemiBold : Font.Normal
                     color: day.index === 0 ? Theme.accent : Theme.text
                 }
@@ -349,29 +378,26 @@ Card {
                     iconColor: Theme.subtextBright
                 }
 
-                Text {
+                Label {
                     id: dayRain
+                    role: "caption"
                     anchors.left: dayIcon.right
                     anchors.leftMargin: Theme.spacingTiny
                     anchors.verticalCenter: parent.verticalCenter
                     width: 30
                     opacity: day.modelData.rain >= 20 ? 1 : 0
                     text: Math.round(day.modelData.rain) + "%"
-                    font.pixelSize: Theme.fontSizeCaption
-                    font.family: Theme.fontFamily
                     font.features: { "tnum": 1 }
                     color: Theme.sky
                 }
 
-                Text {
+                Label {
                     id: dayLow
                     anchors.left: dayRain.right
                     anchors.verticalCenter: parent.verticalCenter
                     width: 32
                     horizontalAlignment: Text.AlignRight
                     text: WeatherService.temperatureText(day.modelData.low)
-                    font.pixelSize: Theme.fontSizeSmall
-                    font.family: Theme.fontFamily
                     font.features: { "tnum": 1 }
                     color: Theme.subtext
                 }
@@ -406,68 +432,17 @@ Card {
                     }
                 }
 
-                Text {
+                Label {
                     id: dayHigh
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     width: 32
                     horizontalAlignment: Text.AlignRight
                     text: WeatherService.temperatureText(day.modelData.high)
-                    font.pixelSize: Theme.fontSizeSmall
-                    font.family: Theme.fontFamily
                     font.weight: Font.DemiBold
                     font.features: { "tnum": 1 }
-                    color: Theme.text
                 }
             }
-        }
-    }
-
-    component Separator: Rectangle {
-        visible: WeatherService.ready
-        width: parent ? parent.width : 0
-        height: Theme.separatorThickness
-        color: Theme.separator
-    }
-
-    // A small icon and its value over what it measures.
-    component Stat: Column {
-        id: stat
-
-        property string iconName: ""
-        property string text: ""
-        property string label: ""
-
-        spacing: Theme.spacingMicro
-
-        Row {
-            anchors.horizontalCenter: parent.horizontalCenter
-            spacing: Theme.spacingTiny
-
-            AppIcon {
-                anchors.verticalCenter: parent.verticalCenter
-                name: stat.iconName
-                size: Theme.iconSizeSmall
-                iconColor: Theme.subtextBright
-            }
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: stat.text
-                font.pixelSize: Theme.fontSizeSmall
-                font.family: Theme.fontFamily
-                font.weight: Font.DemiBold
-                font.features: { "tnum": 1 }
-                color: Theme.text
-            }
-        }
-
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: stat.label
-            font.pixelSize: Theme.fontSizeMicro
-            font.family: Theme.fontFamily
-            color: Theme.subtext
         }
     }
 }

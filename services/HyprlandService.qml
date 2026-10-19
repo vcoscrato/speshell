@@ -2,6 +2,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Hyprland
+import Quickshell.Io
 
 // Speshell's integration with Hyprland: whether it runs this session, its focused
 // monitor, its events, and its dispatchers. Everything Hyprland-only goes through
@@ -15,6 +16,7 @@ Singleton {
     readonly property string focusedMonitor: root.running && Hyprland.focusedMonitor
         ? Hyprland.focusedMonitor.name
         : ""
+    property string version: ""
 
     // Hyprland's socket events, as `name>>data` lines split at the `>>`.
     signal event(string name, string data)
@@ -45,6 +47,18 @@ Singleton {
             .replace(/"/g, "\\\"")
             .replace(/\r/g, "\\r")
             .replace(/\n/g, "\\n") + "\"";
+    }
+
+    Process {
+        running: root.running
+        command: ["hyprctl", "version"]
+        stdout: SplitParser {
+            onRead: line => {
+                const match = String(line || "").match(/^Hyprland\s+(\S+)/);
+                if (match && root.version === "")
+                    root.version = match[1];
+            }
+        }
     }
 
     Connections {

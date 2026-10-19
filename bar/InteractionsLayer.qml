@@ -14,25 +14,6 @@ Item {
     // Untyped, so the effects' functions can be called on it.
     readonly property var interactions: effectsLoader.item
 
-    Loader {
-        id: effectsLoader
-
-        // EffectClock runs at this speed and frame rate.
-        property real timeScale: EffectsService.controlsSpeed
-        property int frameRate: EffectsService.frameRate
-
-        anchors.fill: parent
-        enabled: false
-        active: root.presented && EffectsService.interactions !== null
-        sourceComponent: EffectsService.interactions
-    }
-
-    Binding {
-        target: effectsLoader.item
-        property: "theme"
-        value: Theme
-    }
-
     // Whether `item` is part of the host; popups and other windows are not.
     function holds(item) {
         for (var parentItem = item; parentItem; parentItem = parentItem.parent) {
@@ -52,6 +33,25 @@ Item {
         if (pointer)
             return pointer.mapToItem(root, pointer.mouseX, pointer.mouseY);
         return Qt.point(area.x + area.width / 2, area.y + area.height / 2);
+    }
+
+    Loader {
+        id: effectsLoader
+
+        // EffectClock runs at this speed and frame rate.
+        property real timeScale: EffectsService.controlsSpeed
+        property int frameRate: EffectsService.frameRate
+
+        anchors.fill: parent
+        enabled: false
+        active: root.presented && EffectsService.interactions !== null
+        sourceComponent: EffectsService.interactions
+    }
+
+    Binding {
+        target: effectsLoader.item
+        property: "theme"
+        value: Theme
     }
 
     Connections {

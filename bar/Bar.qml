@@ -18,13 +18,10 @@ PanelWindow {
     id: root
 
     required property var modelData
-    property var config: null
 
     // [Bar] position, height, width (percent of the screen), margin (from the screen's
     // edge; 0 docks the bar there), gap (to the windows), and outline.
-    readonly property var settings: root.config
-        ? root.config.bar
-        : ({ position: "top", height: 40, width: 100, margin: 0, gap: 0, outline: "edges" })
+    readonly property var settings: ConfigService.settings.bar
     readonly property bool atTop: root.settings.position !== "bottom"
     readonly property bool docked: root.settings.margin === 0
     readonly property bool fullWidth: strip.width >= root.width
@@ -46,6 +43,22 @@ PanelWindow {
     readonly property bool dropdownOpen: root.openPanel !== ""
     property int openMenus: 0
     readonly property bool overlayOpen: root.dropdownOpen || root.openMenus > 0
+
+    // A thin line between groups of bar items.
+    component Separator: Rectangle {
+        anchors.verticalCenter: parent.verticalCenter
+        width: Theme.separatorThickness
+        color: Theme.separator
+    }
+
+    // A recessed well holding a group of chips or icons.
+    component Well: Rectangle {
+        anchors.verticalCenter: parent.verticalCenter
+        radius: Theme.borderRadius
+        color: Theme.controlFill
+        border.width: Theme.borderWidth
+        border.color: Theme.controlBorder
+    }
 
     onDropdownOpenChanged: PanelService.openDropdowns += root.dropdownOpen ? 1 : -1
     Component.onDestruction: if (root.dropdownOpen) PanelService.openDropdowns -= 1
@@ -209,12 +222,9 @@ PanelWindow {
                     }
                 }
 
-                Rectangle {
-                    anchors.verticalCenter: parent.verticalCenter
+                Separator {
                     visible: workspaces.visible
-                    width: Theme.separatorThickness
                     height: Math.min(Theme.controlHeightSmall, root.itemSize)
-                    color: Theme.separator
                 }
 
                 Workspaces {
@@ -284,15 +294,10 @@ PanelWindow {
 
                 // The timers, each opening to set or control it, and what's running, in a
                 // well of their own.
-                Rectangle {
-                    anchors.verticalCenter: parent.verticalCenter
+                Well {
                     visible: timerChips.count + activityChips.count > 0
                     width: timerRow.implicitWidth + Theme.spacingMicro * 2
                     height: root.itemSize
-                    radius: Theme.borderRadius
-                    color: Theme.controlFill
-                    border.width: Theme.borderWidth
-                    border.color: Theme.controlBorder
 
                     Row {
                         id: timerRow
@@ -340,15 +345,10 @@ PanelWindow {
                 spacing: Theme.spacingTiny
 
                 // Other apps' icons, in a well of their own.
-                Rectangle {
-                    anchors.verticalCenter: parent.verticalCenter
+                Well {
                     visible: trayRepeater.count > 0
                     width: trayRow.implicitWidth + Theme.spacingTiny * 2
                     height: root.itemSize
-                    radius: Theme.borderRadius
-                    color: Theme.controlFill
-                    border.width: Theme.borderWidth
-                    border.color: Theme.controlBorder
 
                     Row {
                         id: trayRow
@@ -394,12 +394,9 @@ PanelWindow {
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: Theme.spacingTiny
 
-                        Rectangle {
-                            anchors.verticalCenter: parent.verticalCenter
+                        Separator {
                             visible: group.index > 0
-                            width: Theme.separatorThickness
                             height: Math.min(Theme.controlHeightSmall, root.itemSize)
-                            color: Theme.separator
                         }
 
                         Repeater {

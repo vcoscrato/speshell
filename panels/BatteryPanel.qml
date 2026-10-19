@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell.Services.UPower
 import qs.components
 import qs.theme
+import "../components/Format.js" as Format
 
 // The laptop battery's charge, whether it charges, and the time to full or empty.
 Card {
@@ -20,13 +21,9 @@ Card {
     title: "Battery"
     iconName: "battery"
 
-    // "2 h 5 min", or "" when unknown.
+    // "2 h 5 min", to the minute, or "" when unknown.
     function duration(seconds) {
-        if (!seconds || seconds <= 0)
-            return "";
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor(seconds % 3600 / 60);
-        return hours > 0 ? hours + " h " + minutes + " min" : minutes + " min";
+        return seconds > 0 ? Format.duration(Math.max(60, Math.round(seconds / 60) * 60)) : "";
     }
 
     readonly property string detail: {
@@ -46,19 +43,16 @@ Card {
         width: parent.width
         height: Math.max(percentText.implicitHeight, gauge.height)
 
-        Text {
+        Label {
             id: percentText
+            role: "display"
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
             text: root.ready ? Math.round(root.percent) + "%" : "—"
-            font.pixelSize: Theme.fontSizeTitle
-            font.family: Theme.fontFamily
-            font.weight: Font.DemiBold
             font.features: { "tnum": 1 }
-            color: Theme.text
         }
 
-        Text {
+        Label {
             anchors.left: percentText.right
             anchors.leftMargin: Theme.spacingMedium
             anchors.right: gauge.left
@@ -66,8 +60,6 @@ Card {
             anchors.verticalCenter: parent.verticalCenter
             text: root.detail
             elide: Text.ElideRight
-            font.pixelSize: Theme.fontSizeSmall
-            font.family: Theme.fontFamily
             color: Theme.subtext
         }
 
@@ -93,7 +85,7 @@ Card {
                     y: 3
                     width: (frame.width - 6) * Math.max(0, Math.min(1, root.percent / 100))
                     height: frame.height - 6
-                    radius: Theme.borderRadiusSmall
+                    radius: Theme.borderRadius
                     color: root.tone
 
                     Behavior on width {

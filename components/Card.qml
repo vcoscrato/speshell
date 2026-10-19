@@ -1,6 +1,8 @@
 import QtQuick
 import qs.theme
 
+// A panel's body: an optional header with an icon, a title, and actions, then content
+// pinned at the top and the rest below.
 Item {
     id: root
 
@@ -13,9 +15,7 @@ Item {
     implicitWidth: Theme.panelWidth
     implicitHeight: container.implicitHeight
 
-    // Don't animate implicitHeight: under Qt 6.12, animating this clipped card's
-    // height over large content (a long Notes preview) segfaults the scene graph
-    // renderer in QSGBatchRenderer::prepareAlphaBatches.
+    // Its height follows the content at once; the dropdown hosting it animates.
     clip: true
 
     Column {
@@ -43,13 +43,9 @@ Item {
                     visible: root.iconName !== ""
                 }
 
-                Text {
+                Label {
+                    role: "section"
                     text: root.title
-                    font.pixelSize: Theme.fontSizeSmall
-                    font.family: Theme.fontFamily
-                    font.capitalization: Font.AllUppercase
-                    font.letterSpacing: 0.8
-                    color: Theme.subtext
                 }
             }
 

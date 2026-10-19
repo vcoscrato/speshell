@@ -60,10 +60,10 @@ Singleton {
     // [Appearance] drawWallpaper: Speshell draws the desktop background, showing
     // the default wallpaper for themes without their own. Off by default so other
     // wallpaper tools keep working; themes still set colors and effects.
-    property bool wallpaperEnabled: false
+    readonly property bool wallpaperEnabled: ConfigService.settings.appearance.drawWallpaper
     // [Appearance] shuffleAtLaunch: off, wallpaper, theme, or both, picked at
-    // random once the themes are known; "" until the config is applied.
-    property string launchShuffle: ""
+    // random once the themes are known; "" until config.ini loads, which may ask for one.
+    readonly property string launchShuffle: ConfigService.config ? ConfigService.config.appearance.shuffleAtLaunch : ""
     property bool launched: false
     // The wallpaper to draw: held back until the launch pick, so startup does not
     // show the saved one only to replace it.

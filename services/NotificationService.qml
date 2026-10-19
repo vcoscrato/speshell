@@ -4,13 +4,15 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
+// Notifications: the history, the toasts on screen and when each expires, Do Not
+// Disturb (kept across restarts), and Speshell's own notices.
 Singleton {
     id: root
 
     property bool dndEnabled: false
     property bool dndChangedThisSession: false
     // Maximum simultaneous toasts; -1 shows every toast.
-    property int maxVisible: 3
+    readonly property int maxVisible: ConfigService.settings.notifications.maxVisible
     property var notificationHistory: []
     property var activePopups: []
     property int popupCounter: 0
@@ -80,23 +82,6 @@ Singleton {
             popup.notification.expire();
     }
 
-    function launchDesktopEntry(desktopEntryId) {
-        var requested = String(desktopEntryId || "");
-        if (requested === "")
-            return false;
-        var entries = DesktopEntries.applications && DesktopEntries.applications.values
-            ? DesktopEntries.applications.values : [];
-        for (var i = 0; i < entries.length; i++) {
-            var id = String(entries[i].id || "");
-            if (id === requested || id === requested + ".desktop"
-                    || id.replace(/\.desktop$/, "") === requested.replace(/\.desktop$/, "")) {
-                entries[i].execute();
-                return true;
-            }
-        }
-        return false;
-    }
-
     function activatePopup(popupId) {
         var popup = root.popupById(popupId);
         if (!popup)
@@ -107,7 +92,11 @@ Singleton {
                 root.removePopup(popupId);
             return;
         }
-        root.launchDesktopEntry(popup.desktopEntry);
+        // Without a default action, a click opens the app that sent it.
+        const id = String(popup.desktopEntry || "").replace(/\.desktop$/, "");
+        const entry = id !== "" ? DesktopEntries.byId(id) ?? DesktopEntries.heuristicLookup(id) : null;
+        if (entry)
+            LauncherService.launchEntry(entry);
         root.dismissPopup(popupId);
     }
 

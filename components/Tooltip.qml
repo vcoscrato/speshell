@@ -18,19 +18,15 @@ T.ToolTip {
     delay: 300
     closePolicy: T.Popup.CloseOnEscape | T.Popup.CloseOnPressOutsideParent | T.Popup.CloseOnReleaseOutsideParent
 
-    contentItem: Text {
+    contentItem: Label {
         text: root.text
-        textFormat: Text.PlainText
         wrapMode: Text.Wrap
-        font.pixelSize: Theme.fontSizeSmall
-        font.family: Theme.fontFamily
-        color: Theme.text
     }
 
     background: Rectangle {
-        radius: Theme.borderRadiusSmall
-        color: Theme.surface2
+        radius: Theme.borderRadius
+        color: Theme.popupFill
         border.width: Theme.borderWidth
-        border.color: Theme.selectedBorder
+        border.color: Theme.popupBorder
     }
 }

@@ -5,6 +5,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Services.Mpris
 
+// The MPRIS player to show: the one playing, else the last shown, else any.
 Singleton {
     id: root
 

@@ -1,4 +1,5 @@
 import QtQuick
+import qs.components
 import qs.theme
 
 // A bar item's name, shown below it, or above it on a bottom bar, while the pointer is
@@ -24,22 +25,19 @@ Rectangle {
     onWidthChanged: if (root.visible) root.place()
 
     y: root.above ? -root.height - Theme.spacingSmall : parent.height + Theme.spacingSmall
-    width: labelText.implicitWidth + Theme.spacingLarge
-    height: Math.max(26, labelText.implicitHeight + Theme.spacingSmall)
-    radius: Theme.borderRadiusSmall
-    color: Theme.surface2
+    // Padded as Tooltip is.
+    width: labelText.implicitWidth + Theme.spacingSmall * 2
+    height: labelText.implicitHeight + Theme.spacingTiny * 2
+    radius: Theme.borderRadius
+    color: Theme.popupFill
     border.width: Theme.borderWidth
-    border.color: Theme.selectedBorder
+    border.color: Theme.popupBorder
     z: 100
 
-    Text {
+    Label {
         id: labelText
 
         anchors.centerIn: parent
         text: root.text
-        textFormat: Text.PlainText
-        font.pixelSize: Theme.fontSizeSmall
-        font.family: Theme.fontFamily
-        color: Theme.text
     }
 }

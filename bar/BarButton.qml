@@ -37,6 +37,11 @@ Item {
         ? root.size
         : Math.max(root.size, contentRow.implicitWidth + root.horizontalPadding * 2)
     implicitHeight: root.size
+    scale: mouse.pressed ? Theme.pressScale : 1
+
+    Behavior on scale {
+        NumberAnimation { duration: Theme.animDurationFast; easing.type: Theme.animEasing }
+    }
 
     Accessible.role: Accessible.Button
     Accessible.name: root.label || root.text
@@ -44,7 +49,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        radius: Theme.borderRadiusSmall
+        radius: Theme.borderRadius
         color: root.open ? Theme.selectedFill : (root.pointerInside ? Theme.cardHover : "transparent")
         border.width: root.open ? Theme.borderWidth : 0
         border.color: Theme.selectedBorder
@@ -65,13 +70,11 @@ Item {
             iconColor: root.iconColor
         }
 
-        Text {
+        Label {
             anchors.verticalCenter: parent.verticalCenter
             visible: root.text !== ""
             text: root.text
-            textFormat: Text.PlainText
             font.pixelSize: root.fontSize
-            font.family: Theme.fontFamily
             font.weight: root.fontWeight
             font.features: root.tabularDigits ? { "tnum": 1 } : {}
             color: root.open ? Theme.accent : Theme.text

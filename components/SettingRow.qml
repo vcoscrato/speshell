@@ -38,12 +38,9 @@ Item {
         y: root.stacked ? 0 : (root.height - height) / 2
         spacing: Theme.spacingMicro
 
-        Text {
+        Label {
             width: Math.min(implicitWidth, labelRow.available - (infoTip.visible ? infoTip.width + labelRow.spacing : 0))
             text: root.label
-            font.pixelSize: Theme.fontSizeSmall
-            font.family: Theme.fontFamily
-            color: Theme.text
             elide: Text.ElideRight
             anchors.verticalCenter: parent.verticalCenter
         }

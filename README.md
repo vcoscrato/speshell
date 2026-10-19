@@ -1,14 +1,13 @@
 # Speshell
 
-This is Speshell, pronounced *special*. Why is it special, you may ask? Well, because it's mine.
-
-It's a desktop shell built with [Quickshell](https://quickshell.outfoxxed.me/): a bar whose buttons open small panels, a launcher, notifications, and themes that animate it all in their own style.
-
-A personal setup first, largely built with AI. Borrow whatever is useful.
+This is Speshell, pronounced *special*. My [Quickshell](https://quickshell.outfoxxed.me/) config. Why is it special, you may ask? Well, because it's mine. Borrow whatever is useful.
 
 <p align="center">
   <img src=".github/screenshot.png" width="100%" alt="Speshell's bar with the clock panel open and a timer running, in the Fire theme" />
+  <img src=".github/screenshots/cosmos.jpg" width="100%" alt="The launcher picking a theme, in the Cosmos theme" />
 </p>
+
+<p align="center"><a href=".github/screenshots/README.md">See every theme</a></p>
 
 ## Features
 
@@ -81,7 +80,7 @@ Unknown bangs go to the search engine, so its own bangs work too.
 
 ## Tools
 
-The **Tools** panel sets up timers and runs each tool whose programs are installed; the others don't show. Areas are picked with a selection in the theme's colors, and results arrive as toasts.
+The **Tools** panel sets up timers and runs each tool whose programs are installed; the others don't show. Areas are picked with a selection in the theme's colors, and results arrive as toasts. A tool run from the panel closes it first; run from a keybinding, it leaves an open panel on screen, so a screenshot can show it.
 
 Its Timer row puts a new timer in the bar and opens it there: name it if you like, then pick a preset, or type a length like `25`, `1h30`, or `90s`, or an end time like `at 21:30`. Each timer stays in the bar until it ends, when a notification arrives even through Do Not Disturb. Click one to rename it, add 1, 5, or 10 minutes, pause, or stop it; scroll over it to change it by a minute, and right-click to pause or resume. `speshell timer` starts and controls timers too, acting on the one that ends first when given no name.
 
@@ -155,6 +154,7 @@ speshell activity list | clear ID | refresh
 ```bash
 just lint test
 just shaders   # compile effect shaders; needed once in a checkout
+just shot fire # the bar in a theme with each panel open, offscreen, and a contact sheet
 ```
 
 `bin/speshell` run from a checkout uses that checkout. Hardware behavior is checked by hand with [`tests/manual.md`](tests/manual.md); agent notes are in [AGENTS.md](AGENTS.md).

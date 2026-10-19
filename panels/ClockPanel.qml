@@ -1,5 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import qs.components
 import qs.theme
 
 // The clock panel: the theme's clock face over the date, beside the month.
@@ -58,14 +59,11 @@ Item {
                 running: Theme.motion
             }
 
-            Text {
+            Label {
                 id: dateText
+                role: "heading"
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: Qt.formatDate(root.now, "dddd, d MMMM")
-                font.pixelSize: Theme.fontSizeLarge
-                font.family: Theme.fontFamily
-                font.weight: Font.DemiBold
-                color: Theme.text
             }
         }
 

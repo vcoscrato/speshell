@@ -22,14 +22,14 @@ TestCase {
     function test_listSectionsKeepOrderAndCommas() {
         var result = Config.parseAndValidate("[Audio.QuickSwitch]\n1 = Speakers\n2 = Display, HDMI\n");
         verify(result.ok, messages(result));
-        compare(result.config.audioQuickSwitch, ["Speakers", "Display, HDMI"]);
+        compare(result.config.audio.quickSwitch, ["Speakers", "Display, HDMI"]);
     }
 
     function test_lockCommandTakesArguments() {
         var result = Config.parseAndValidate(
             "[Power]\nlockCommand = swaylock\n\n[Power.Arguments]\n1 = --daemonize\n2 = --color=00,00,00\n");
         verify(result.ok, messages(result));
-        compare(result.config.powerMenu.lockCommand, ["swaylock", "--daemonize", "--color=00,00,00"]);
+        compare(result.config.power.lockCommand, ["swaylock", "--daemonize", "--color=00,00,00"]);
     }
 
     function test_rejectsInvalidValues_data() {

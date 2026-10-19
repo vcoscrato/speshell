@@ -2,6 +2,8 @@ import QtQuick
 import qs.services
 import qs.theme
 
+// An on/off switch with the theme's knob. It shows the requested state at once and
+// falls back if the change doesn't happen.
 Rectangle {
     id: root
 
@@ -17,12 +19,6 @@ Rectangle {
     readonly property bool on: root.pending ? root.requested : root.checked
 
     onCheckedChanged: if (root.checked === root.requested) root.pending = false
-
-    Timer {
-        id: pendingTimer
-        interval: 4000
-        onTriggered: root.pending = false
-    }
 
     implicitWidth: 36
     implicitHeight: 20
@@ -61,6 +57,12 @@ Rectangle {
             pendingTimer.restart();
         EffectsService.switched(root, next);
         root.toggled(next);
+    }
+
+    Timer {
+        id: pendingTimer
+        interval: 4000
+        onTriggered: root.pending = false
     }
 
     Rectangle {

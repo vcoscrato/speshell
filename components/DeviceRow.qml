@@ -22,12 +22,9 @@ Rectangle {
     signal primaryTriggered()
     signal actionTriggered(string actionId)
 
-    // The spinner stops wherever it is; set the icon upright again.
-    onBusyChanged: if (!root.busy) statusIcon.rotation = 0
-
     width: parent ? parent.width : 300
     implicitHeight: contentColumn.implicitHeight + Theme.spacingSmall * 2
-    radius: Theme.borderRadiusSmall
+    radius: Theme.borderRadius
     color: root.current
         ? Theme.selectedFill
         : (rowMouse.containsMouse && root.primaryEnabled ? Theme.controlFill : "transparent")
@@ -60,31 +57,13 @@ Rectangle {
             width: parent.width
             height: Math.max(iconDisc.height, textColumn.implicitHeight)
 
-            Rectangle {
+            IconDisc {
                 id: iconDisc
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                width: Theme.controlHeight
-                height: width
-                radius: width / 2
-                color: Theme.alpha(root.current ? Theme.accent : Theme.overlay,
-                    root.current ? Theme.tintStrong : Theme.tintSubtle)
-
-                AppIcon {
-                    id: statusIcon
-                    anchors.centerIn: parent
-                    name: root.busy ? "loader" : root.iconName
-                    size: Theme.iconSizeMedium
-                    iconColor: root.current || root.busy ? Theme.accent : Theme.subtextBright
-
-                    RotationAnimator on rotation {
-                        from: 0
-                        to: 360
-                        duration: 1200
-                        loops: Animation.Infinite
-                        running: root.busy && root.visible
-                    }
-                }
+                iconName: root.busy ? "loader" : root.iconName
+                lit: root.current
+                spinning: root.busy
             }
 
             Column {
@@ -96,21 +75,17 @@ Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: Theme.spacingMicro
 
-                Text {
+                Label {
+                    role: "title"
                     width: parent.width
                     text: root.title
-                    font.pixelSize: Theme.fontSizeNormal
-                    font.family: Theme.fontFamily
-                    font.weight: root.current ? Font.DemiBold : Font.Medium
-                    color: Theme.text
                     elide: Text.ElideRight
                 }
 
-                Text {
+                Label {
+                    role: "caption"
                     width: parent.width
                     text: root.subtitle
-                    font.pixelSize: Theme.fontSizeCaption
-                    font.family: Theme.fontFamily
                     color: root.subtitleColor
                     elide: Text.ElideRight
                     visible: text !== ""

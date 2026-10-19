@@ -4,10 +4,11 @@ import qs.services
 import qs.theme
 import "Settings.js" as Settings
 
+// Settings › Launcher: visible results, width, and the web search engine.
 Column {
     id: root
 
-    readonly property var launcher: ConfigService.config?.launcher ?? ({})
+    readonly property var launcher: ConfigService.settings.launcher
     readonly property var rowOptions: [
         { value: 3, label: "3" },
         { value: 5, label: "5" },
@@ -31,7 +32,7 @@ Column {
 
     SettingRow {
         id: rowsRow
-        readonly property int rows: root.launcher.visibleRows ?? 5
+        readonly property int rows: root.launcher.visibleRows
 
         label: "Visible results"
         info: Settings.explain("Results shown before the list scrolls.", root.rowOptions, rows, rows + " rows")
@@ -48,7 +49,7 @@ Column {
 
         SelectMenu {
             options: root.widthOptions
-            currentValue: root.launcher.width ?? 540
+            currentValue: root.launcher.width
             fallbackLabel: currentValue + " px · Custom"
             onValueSelected: value => ConfigService.setProperty("Launcher", "width", value)
         }
@@ -60,7 +61,7 @@ Column {
 
         SelectMenu {
             options: root.searchOptions
-            currentValue: root.launcher.searchUrl ?? "https://duckduckgo.com/?q={query}"
+            currentValue: root.launcher.searchUrl
             fallbackLabel: "Custom URL"
             onValueSelected: value => ConfigService.setProperty("Launcher", "searchUrl", value)
         }

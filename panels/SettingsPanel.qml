@@ -49,10 +49,9 @@ Card {
             anchors.verticalCenter: parent.verticalCenter
         }
 
-        Text {
+        Label {
+            role: "caption"
             text: "Saved"
-            font.pixelSize: Theme.fontSizeCaption
-            font.family: Theme.fontFamily
             color: Theme.success
             anchors.verticalCenter: parent.verticalCenter
         }
@@ -76,7 +75,6 @@ Card {
         id: tabMetrics
         font.pixelSize: Theme.fontSizeSmall
         font.family: Theme.fontFamily
-        font.bold: true
     }
 
     // Page tabs: the current one shows its name, the others share the remaining width.
@@ -95,84 +93,33 @@ Card {
             / (root.pages.length - 1)
 
         width: parent.width
-        height: Math.max(Theme.controlHeight, tabMetrics.height + Theme.spacingSmall * 2)
+        height: Theme.controlHeightSmall
 
         Repeater {
             model: root.pages
 
-            delegate: Rectangle {
+            delegate: Tab {
                 id: tab
 
                 required property var modelData
                 required property int index
-                readonly property bool current: tab.index === tabStrip.activeIndex
 
                 x: tab.index <= tabStrip.activeIndex
                     ? tab.index * (tabStrip.restWidth + tabStrip.gap)
                     : (tab.index - 1) * (tabStrip.restWidth + tabStrip.gap) + tabStrip.activeWidth + tabStrip.gap
                 width: tab.current ? tabStrip.activeWidth : tabStrip.restWidth
                 height: tabStrip.height
-                radius: Theme.borderRadiusSmall
-                clip: true
-                color: tab.current
-                    ? Theme.alpha(Theme.accent, Theme.tintStrong)
-                    : (tabMouse.containsMouse ? Theme.cardHover : Theme.controlFill)
-                border.width: Theme.borderWidth
-                border.color: tab.current ? Theme.selectedBorder : "transparent"
+                text: tab.modelData.label
+                iconName: tab.modelData.icon
+                current: tab.index === tabStrip.activeIndex
+                showText: tab.current
+                onClicked: root.activePage = tab.modelData.id
 
                 Behavior on x {
                     NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasing }
                 }
                 Behavior on width {
                     NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasing }
-                }
-
-                Accessible.role: Accessible.PageTab
-                Accessible.name: tab.modelData.label
-                Accessible.selected: tab.current
-                Accessible.onPressAction: root.activePage = tab.modelData.id
-
-                Row {
-                    anchors.centerIn: parent
-                    spacing: tab.current ? Theme.spacingTiny : 0
-
-                    AppIcon {
-                        name: tab.modelData.icon
-                        size: Theme.iconSizeSmall
-                        iconColor: tab.current
-                            ? Theme.accent
-                            : (tabMouse.containsMouse ? Theme.text : Theme.subtext)
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-
-                    Text {
-                        width: Math.min(implicitWidth, tab.width - Theme.iconSizeSmall
-                            - Theme.spacingTiny - Theme.spacingSmall * 2)
-                        elide: Text.ElideRight
-                        visible: tab.current
-                        opacity: tab.current ? 1 : 0
-                        text: tab.modelData.label
-                        font: tabMetrics.font
-                        color: Theme.text
-                        anchors.verticalCenter: parent.verticalCenter
-
-                        Behavior on opacity {
-                            NumberAnimation { duration: Theme.animDuration }
-                        }
-                    }
-                }
-
-                MouseArea {
-                    id: tabMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.activePage = tab.modelData.id
-                }
-
-                Tooltip {
-                    visible: !tab.current && tabMouse.containsMouse
-                    text: tab.modelData.label
                 }
             }
         }

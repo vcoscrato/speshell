@@ -4,23 +4,24 @@ import qs.components
 import qs.services
 import qs.theme
 
+// Settings › Bar: its position, sizes, and outline.
 Column {
     id: root
 
-    readonly property var bar: ConfigService.config?.bar ?? ({})
+    readonly property var bar: ConfigService.settings.bar
     readonly property var positionOptions: [
         { value: "top", label: "Top" },
         { value: "bottom", label: "Bottom" }
     ]
-    // The bar's sizes, each with the values offered and its default.
+    // The bar's sizes, each with the values offered.
     readonly property var sizes: [
-        { key: "height", label: "Height", fallback: 40, unit: " px",
+        { key: "height", label: "Height", unit: " px",
           options: [24, 28, 32, 36, 40, 44, 48, 56, 64].map(px => ({ value: px, label: px + " px" })) },
-        { key: "width", label: "Width", fallback: 100, unit: "%",
+        { key: "width", label: "Width", unit: "%",
           options: [25, 33, 50, 66, 75, 90, 100].map(percent => ({ value: percent, label: percent >= 100 ? "Full" : percent + "%" })) },
-        { key: "margin", label: "Margin", fallback: 0, unit: " px",
+        { key: "margin", label: "Margin", unit: " px",
           options: [0, 2, 4, 8, 12, 16, 24, 32].map(px => ({ value: px, label: px === 0 ? "Docked" : px + " px" })) },
-        { key: "gap", label: "Gap", fallback: 0, unit: " px",
+        { key: "gap", label: "Gap", unit: " px",
           options: [0, 1, 2, 4, 6, 8, 12, 16].map(px => ({ value: px, label: px + " px" })) }
     ]
 
@@ -32,7 +33,7 @@ Column {
 
         SegmentedControl {
             options: root.positionOptions
-            currentValue: root.bar.position ?? "top"
+            currentValue: root.bar.position
             onValueSelected: value => ConfigService.setProperty("Bar", "position", value)
         }
     }
@@ -53,16 +54,14 @@ Column {
                 id: size
 
                 required property var modelData
-                readonly property var current: root.bar[size.modelData.key] ?? size.modelData.fallback
+                readonly property var current: root.bar[size.modelData.key]
 
                 width: sizeGrid.columnWidth
                 spacing: Theme.spacingTiny
 
-                Text {
+                Label {
+                    role: "caption"
                     text: size.modelData.label
-                    font.pixelSize: Theme.fontSizeCaption
-                    font.family: Theme.fontFamily
-                    color: Theme.subtext
                 }
 
                 SelectMenu {

@@ -1,6 +1,7 @@
 import QtQuick
 import qs.theme
 
+// A square button that shows only an icon, filled while hovered, and its tooltip.
 Rectangle {
     id: root
 
@@ -16,15 +17,16 @@ Rectangle {
 
     signal clicked()
 
-    onIconSpinningChanged: if (!root.iconSpinning) iconContainer.rotation = 0
-
     width: size
     height: size
-    radius: Theme.borderRadiusSmall
+    radius: Theme.borderRadius
     opacity: enabled ? 1.0 : Theme.disabledOpacity
-    color: mouseArea.containsMouse && root.enabled
-        ? (mouseArea.pressed ? Theme.surface2 : root.hoverColor)
-        : "transparent"
+    scale: mouseArea.pressed ? Theme.pressScale : 1
+    color: mouseArea.containsMouse && root.enabled ? root.hoverColor : "transparent"
+
+    Behavior on scale {
+        NumberAnimation { duration: Theme.animDurationFast; easing.type: Theme.animEasing }
+    }
 
     Accessible.role: Accessible.Button
     Accessible.name: root.tooltipText !== ""
@@ -35,33 +37,13 @@ Rectangle {
             root.clicked();
     }
 
-    Item {
-        id: iconContainer
+    AppIcon {
         anchors.centerIn: parent
         anchors.horizontalCenterOffset: root.iconXOffset
-        width: root.size
-        height: root.size
-        scale: mouseArea.pressed ? 0.85 : 1.0
-
-        AppIcon {
-            anchors.centerIn: parent
-            name: root.iconName
-            size: root.iconSize
-            iconColor: root.iconColor
-            visible: root.iconName !== ""
-        }
-
-        Behavior on scale {
-            NumberAnimation { duration: Theme.animDurationFast; easing.type: Theme.animEasing }
-        }
-
-        RotationAnimator on rotation {
-            from: 0
-            to: 360
-            duration: 900
-            loops: Animation.Infinite
-            running: root.iconSpinning
-        }
+        name: root.iconName
+        size: root.iconSize
+        iconColor: root.iconColor
+        spinning: root.iconSpinning
     }
 
     MouseArea {

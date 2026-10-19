@@ -4,10 +4,11 @@ import qs.services
 import qs.theme
 import "Settings.js" as Settings
 
+// Settings › General: text size, volume scroll step, and toasts on screen.
 Column {
     id: root
 
-    readonly property var config: ConfigService.config ?? ({})
+    readonly property var settings: ConfigService.settings
     readonly property var textScaleOptions: [
         { value: 0.85, label: "Compact · 85%" },
         { value: 1.0, label: "Default · 100%" },
@@ -37,7 +38,7 @@ Column {
 
         SelectMenu {
             options: root.textScaleOptions
-            currentValue: root.config.textScale ?? 1.0
+            currentValue: root.settings.appearance.textScale
             fallbackLabel: Math.round(Number(currentValue) * 100) + "% · Custom"
             onValueSelected: value => ConfigService.setProperty("Appearance", "textScale", value)
         }
@@ -45,7 +46,7 @@ Column {
 
     SettingRow {
         id: scrollStepRow
-        readonly property int step: root.config.audioScrollStep ?? 5
+        readonly property int step: root.settings.audio.scrollStep
 
         label: "Volume scroll step"
         info: Settings.explain("How much one scroll over the bar's speaker and microphone changes their volume.",
@@ -60,7 +61,7 @@ Column {
 
     SettingRow {
         id: toastsRow
-        readonly property int count: root.config.maxVisibleNotification ?? 3
+        readonly property int count: root.settings.notifications.maxVisible
 
         label: "Toasts on screen"
         info: Settings.explain("Notifications shown at once. The oldest closes first.", root.toastOptions,

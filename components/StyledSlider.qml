@@ -3,6 +3,7 @@ import QtQuick.Controls as Controls
 import qs.services
 import qs.theme
 
+// A themed slider: the theme's knob, and the effects that follow the hand on it.
 Controls.Slider {
     id: root
 

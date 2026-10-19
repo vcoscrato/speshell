@@ -6,12 +6,20 @@ import Quickshell.Io
 import "../core/Config.js" as Config
 import "Shell.js" as Shell
 
+// config.ini: loads and validates it (Config.js), seeding it from config.example.ini
+// on the first run, follows edits made outside Speshell, and writes the Settings
+// panel's changes. Read the settings in force from `settings`.
 Singleton {
     id: root
 
     readonly property string bundledExamplePath: Qt.resolvedUrl("../config.example.ini").toString().replace(/^file:\/\//, "")
     property string status: "idle"
+    // The config.ini loaded: by section, as Config.js builds it. Null while it loads or
+    // when it is invalid.
     property var config: null
+    // The settings in force: the config last loaded, or the defaults before one is.
+    // Read settings here; it never goes null.
+    property var settings: Config.defaults()
     property var errors: []
     property string configPath: ""
     property string configDir: ""
@@ -28,6 +36,8 @@ Singleton {
     readonly property bool invalid: root.status === "invalid"
     readonly property bool loading: root.status === "loading"
     readonly property string errorReport: root.buildErrorReport()
+
+    onConfigChanged: if (root.config) root.settings = root.config
 
     function load() {
         if (configLoadProc.running) {

@@ -56,7 +56,7 @@ Row {
             anchors.centerIn: parent
             width: coverButton.coverSize
             height: coverButton.coverSize
-            radius: Theme.borderRadiusSmall
+            radius: Theme.borderRadius
             color: cover.status === Image.Ready ? "transparent" : Theme.controlFill
             // Dimmed while paused.
             opacity: MediaService.playing || coverButton.pointerInside || coverButton.open ? 1 : Theme.disabledOpacity

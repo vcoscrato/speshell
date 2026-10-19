@@ -1,7 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
-import Quickshell.Io
 import qs.components
 import qs.services
 import qs.theme
@@ -11,10 +10,8 @@ import qs.theme
 Column {
     id: root
 
-    property string quickshellVersion: ""
-    property string hyprlandVersion: ""
     readonly property string compositor: HyprlandService.running
-        ? "Hyprland " + (root.hyprlandVersion || "")
+        ? "Hyprland " + HyprlandService.version
         : (Quickshell.env("XDG_CURRENT_DESKTOP") || "Unknown")
     readonly property string configPath: {
         const path = ConfigService.configPath || (ConfigService.configDir || "~/.config/speshell") + "/config.ini";
@@ -47,33 +44,25 @@ Column {
                 anchors.verticalCenter: parent.verticalCenter
             }
 
-            Text {
+            Label {
                 id: nameText
+                role: "heading"
                 anchors.verticalCenter: parent.verticalCenter
                 text: "Speshell"
-                font.pixelSize: Theme.fontSizeLarge
-                font.family: Theme.fontFamily
-                font.bold: true
-                color: Theme.text
             }
 
-            Text {
+            Label {
                 anchors.baseline: nameText.baseline
                 text: SystemState.appVersion
-                font.pixelSize: Theme.fontSizeSmall
-                font.family: Theme.fontFamily
                 color: Theme.subtext
             }
         }
 
-        IconButton {
+        HeaderButton {
             id: githubButton
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            size: Theme.controlHeightSmall
-            iconSize: Theme.iconSizeSmall
             iconName: "github"
-            iconColor: containsMouse ? Theme.accent : Theme.subtext
             tooltipText: "Speshell on GitHub"
             onClicked: Qt.openUrlExternally("https://github.com/vcoscrato/speshell")
         }
@@ -86,7 +75,7 @@ Column {
         Detail {
             labelWidth: root.labelWidth
             label: "Quickshell"
-            value: root.quickshellVersion || "unknown"
+            value: SystemState.quickshellVersion || "unknown"
         }
 
         Detail {
@@ -158,25 +147,20 @@ Column {
         width: parent ? parent.width : 0
         height: Math.max(Theme.controlHeightSmall, valueText.implicitHeight)
 
-        Text {
+        Label {
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
             text: detail.label
-            font.pixelSize: Theme.fontSizeSmall
-            font.family: Theme.fontFamily
             color: Theme.overlay
         }
 
-        Text {
+        Label {
             id: valueText
             anchors.left: parent.left
             anchors.leftMargin: detail.labelWidth + Theme.spacingLarge
             anchors.verticalCenter: parent.verticalCenter
             width: Math.min(implicitWidth, detail.width - x - (detailInfo.visible ? detailInfo.width + Theme.spacingSmall : 0))
             text: detail.value
-            font.pixelSize: Theme.fontSizeSmall
-            font.family: Theme.fontFamily
-            color: Theme.text
             elide: Text.ElideMiddle
         }
 
@@ -187,30 +171,6 @@ Column {
             anchors.verticalCenter: parent.verticalCenter
             visible: detail.info !== ""
             text: detail.info
-        }
-    }
-
-    Process {
-        running: true
-        command: ["quickshell", "--version"]
-        stdout: SplitParser {
-            onRead: line => {
-                const match = String(line || "").match(/^Quickshell\s+(\S+)/i);
-                if (match)
-                    root.quickshellVersion = match[1];
-            }
-        }
-    }
-
-    Process {
-        running: HyprlandService.running
-        command: ["hyprctl", "version"]
-        stdout: SplitParser {
-            onRead: line => {
-                const match = String(line || "").match(/^Hyprland\s+(\S+)/);
-                if (match && root.hyprlandVersion === "")
-                    root.hyprlandVersion = match[1];
-            }
         }
     }
 }

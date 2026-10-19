@@ -15,9 +15,6 @@ Item {
 
     signal activated()
 
-    // The spinner stops wherever it is; set the icon upright again.
-    onBusyChanged: if (!root.busy) statusIcon.rotation = 0
-
     width: parent ? parent.width : 300
     implicitHeight: column.implicitHeight + Theme.spacingXL * 2
     height: implicitHeight
@@ -28,53 +25,27 @@ Item {
         width: Math.min(parent.width, 300)
         spacing: Theme.spacingSmall
 
-        Rectangle {
+        IconDisc {
             anchors.horizontalCenter: parent.horizontalCenter
-            width: 48
-            height: width
-            radius: width / 2
-            color: Theme.alpha(root.busy ? Theme.accent : Theme.overlay,
-                Theme.tintSubtle)
-            border.width: Theme.borderWidth
-            border.color: Theme.alpha(root.busy ? Theme.accent : Theme.overlay,
-                Theme.tintStrong)
-
-            AppIcon {
-                id: statusIcon
-                anchors.centerIn: parent
-                name: root.busy ? "loader" : root.iconName
-                size: Theme.iconSizeLarge
-                iconColor: root.busy ? Theme.accent : Theme.subtext
-
-                RotationAnimator on rotation {
-                    from: 0
-                    to: 360
-                    duration: 1200
-                    loops: Animation.Infinite
-                    running: root.busy && root.visible
-                }
-            }
+            size: Theme.controlHeight * 1.5
+            iconName: root.busy ? "loader" : root.iconName
+            spinning: root.busy
         }
 
         Item { width: 1; height: Theme.spacingTiny }
 
-        Text {
+        Label {
+            role: "title"
             width: parent.width
             text: root.title
             horizontalAlignment: Text.AlignHCenter
-            font.pixelSize: Theme.fontSizeNormal
-            font.family: Theme.fontFamily
-            font.weight: Font.DemiBold
-            color: Theme.text
             wrapMode: Text.WordWrap
         }
 
-        Text {
+        Label {
             width: parent.width
             text: root.detail
             horizontalAlignment: Text.AlignHCenter
-            font.pixelSize: Theme.fontSizeSmall
-            font.family: Theme.fontFamily
             color: Theme.subtext
             wrapMode: Text.WordWrap
             visible: text !== ""

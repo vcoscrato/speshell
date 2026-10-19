@@ -5,6 +5,8 @@ import qs.components
 import qs.services
 import qs.theme
 
+// The volume shown at the bottom of the screen when it changes from outside Speshell,
+// as with media keys.
 OsdWindow {
     id: root
 
@@ -18,7 +20,7 @@ OsdWindow {
 
     card: osdCard
     implicitWidth: 316
-    implicitHeight: 86
+    implicitHeight: osdContent.implicitHeight + Theme.spacingMedium * 2
 
     anchors {
         bottom: true
@@ -59,78 +61,64 @@ OsdWindow {
         // Bottom center of the screen: rounded toward its center.
         Surface {
             anchors.fill: parent
-            radius: Theme.spacingMedium
+            backdrop: true
             roundTopLeft: true
             roundTopRight: true
         }
 
         Row {
-            anchors {
-                fill: parent
-                leftMargin: Theme.spacingLarge
-                rightMargin: Theme.spacingLarge
-                topMargin: Theme.spacingMedium
-                bottomMargin: Theme.spacingMedium
-            }
+            id: osdContent
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.leftMargin: Theme.spacingLarge
+            anchors.rightMargin: Theme.spacingLarge
+            anchors.verticalCenter: parent.verticalCenter
             spacing: Theme.spacingMedium
 
-            Rectangle {
-                width: 46
-                height: 46
-                radius: Theme.borderRadiusSmall
+            IconDisc {
+                id: disc
                 anchors.verticalCenter: parent.verticalCenter
-                color: Theme.alpha(root.indicatorColor, Theme.tintSubtle)
-
-                AppIcon {
-                    anchors.centerIn: parent
-                    name: root.indicatorIcon
-                    size: Theme.iconSizeLarge
-                    iconColor: root.indicatorColor
-                }
+                size: Theme.controlHeight * 1.5
+                iconName: root.indicatorIcon
+                lit: true
             }
 
             Column {
-                width: parent.width - 46 - parent.spacing
+                width: parent.width - disc.width - parent.spacing
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: Theme.spacingSmall
 
-                Row {
+                Item {
                     width: parent.width
+                    height: volumeValue.implicitHeight
 
-                    Text {
-                        text: root.displayedMuted ? "OUTPUT MUTED" : "OUTPUT VOLUME"
-                        font.pixelSize: Theme.fontSizeCaption
-                        font.family: Theme.fontFamily
-                        font.bold: true
-                        font.letterSpacing: 1.2
-                        color: Theme.subtextBright
+                    Label {
+                        role: "section"
+                        anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
+                        text: root.displayedMuted ? "Output muted" : "Output volume"
                     }
 
-                    Item { width: parent.width - parent.children[0].width - volumeValue.width; height: 1 }
-
-                    Text {
+                    Label {
                         id: volumeValue
-                        text: root.displayedVolume + "%"
-                        font.pixelSize: Theme.fontSizeLarge
-                        font.family: Theme.fontFamily
-                        font.bold: true
-                        color: root.indicatorColor
+                        role: "heading"
+                        anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
+                        text: root.displayedVolume + "%"
+                        color: root.indicatorColor
+                        font.features: { "tnum": 1 }
                     }
                 }
 
+                // As the timer's progress bar.
                 Rectangle {
                     width: parent.width
-                    height: 6
-                    radius: 1
+                    height: Theme.spacingTiny
+                    radius: height / 2
                     color: Theme.surface2
-                    clip: true
 
                     Rectangle {
-                        width: root.displayedMuted
-                            ? 0
-                            : parent.width * root.displayedVolume / 100
+                        width: root.displayedMuted ? 0 : parent.width * root.displayedVolume / 100
                         height: parent.height
                         radius: parent.radius
                         color: root.indicatorColor

@@ -11,6 +11,8 @@ import qs.components
 import qs.services
 import qs.theme
 
+// The window shown instead of the shell while config.ini is invalid: what is wrong,
+// with buttons to open the file, copy a report, retry, or quit.
 PanelWindow {
     id: root
 
@@ -52,6 +54,7 @@ PanelWindow {
         anchors.centerIn: parent
         width: Math.min(720, parent.width - Theme.spacingXL * 2)
         height: Math.min(620, parent.height - Theme.spacingXL * 2)
+        backdrop: true
         roundTopLeft: true
         roundTopRight: true
         roundBottomRight: true
@@ -80,20 +83,15 @@ PanelWindow {
                     width: parent.width - alertIcon.width - parent.spacing
                     spacing: Theme.spacingMicro
 
-                    Text {
+                    Label {
+                        role: "heading"
                         text: "Configuration invalid"
-                        color: Theme.text
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeTitle
-                        font.bold: true
                     }
 
-                    Text {
+                    Label {
                         width: parent.width
                         text: "Speshell is stopped until the configuration is corrected."
                         color: Theme.subtext
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSupporting
                         wrapMode: Text.WordWrap
                     }
                 }
@@ -107,14 +105,12 @@ PanelWindow {
                 border.width: Theme.borderWidth
                 border.color: Theme.controlBorder
 
-                Text {
+                Label {
                     anchors.fill: parent
                     anchors.leftMargin: Theme.spacingMedium
                     anchors.rightMargin: Theme.spacingMedium
                     text: ConfigService.configPath || "~/.config/speshell/config.ini"
                     color: Theme.subtextBright
-                    font.family: "monospace"
-                    font.pixelSize: Theme.fontSizeSmall
                     elide: Text.ElideMiddle
                     verticalAlignment: Text.AlignVCenter
                 }
@@ -162,14 +158,12 @@ PanelWindow {
                 width: parent.width
                 height: Theme.controlHeight
 
-                Text {
+                Label {
                     anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
                     width: Math.max(0, parent.width - actionRow.width - Theme.spacingMedium)
                     text: ConfigService.operationMessage
                     color: ConfigService.operationFailed ? Theme.error : Theme.success
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSmall
                     elide: Text.ElideRight
                 }
 

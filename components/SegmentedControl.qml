@@ -58,7 +58,7 @@ Rectangle {
         y: root.inset
         width: root.segmentWidth
         height: root.height - root.inset * 2
-        radius: Theme.borderRadiusSmall
+        radius: Theme.borderRadius
         color: Theme.alpha(Theme.accent, Theme.tintStrong)
         border.width: Theme.borderWidth
         border.color: Theme.selectedBorder
@@ -82,7 +82,7 @@ Rectangle {
             y: root.inset
             width: root.segmentWidth
             height: root.height - root.inset * 2
-            radius: Theme.borderRadiusSmall
+            radius: Theme.borderRadius
             color: segmentMouse.containsMouse && !segment.selected && root.enabled
                 ? Theme.controlFill
                 : "transparent"

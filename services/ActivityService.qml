@@ -3,6 +3,8 @@ pragma Singleton
 import QtQuick
 import Quickshell
 
+// What's running, for the bar's chips: activities published by providers (Speshell's
+// tools, `speshell activity`), one per id, and the actions they offer.
 Singleton {
     id: root
 

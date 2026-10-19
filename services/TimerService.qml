@@ -2,7 +2,7 @@ pragma Singleton
 
 import QtQuick
 import Quickshell
-import "TimerProvider.js" as TimerProvider
+import "../components/Format.js" as Format
 
 // The timers: each counts down a length, pauses and resumes, and notifies when it ends,
 // even through Do Not Disturb, then goes. Tools creates one unset, and the bar holds
@@ -27,11 +27,6 @@ Singleton {
         property double endsAtMs: 0
         property bool paused: false
         readonly property bool isSet: totalSeconds > 0
-    }
-
-    Component {
-        id: countdownComponent
-        Countdown {}
     }
 
     // A new unset timer, or the one that already waits to be set.
@@ -140,8 +135,13 @@ Singleton {
         if (timer.remainingSeconds > 0)
             return;
         NotificationService.addInternalNotification("timer-" + timer.key, timer.name !== "" ? timer.name : "Time's up",
-            "Your " + TimerProvider.formatLength(timer.totalSeconds) + " timer has ended.", true);
+            "Your " + Format.duration(timer.totalSeconds) + " timer has ended.", true);
         root.stop(timer);
+    }
+
+    Component {
+        id: countdownComponent
+        Countdown {}
     }
 
     // Ticks just after each whole second left on any timer, so the counts step evenly.

@@ -5,6 +5,8 @@ import qs.components
 import qs.theme
 import qs.services
 
+// The displays: each one's mode, and on and off, their layout and position, applied
+// on request and kept or reverted.
 Card {
     id: root
     title: "Displays"
@@ -165,8 +167,9 @@ Card {
             onClicked: DisplayService.revertDisplayChanges()
         }
 
-        RefreshButton {
-            active: root.busy
+        HeaderButton {
+            iconName: "refresh"
+            busy: root.busy
             enabled: !root.busy
             tooltipText: root.busy ? "Refreshing displays" : "Refresh displays"
             onClicked: DisplayService.refresh()
@@ -190,28 +193,25 @@ Card {
                 anchors.verticalCenter: parent.verticalCenter
                 width: badgeText.width + 14
                 height: Math.max(18, badgeText.implicitHeight + Theme.spacingTiny)
-                radius: Theme.borderRadiusSmall
+                radius: Theme.borderRadius
                 color: Theme.selectedFill
                 border.width: Theme.borderWidth
                 border.color: Theme.selectedBorder
 
-                Text {
+                Label {
                     id: badgeText
+                    role: "caption"
                     anchors.centerIn: parent
                     text: root.layoutLabel(DisplayService.draftLayoutMode)
-                    font.pixelSize: Theme.fontSizeCaption
-                    font.family: Theme.fontFamily
-                    font.bold: true
+                    font.weight: Font.Bold
                     color: Theme.accent
                 }
             }
 
-            Text {
+            Label {
                 width: Math.max(0, statusRow.width
                     - (layoutBadge.visible ? layoutBadge.width + statusRow.spacing : 0))
                 text: root.multiple ? root.statusText() : root.noticeText()
-                font.pixelSize: Theme.fontSizeSmall
-                font.family: Theme.fontFamily
                 color: DisplayService.errorText !== ""
                     ? Theme.error
                     : (DisplayService.hasPending ? Theme.warning : Theme.subtext)
@@ -224,7 +224,7 @@ Card {
             width: parent.width
             visible: DisplayService.confirming || DisplayService.reverting
             implicitHeight: confirmationColumn.implicitHeight + Theme.spacingMedium * 2
-            radius: Theme.borderRadiusSmall
+            radius: Theme.borderRadius
             color: Theme.alpha(Theme.warning, Theme.tintSubtle)
             border.width: Theme.borderWidth
             border.color: Theme.alpha(Theme.warning, Theme.tintOutline)
@@ -237,24 +237,19 @@ Card {
                 width: parent.width - Theme.spacingMedium * 2
                 spacing: Theme.spacingSmall
 
-                Text {
+                Label {
+                    role: "title"
                     width: parent.width
                     text: DisplayService.reverting
                         ? "Restoring previous display settings…"
                         : "Keep these display settings?"
-                    font.pixelSize: Theme.fontSizeNormal
-                    font.family: Theme.fontFamily
-                    font.bold: true
-                    color: Theme.text
                 }
 
-                Text {
+                Label {
                     width: parent.width
                     visible: DisplayService.confirming
                     text: "Changes revert automatically in "
                         + DisplayService.confirmationSecondsRemaining + " seconds."
-                    font.pixelSize: Theme.fontSizeSmall
-                    font.family: Theme.fontFamily
                     color: Theme.subtext
                     wrapMode: Text.WordWrap
                 }
@@ -289,18 +284,16 @@ Card {
             width: parent.width
             height: 148
             visible: root.multiple
-            radius: Theme.borderRadiusSmall
+            radius: Theme.borderRadius
             color: Theme.controlFill
             border.width: Theme.borderWidth
             border.color: Theme.controlBorder
             clip: true
 
-            Text {
+            Label {
                 anchors.centerIn: parent
                 text: "No active displays"
                 visible: DisplayService.draftActiveMonitors.length === 0
-                font.pixelSize: Theme.fontSizeSmall
-                font.family: Theme.fontFamily
                 color: Theme.overlay
             }
 
@@ -337,15 +330,14 @@ Card {
                     Accessible.name: "Select " + DisplayService.monitorName(displayTile.modelData)
                     Accessible.onPressAction: DisplayService.setSelected(displayTile.modelData.name)
 
-                    Text {
+                    Label {
+                        role: "caption"
                         anchors.centerIn: parent
                         width: Math.max(0, parent.width - Theme.spacingSmall)
                         text: displayTile.modelData.name || "Display"
                         horizontalAlignment: Text.AlignHCenter
                         elide: Text.ElideRight
-                        font.pixelSize: Theme.fontSizeCaption
-                        font.family: Theme.fontFamily
-                        font.bold: true
+                        font.weight: Font.Bold
                         color: Theme.text
                     }
 
@@ -385,7 +377,7 @@ Card {
 
                     width: Math.min(displayPicker.width, Math.max(82, pillText.implicitWidth + pillState.implicitWidth + 26))
                     height: Theme.controlHeightSmall
-                    radius: Theme.borderRadiusSmall
+                    radius: Theme.borderRadius
                     opacity: root.busy ? Theme.disabledOpacity : 1.0
                     color: Theme.alpha(pillColor,
                         selected ? Theme.tintStrong : Theme.tintSubtle)
@@ -402,23 +394,21 @@ Card {
                         anchors.centerIn: parent
                         spacing: Theme.spacingTiny
 
-                        Text {
+                        Label {
                             id: pillText
+                            role: "caption"
                             width: Math.min(138, implicitWidth)
                             text: displayPill.modelData.name || "Display"
-                            font.pixelSize: Theme.fontSizeCaption
-                            font.family: Theme.fontFamily
-                            font.bold: true
+                            font.weight: Font.Bold
                             color: displayPill.modelData.disabled ? Theme.subtext : Theme.text
                             elide: Text.ElideRight
                             anchors.verticalCenter: parent.verticalCenter
                         }
 
-                        Text {
+                        Label {
                             id: pillState
                             text: displayPill.modelData.disabled ? "Off" : "On"
                             font.pixelSize: Theme.fontSizeMicro
-                            font.family: Theme.fontFamily
                             color: displayPill.pillColor
                             anchors.verticalCenter: parent.verticalCenter
                         }
@@ -439,7 +429,7 @@ Card {
             width: parent.width
             visible: root.selectedMonitor !== null
             implicitHeight: editorColumn.implicitHeight + Theme.spacingMedium * 2
-            radius: Theme.borderRadiusSmall
+            radius: Theme.borderRadius
             color: Theme.controlFill
             border.width: Theme.borderWidth
             border.color: Theme.controlBorder
@@ -468,23 +458,18 @@ Card {
                         spacing: Theme.spacingMicro
                         anchors.verticalCenter: parent.verticalCenter
 
-                        Text {
+                        Label {
+                            role: "title"
                             width: parent.width
                             text: root.selectedMonitor ? (root.selectedMonitor.name || "Display") : ""
-                            font.pixelSize: Theme.fontSizeNormal
-                            font.family: Theme.fontFamily
-                            font.bold: true
-                            color: Theme.text
                             elide: Text.ElideRight
                         }
 
-                        Text {
+                        Label {
+                            role: "caption"
                             width: parent.width
                             visible: root.selectedMonitor !== null && root.selectedMonitor.description !== ""
                             text: root.selectedMonitor ? root.selectedMonitor.description : ""
-                            font.pixelSize: Theme.fontSizeCaption
-                            font.family: Theme.fontFamily
-                            color: Theme.subtext
                             elide: Text.ElideRight
                         }
                     }
@@ -503,115 +488,52 @@ Card {
                     }
                 }
 
-                SelectRow {
-                    id: layoutRow
+                SettingRow {
                     visible: root.multiple
                     enabled: !root.busy
                     label: "Layout"
-                    value: root.layoutLabel(DisplayService.draftLayoutMode)
-                    onActivated: layoutMenu.open()
 
-                    PopupMenu {
-                        id: layoutMenu
-                        y: layoutRow.height
-
-                        PopupMenuItem {
-                            focusPolicy: Qt.ClickFocus
-                            text: "Single"
-                            selectable: true
-                            selected: DisplayService.draftLayoutMode === "single"
-                            onTriggered: DisplayService.setDraftLayoutMode("single")
-                        }
-                        PopupMenuItem {
-                            focusPolicy: Qt.ClickFocus
-                            text: "Mirror"
-                            selectable: true
-                            selected: DisplayService.draftLayoutMode === "mirror"
-                            enabled: DisplayService.draftMonitors.length > 1
-                            onTriggered: DisplayService.setDraftLayoutMode("mirror")
-                        }
-                        PopupMenuItem {
-                            focusPolicy: Qt.ClickFocus
-                            text: "Extend"
-                            selectable: true
-                            selected: DisplayService.draftLayoutMode === "extend"
-                            enabled: DisplayService.draftMonitors.length > 1
-                            onTriggered: DisplayService.setDraftLayoutMode("extend")
-                        }
+                    SelectMenu {
+                        options: [
+                            { value: "single", label: "Single" },
+                            { value: "mirror", label: "Mirror" },
+                            { value: "extend", label: "Extend" }
+                        ]
+                        currentValue: DisplayService.draftLayoutMode
+                        onValueSelected: value => DisplayService.setDraftLayoutMode(value)
                     }
                 }
 
-                SelectRow {
-                    id: positionRow
+                // Where the selected display sits next to another; the menu moves it there.
+                SettingRow {
                     visible: root.multiple
                     enabled: root.canPositionSelected && !root.busy
                     label: "Position"
-                    value: root.positionLabel()
-                    onActivated: positionMenu.open()
 
-                    PopupMenu {
-                        id: positionMenu
-                        y: positionRow.height
-
-                        PopupMenuItem {
-                            focusPolicy: Qt.ClickFocus
-                            text: "Left"
-                            onTriggered: DisplayService.arrangeSelected("left")
-                        }
-                        PopupMenuItem {
-                            focusPolicy: Qt.ClickFocus
-                            text: "Right"
-                            onTriggered: DisplayService.arrangeSelected("right")
-                        }
-                        PopupMenuItem {
-                            focusPolicy: Qt.ClickFocus
-                            text: "Above"
-                            onTriggered: DisplayService.arrangeSelected("above")
-                        }
-                        PopupMenuItem {
-                            focusPolicy: Qt.ClickFocus
-                            text: "Below"
-                            onTriggered: DisplayService.arrangeSelected("below")
-                        }
+                    SelectMenu {
+                        options: [
+                            { value: "left", label: "Left" },
+                            { value: "right", label: "Right" },
+                            { value: "above", label: "Above" },
+                            { value: "below", label: "Below" }
+                        ]
+                        fallbackLabel: root.positionLabel()
+                        onValueSelected: value => DisplayService.arrangeSelected(value)
                     }
                 }
 
-                SelectRow {
-                    id: modeRow
+                SettingRow {
                     enabled: root.selectedEnabled && root.selectedModeOptions.length > 0 && !root.busy
                     label: "Mode"
-                    value: root.selectedMonitor ? root.modeText(root.selectedMonitor) : ""
-                    onActivated: modeMenu.open()
 
-                    PopupMenu {
-                        id: modeMenu
-                        y: modeRow.height
+                    SelectMenu {
+                        readonly property string current: root.selectedMonitor
+                            ? DisplayService.monitorModeString(root.selectedMonitor) : ""
 
-                        Instantiator {
-                            model: root.selectedModeOptions
-
-                            delegate: PopupMenuItem {
-                                required property var modelData
-                                focusPolicy: Qt.ClickFocus
-
-                                text: DisplayService.modeLabel(modelData)
-                                selectable: true
-                                selected: root.selectedMonitor !== null
-                                    && DisplayService.modesEquivalent(
-                                        modelData,
-                                        DisplayService.monitorModeString(root.selectedMonitor)
-                                    )
-                                onTriggered: DisplayService.setSelectedMode(modelData)
-                            }
-
-                            onObjectAdded: function(index, object) {
-                                modeMenu.insertItem(index, object);
-                            }
-
-                            onObjectRemoved: function(index, object) {
-                                modeMenu.removeItem(object);
-                            }
-                        }
+                        options: root.selectedModeOptions.map(mode => ({ value: mode, label: DisplayService.modeLabel(mode) }))
+                        currentValue: root.selectedModeOptions.find(mode => DisplayService.modesEquivalent(mode, current))
+                        fallbackLabel: root.selectedMonitor ? root.modeText(root.selectedMonitor) : ""
+                        onValueSelected: value => DisplayService.setSelectedMode(value)
                     }
                 }
 
@@ -620,10 +542,8 @@ Card {
                     spacing: Theme.spacingSmall
                     visible: root.canControlSelectedBrightness
 
-                    Text {
+                    Label {
                         text: "Brightness"
-                        font.pixelSize: Theme.fontSizeSmall
-                        font.family: Theme.fontFamily
                         color: Theme.subtext
                         width: 70
                         anchors.verticalCenter: parent.verticalCenter
@@ -643,10 +563,8 @@ Card {
                         onPressedChanged: if (!pressed) BrightnessService.commit()
                     }
 
-                    Text {
+                    Label {
                         text: BrightnessService.percent + "%"
-                        font.pixelSize: Theme.fontSizeSmall
-                        font.family: Theme.fontFamily
                         color: Theme.subtext
                         width: 32
                         horizontalAlignment: Text.AlignRight

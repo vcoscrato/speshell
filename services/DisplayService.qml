@@ -5,6 +5,8 @@ import Quickshell
 import Quickshell.Io
 import "Shell.js" as Shell
 
+// Hyprland's monitors for the Displays panel: a draft of modes, positions, and layout
+// that applies on request and reverts unless kept.
 Singleton {
     id: root
 

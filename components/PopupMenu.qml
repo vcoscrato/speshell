@@ -34,9 +34,9 @@ T.Menu {
     background: Rectangle {
         implicitWidth: 160
         radius: Theme.borderRadius
-        color: Theme.card
+        color: Theme.popupFill
         border.width: Theme.borderWidth
-        border.color: Theme.surface2
+        border.color: Theme.popupBorder
     }
 
     T.Overlay.modal: Item {}

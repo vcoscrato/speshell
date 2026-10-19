@@ -5,6 +5,8 @@ import Qt.labs.folderlistmodel
 import Quickshell
 import Quickshell.Io
 
+// Notes as text files under <dataDir>/notes: the list, the open note, saving as you
+// type, edits made outside Speshell, and creating and deleting notes with an undo.
 Singleton {
     id: root
 
@@ -30,6 +32,8 @@ Singleton {
     property string mutationNextNote: ""
     property var mutationNextList: []
     property int mutationOriginalIndex: -1
+    // A deleted note waits in the trash this long, for Undo, before it goes.
+    readonly property int undoMs: 5000
     property string pendingDeleteNote: ""
     property int pendingDeleteIndex: -1
     property string bootstrapDataDir: ""
@@ -98,15 +102,12 @@ Singleton {
         bootstrapProc.command = [
             "sh", "-c",
             "set -eu; "
-                + "notes_dir=$1; legacy_file=$2; scratchpad_file=$3; trash_dir=$4; "
+                + "notes_dir=$1; scratchpad_file=$2; trash_dir=$3; "
                 + "umask 077; "
                 + "mkdir -p -- \"$notes_dir\" \"$trash_dir\"; "
                 + "for discarded in \"$trash_dir\"/*.txt \"$trash_dir\"/.*.txt; do "
                 + "  if [ -f \"$discarded\" ]; then rm -f -- \"$discarded\"; fi; "
                 + "done; "
-                + "if [ -f \"$legacy_file\" ] && [ ! -e \"$scratchpad_file\" ]; then "
-                + "  mv -- \"$legacy_file\" \"$scratchpad_file\"; "
-                + "fi; "
                 + "has_notes=false; "
                 + "for candidate in \"$notes_dir\"/*.txt \"$notes_dir\"/.*.txt; do "
                 + "  if [ -f \"$candidate\" ]; then has_notes=true; break; fi; "
@@ -114,7 +115,6 @@ Singleton {
                 + "if [ \"$has_notes\" = false ]; then : > \"$scratchpad_file\"; fi",
             "speshell-notes-bootstrap",
             root.notesDir,
-            ConfigService.dataDir + "/scratchpad.txt",
             root.resolveNotePath("Scratchpad"),
             root.trashDir
         ];
@@ -595,7 +595,7 @@ Singleton {
 
     Timer {
         id: deleteCommitTimer
-        interval: 5000
+        interval: root.undoMs
         repeat: false
         onTriggered: root.commitPendingDelete()
     }
