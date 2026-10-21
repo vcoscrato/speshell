@@ -200,9 +200,8 @@ Singleton {
             return true;
         }
         if (result.kind === "command" && payload.command === "mirror") {
-            // Keep or Revert waits in the Displays panel; unanswered, the change reverts.
             DisplayService.toggleMirror();
-            return PanelService.open("display");
+            return true;
         }
         if (result.kind === "theme") {
             if (payload.theme !== undefined)

@@ -500,19 +500,20 @@ Card {
                     }
                 }
 
+                // Extend and Mirror apply at once around the selected display; Single waits for Apply.
                 SettingRow {
                     visible: root.multiple
                     enabled: !root.busy
                     label: "Layout"
 
-                    SelectMenu {
+                    SegmentedControl {
                         options: [
-                            { value: "single", label: "Single" },
+                            { value: "extend", label: "Extend" },
                             { value: "mirror", label: "Mirror" },
-                            { value: "extend", label: "Extend" }
+                            { value: "single", label: "Single" }
                         ]
-                        currentValue: DisplayService.draftLayoutMode
-                        onValueSelected: value => DisplayService.setDraftLayoutMode(value)
+                        currentValue: DisplayService.hasPending ? DisplayService.draftLayoutMode : DisplayService.layoutMode
+                        onValueSelected: value => DisplayService.setLayout(value)
                     }
                 }
 

@@ -36,10 +36,12 @@ Singleton {
 
     readonly property var draftActiveMonitors: root.buildActiveMonitors(root.draftMonitors)
     readonly property string draftLayoutMode: root.detectLayoutMode(root.draftMonitors)
+    readonly property string layoutMode: root.detectLayoutMode(root.monitors)
     // Mirroring needs a second display, on or off.
     readonly property bool canMirror: root.monitors.length > 1
-    readonly property bool mirrored: root.detectLayoutMode(root.monitors) === "mirror"
-    property bool mirrorQueued: false
+    readonly property bool mirrored: root.layoutMode === "mirror"
+    // Set by the launcher, so the outcome shows on the OSD rather than in a closed panel.
+    property bool announceLayout: false
     // The laptop's display as it was before the closed lid turned it off, or null.
     property var lidParkedMonitor: null
 
@@ -212,6 +214,14 @@ Singleton {
         };
     }
 
+    // Hyprland names the mirrored display by its id, or "none"; the draft keeps its name.
+    function withMirrorNames(source) {
+        const names = {};
+        source.forEach(monitor => names[String(monitor.id)] = root.monitorName(monitor));
+        return source.map(monitor => Object.assign({}, monitor,
+            { mirrorOf: names[String(monitor.mirrorOf)] || "" }));
+    }
+
     function cloneMonitors(source) {
         var result = [];
         var list = source || [];
@@ -301,7 +311,9 @@ Singleton {
             + ", mode = " + quote(mode)
             + ", position = " + quote(position)
             + ", scale = " + scale
-            + (mirrorTarget !== "" ? ", mirror = " + quote(mirrorTarget) : "")
+            // Always sent: Hyprland merges the rule into the last one, so a mirror left
+            // out stays mirrored.
+            + ", mirror = " + quote(mirrored ? mirrorTarget : "")
             + " })"];
     }
 
@@ -376,28 +388,33 @@ Singleton {
         return true;
     }
 
-    // Mirrors every display onto the focused one, or extends them again if they are
-    // mirrored. It reads the displays first, then applies like the Displays panel does,
-    // so the change waits for Keep there and reverts on its own otherwise.
-    function toggleMirror() {
-        root.mirrorQueued = true;
-        root.refresh();
+    // Mirror and Extend apply at once around the selected display, dropping any draft:
+    // every display stays on and the source keeps its place, so there is nothing to
+    // confirm. Single turns displays off, so it is drafted for Apply and Keep instead.
+    function setLayout(mode) {
+        if (mode === "single") {
+            root.setDraftLayoutMode(mode);
+            return true;
+        }
+        if (root.displayEditingLocked || !root.canMirror)
+            return false;
+        root.resetDraft();
+        root.setDraftLayoutMode(mode);
+        if (root.runMonitorCommands(root.commandsForMonitors(root.draftMonitors, false), "layout"))
+            return true;
+        root.resetDraft();
+        return false;
     }
 
-    function runQueuedMirror() {
-        root.mirrorQueued = false;
-        if (root.applying || root.confirming || root.reverting)
-            return;
-        if (!root.canMirror) {
-            root.errorText = "Mirroring needs a second display.";
-            return;
-        }
+    // Mirrors every display onto the focused one, or extends them again.
+    function toggleMirror() {
         root.resetDraft();
-        var source = root.primaryMonitorObject(root.draftMonitors);
-        if (source)
-            root.selectedName = root.monitorName(source);
-        root.setDraftLayoutMode(root.mirrored ? "extend" : "mirror");
-        root.applyDraft();
+        root.setSelected(HyprlandService.focusedMonitor);
+        const mode = root.mirrored ? "extend" : "mirror";
+        root.announceLayout = root.setLayout(mode);
+        if (!root.announceLayout)
+            OsdService.show("display", "Displays unchanged",
+                root.displayEditingLocked ? "Another change is in progress" : "", -1);
     }
 
     function activeDraftCount() {
@@ -760,7 +777,7 @@ Singleton {
             try {
                 var json = JSON.parse(monitorsOutput.text || "[]");
                 if (Array.isArray(json)) {
-                    root.monitors = root.sortMonitors(json);
+                    root.monitors = root.sortMonitors(root.withMirrorNames(json));
                     if (!root.hasPending) {
                         root.resetDraft();
                     } else {
@@ -773,14 +790,11 @@ Singleton {
                     if (root.topologyRollbackQueued) {
                         root.topologyRollbackQueued = false;
                         Qt.callLater(root.revertDisplayChanges);
-                    } else if (root.mirrorQueued) {
-                        Qt.callLater(root.runQueuedMirror);
                     } else {
                         Qt.callLater(root.followLid);
                     }
                 }
             } catch(e) {
-                root.mirrorQueued = false;
                 root.errorText = "Could not read displays.";
                 console.warn("[Speshell] Failed to parse hyprctl monitors output:", e);
                 if (root.topologyRollbackQueued) {
@@ -811,6 +825,16 @@ Singleton {
                     root.rollbackRetryAvailable = false;
                     root.errorText = "";
                 }
+            } else if (completedOperation === "layout") {
+                const failure = exitCode !== 0 ? applyError.text || "Display change failed." : "";
+                root.errorText = failure;
+                if (root.announceLayout)
+                    OsdService.show("display", failure !== "" ? "Display change failed"
+                        : root.draftLayoutMode === "mirror" ? "Displays mirrored" : "Displays extended",
+                        failure, -1);
+                root.announceLayout = false;
+                root.hasPending = false;
+                root.pendingSummary = "";
             } else if (exitCode !== 0) {
                 root.rollbackMonitors = [];
                 root.errorText = applyError.text || "Display change failed.";
