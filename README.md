@@ -12,7 +12,7 @@ This is Speshell, pronounced *special*. My [Quickshell](https://quickshell.outfo
 ## Features
 
 - A bar on every screen: workspaces, the clock with the weather and your timers, the playing track, the tray, and a button for each panel
-- Clock panel: a clock face in the theme's style beside the month, and your calendars' events, to add, change, delete, and join (see [Calendar](#calendar))
+- Clock panel: a clock face in the theme's style beside the month, and a button that opens Google Calendar in the browser
 - Weather panel: the conditions now, the next hours, and the week
 - Panels for audio output and input, displays and brightness, network (Wi-Fi, and NetworkManager's VPN and WireGuard profiles), Bluetooth, battery, notifications with Do Not Disturb, media, power, Markdown notes, clipboard history, and tools
 - On a laptop: the battery's charge in the bar, low-battery warnings, a charge limit, dimming, locking, and sleeping on idle, hibernating, a lower brightness on battery, locking before the lid sleeps it, the laptop's display off while docked with the lid closed, and an OSD for brightness, the keyboard backlight, the microphone, the touchpad, and airplane mode (see [Laptops](#laptops))
@@ -65,12 +65,6 @@ The Speshell mark at the left opens the launcher, followed by the screen's works
 Common options are in the **Settings** panel. Everything else is in `~/.config/speshell/config.ini`, documented by [`config.example.ini`](config.example.ini). Edits apply on save; an invalid file keeps the previous settings and shows the error.
 
 The weather, on with `[Weather] enabled`, comes from [Open-Meteo](https://open-meteo.com/) for `[Weather] location`, or, left empty, for where [ipinfo.io](https://ipinfo.io/) places your IP address. Click the place in the weather panel's header to change it. Units follow your locale's measurement system.
-
-### Calendar
-
-The clock panel shows your calendars through [Dux Calendar](https://github.com/duxlabs-dev/dux-calendar)'s daemon, which signs in to Google, Microsoft, iCloud, CalDAV, and iCal feeds, keeps them synced, and sends their reminders. Install it (`dankcalendar-bin` on the AUR) and Speshell starts the daemon and asks you to connect Google in the clock panel; add the others with `dcal account add`. Speshell runs only the daemon, never Dux's own window.
-
-The month marks the days with events; click a day for its events below. Click an event to change or delete it, or **+** to add one on the day picked: the times take `9:30`, `14:00`, or `2pm`. Meetings get a Join button. A change to a repeating event reaches every occurrence; one can be deleted alone. Changes made elsewhere arrive with Dux's sync, every five minutes or at once with the refresh button.
 
 ## Launcher
 
@@ -127,7 +121,7 @@ Short of room on the screen, the bar goes compact before it grows past the edge:
 
 **The Battery panel** shows the charge, the time to full or empty, the power draw, and the battery's health (its capacity against its design), and the charge of devices like a mouse or headphones. With a battery that has `charge_control_end_threshold`, the charge limit stops charging at 60, 80, or 90% and starts again 5 points below, which keeps a battery that's mostly plugged in healthy; Full charges it all the way, and leaves the firmware's own setting alone at startup. The packaged polkit rule lets you change it without a password; from a checkout, polkit asks.
 
-**Idle**, by `[Idle]` and in Settings › General: after 2 minutes the screen dims and the keyboard backlight goes off, at 5 the session locks with `[Power] lockCommand`, at 6 the displays turn off (Hyprland), and at 15 the laptop sleeps, on battery only unless `sleepPluggedIn = true`. Input undoes each step. Apps can hold idling off, as video players do; playing media holds off sleep; and **Keep awake** in the Power panel, or `speshell awake on`, holds it all off and shows a chip in the bar until clicked. Whatever puts the system to sleep, closing the lid included, locks first.
+**Idle**, by `[Idle]` and in Settings › General, on battery only: after 2 minutes the screen dims and the keyboard backlight goes off, at 5 the session locks with `[Power] lockCommand`, at 6 the displays turn off (Hyprland), and at 15 the laptop sleeps. Input undoes each step. Apps can hold idling off, as video players do; playing media holds off sleep; and **Keep awake**, the cup in the bar on battery, or `speshell awake on`, holds it all off until turned off. Whatever puts the system to sleep, closing the lid included, locks first.
 
 **Hibernate** shows in the Power panel when logind can hibernate (a swap that fits memory, and resume set up), and locks first as Sleep does.
 

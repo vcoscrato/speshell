@@ -102,10 +102,9 @@ Card {
                     width: parent.width
                     spacing: Theme.spacingMicro
 
-                    Text {
+                    Label {
+                        role: "title"
                         text: root.player ? (root.player.trackTitle || "Unknown track") : ""
-                        font: titleMetrics.font
-                        color: Theme.text
                         width: parent.width
                         wrapMode: Text.Wrap
                         maximumLineCount: 2

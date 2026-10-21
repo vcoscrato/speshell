@@ -35,9 +35,10 @@ PanelWindow {
     // As much space beside the end buttons as above and below them.
     readonly property int edgePadding: Math.max(Theme.spacingTiny, (root.settings.height - root.itemSize) / 2)
     // The panel buttons, left to right, in groups: tools, status, and Speshell itself.
+    // "awake" is no panel but Keep awake's switch, shown on battery, where idling runs.
     readonly property var panelGroups: [
         ["tools", "clipboard", "notes"],
-        ["audio", "microphone", "display", "network", "bluetooth", "battery", "notifications"],
+        ["audio", "microphone", "display", "network", "bluetooth", "awake", "battery", "notifications"],
         ["settings", "power"]
     ]
 
@@ -461,23 +462,33 @@ PanelWindow {
                                 id: button
 
                                 required property string modelData
+                                readonly property bool awake: button.modelData === "awake"
 
                                 size: root.itemSize
                                 labelAbove: !root.atTop
-                                panel: button.modelData
-                                visible: PanelService.isSupported(button.modelData)
-                                open: root.dropdownButton === button
-                                label: PanelService.status(button.modelData)
-                                iconName: PanelService.icon(button.modelData)
+                                panel: button.awake ? "" : button.modelData
+                                visible: button.awake ? !BatteryService.pluggedIn : PanelService.isSupported(button.modelData)
+                                open: !button.awake && root.dropdownButton === button
+                                label: button.awake ? (IdleService.keepAwake ? "Keep awake: on" : "Keep awake: off")
+                                    : PanelService.status(button.modelData)
+                                iconName: button.awake ? "awake" : PanelService.icon(button.modelData)
                                 text: PanelService.text(button.modelData)
                                 tabularDigits: true
                                 iconColor: {
-                                    const tone = PanelService.tone(button.modelData);
+                                    const tone = button.awake ? (IdleService.keepAwake ? "accent" : "")
+                                        : PanelService.tone(button.modelData);
                                     if (tone !== "")
                                         return Theme.toneColor(tone);
                                     return button.open ? Theme.accent : (button.pointerInside ? Theme.text : Theme.subtextBright);
                                 }
-                                onClicked: pointer => root.toggleDropdown(button.modelData, button, pointer)
+                                onClicked: pointer => {
+                                    if (!button.awake) {
+                                        root.toggleDropdown(button.modelData, button, pointer);
+                                        return;
+                                    }
+                                    EffectsService.picked(button, pointer);
+                                    IdleService.setKeepAwake(!IdleService.keepAwake);
+                                }
                                 onWheeled: delta => root.step(button.modelData, delta)
                                 onRightClicked: root.cycleDevice(button.modelData)
 

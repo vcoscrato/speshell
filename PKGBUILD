@@ -29,7 +29,6 @@ optdepends=(
   'curl: downloading the dictation model'
   'brightnessctl: brightness and keyboard backlight controls, and dimming on idle'
   'power-profiles-daemon: the system power profile following the power mode'
-  'dankcalendar-bin: your calendars in the clock panel (AUR)'
   'cliphist: clipboard history'
   'hyprlock: default screen locker for power actions and locking on idle'
   'matugen: theming other apps from the Speshell palette'

@@ -5,7 +5,8 @@ import qs.components
 import qs.services
 import qs.theme
 
-// Lock, Keep awake, and the session's power actions, each asking for a second click.
+// Lock, which runs at once, and the session's power actions, each asking for a second
+// click.
 Card {
     id: root
 
@@ -16,12 +17,18 @@ Card {
     // The action waiting for a second click; empty when none is.
     property string pendingAction: ""
 
-    readonly property var actions: [
-        { id: "sleep", label: "Sleep", detail: "Lock and suspend", iconName: "sleep", tone: "accent" },
-        { id: "hibernate", label: "Hibernate", detail: "Lock and save to disk", iconName: "hibernate", tone: "accent" },
-        { id: "logout", label: "Log out", detail: "End this session", iconName: "logout", tone: "warning" },
-        { id: "restart", label: "Restart", detail: "Reboot the system", iconName: "restart", tone: "warning" },
-        { id: "poweroff", label: "Power off", detail: "Shut down", iconName: "power", tone: "error" }
+    // In two rows: what leaves the session waiting, and what ends it.
+    readonly property var rows: [
+        [
+            { id: "lock", label: "Lock", iconName: "lock", tone: "accent" },
+            { id: "sleep", label: "Sleep", iconName: "sleep", tone: "accent" },
+            { id: "hibernate", label: "Hibernate", iconName: "hibernate", tone: "accent" }
+        ],
+        [
+            { id: "logout", label: "Log out", iconName: "logout", tone: "warning" },
+            { id: "restart", label: "Restart", iconName: "restart", tone: "warning" },
+            { id: "poweroff", label: "Power off", iconName: "power", tone: "error" }
+        ]
     ]
 
     onPresentedChanged: if (!root.presented) root.cancelConfirmation()
@@ -34,10 +41,16 @@ Card {
         return true;
     }
 
-    // The first click arms an action; a second click within the countdown runs it.
+    // Lock runs at once. Otherwise the first click arms an action, and a second click
+    // within the countdown runs it.
     function activate(action) {
         if (!root.canRun(action))
             return;
+        if (action === "lock") {
+            root.cancelConfirmation();
+            PowerService.runAction(action);
+            return;
+        }
         if (root.pendingAction !== action) {
             root.pendingAction = action;
             confirmationTimer.restart();
@@ -69,65 +82,51 @@ Card {
         onTriggered: root.pendingAction = ""
     }
 
-    ActionTile {
-        width: parent.width
-        label: PowerService.activeAction === "lock" ? "Working…" : "Lock screen"
-        detail: PowerService.lockerChecking
-            ? "Checking screen locker"
-            : (PowerService.lockerAvailable ? "Secure this session" : "Screen locker unavailable")
-        iconName: "lock"
-        enabled: root.canRun("lock")
-        onActivated: {
-            root.cancelConfirmation();
-            PowerService.runAction("lock");
-        }
-    }
+    Repeater {
+        model: root.rows
 
-    ActionTile {
-        width: parent.width
-        label: "Keep awake"
-        detail: IdleService.keepAwake ? "On until you turn it off: nothing dims, locks, or sleeps"
-            : "Hold off dimming, locking, and sleeping on idle"
-        iconName: "awake"
-        active: IdleService.keepAwake
-        onActivated: {
-            root.cancelConfirmation();
-            IdleService.setKeepAwake(!IdleService.keepAwake);
-        }
-    }
+        delegate: Row {
+            id: row
 
-    // Two to a row; with an odd count, the last takes a row to itself.
-    Flow {
-        id: actionGrid
+            required property var modelData
+            readonly property var shown: row.modelData.filter(action => action.id !== "hibernate" || PowerService.canHibernate)
 
-        readonly property var shown: root.actions.filter(action => action.id !== "hibernate" || PowerService.canHibernate)
+            width: parent.width
+            spacing: Theme.spacingSmall
 
-        width: parent.width
-        spacing: Theme.spacingSmall
+            Repeater {
+                model: row.shown
 
-        Repeater {
-            model: actionGrid.shown
+                delegate: ActionTile {
+                    id: tile
 
-            delegate: ActionTile {
-                id: tile
+                    required property var modelData
+                    readonly property bool pending: root.pendingAction === tile.modelData.id
 
-                required property var modelData
-                required property int index
-                readonly property bool pending: root.pendingAction === tile.modelData.id
-                readonly property bool alone: tile.index === actionGrid.shown.length - 1 && actionGrid.shown.length % 2 === 1
-
-                width: tile.alone ? actionGrid.width : (actionGrid.width - actionGrid.spacing) / 2
-                label: PowerService.activeAction === tile.modelData.id ? "Working…"
-                    : tile.pending ? tile.modelData.label + "?" : tile.modelData.label
-                detail: tile.pending ? "Click again to confirm" : tile.modelData.detail
-                iconName: tile.modelData.iconName
-                tone: tile.modelData.tone
-                enabled: root.canRun(tile.modelData.id)
-                active: tile.pending
-                countdownMs: confirmationTimer.interval
-                onActivated: root.activate(tile.modelData.id)
+                    width: (row.width - row.spacing * (row.shown.length - 1)) / row.shown.length
+                    stacked: true
+                    label: PowerService.activeAction === tile.modelData.id ? "Working…"
+                        : tile.pending ? tile.modelData.label + "?" : tile.modelData.label
+                    iconName: tile.modelData.iconName
+                    tone: tile.modelData.tone
+                    enabled: root.canRun(tile.modelData.id)
+                    active: tile.pending
+                    countdownMs: confirmationTimer.interval
+                    onActivated: root.activate(tile.modelData.id)
+                }
             }
         }
+    }
+
+    Label {
+        visible: PowerService.errorMessage === "" && text !== ""
+        width: parent.width
+        role: "caption"
+        horizontalAlignment: Text.AlignHCenter
+        text: root.pendingAction !== "" ? "Click again to confirm"
+            : PowerService.lockerChecking || PowerService.lockerAvailable ? ""
+            : "No screen locker: lock, sleep, and hibernate are off"
+        color: root.pendingAction !== "" ? Theme.toneColor("warning") : Theme.subtext
     }
 
     Label {

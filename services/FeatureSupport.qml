@@ -19,9 +19,8 @@ Singleton {
     property var keyboardBacklightDevices: []
 
     // The commands Speshell may run: brightnessctl, power profiles, rfkill (airplane
-    // mode), hyprsunset (night light), Tailscale, Dux Calendar, the screen locker, and
-    // the tools'.
-    readonly property var wantedCommands: ["brightnessctl", "powerprofilesctl", "rfkill", "hyprsunset", "tailscale", "dcal",
+    // mode), hyprsunset (night light), Tailscale, the screen locker, and the tools'.
+    readonly property var wantedCommands: ["brightnessctl", "powerprofilesctl", "rfkill", "hyprsunset", "tailscale",
         PowerService.lockerExecutable]
         .concat(ToolsService.commands)
         .filter((command, index, all) => command !== "" && all.indexOf(command) === index)

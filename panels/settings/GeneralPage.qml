@@ -32,7 +32,7 @@ Column {
         { key: "dimAfter", label: "Dim the screen", info: "Dims the screen and turns the keyboard backlight off." },
         { key: "lockAfter", label: "Lock", info: "Locks the session with the screen locker." },
         { key: "screenOffAfter", label: "Turn the screen off", info: "Turns the displays off, on Hyprland." },
-        { key: "sleepAfter", label: "Sleep", info: "Locks and suspends, on battery unless set below. Playing media holds it off." }
+        { key: "sleepAfter", label: "Sleep", info: "Locks and suspends. Playing media holds it off." }
     ]
     readonly property var toastOptions: [
         { value: 1, label: "1" },
@@ -103,7 +103,7 @@ Column {
     Label {
         role: "section"
         topPadding: Theme.spacingSmall
-        text: "When idle"
+        text: "When idle on battery"
     }
 
     Repeater {
@@ -126,18 +126,6 @@ Column {
                 fallbackLabel: Format.duration(idleRow.minutes * 60) + " · Custom"
                 onValueSelected: value => ConfigService.setProperty("Idle", idleRow.modelData.key, value)
             }
-        }
-    }
-
-    SettingRow {
-        visible: BatteryService.available
-        label: "Sleep when plugged in"
-        info: "Sleeps on idle with the charger in too."
-
-        ToggleSwitch {
-            checked: root.settings.idle.sleepPluggedIn
-            tooltipText: "Sleep when plugged in"
-            onToggled: on => ConfigService.setProperty("Idle", "sleepPluggedIn", on ? "true" : "false")
         }
     }
 }

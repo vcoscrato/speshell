@@ -285,8 +285,7 @@ function build(document, errors) {
             dimAfter: realValue(document, "Idle", "dimAfter", 2, 0, 240, errors),
             lockAfter: realValue(document, "Idle", "lockAfter", 5, 0, 240, errors),
             screenOffAfter: realValue(document, "Idle", "screenOffAfter", 6, 0, 240, errors),
-            sleepAfter: realValue(document, "Idle", "sleepAfter", 15, 0, 240, errors),
-            sleepPluggedIn: booleanValue(document, "Idle", "sleepPluggedIn", false, errors)
+            sleepAfter: realValue(document, "Idle", "sleepAfter", 15, 0, 240, errors)
         },
         backlight: {
             device: stringValue(document, "Backlight", "device", "", errors, true),

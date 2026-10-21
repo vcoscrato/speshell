@@ -12,11 +12,13 @@ Singleton {
     id: root
 
     readonly property var settings: ConfigService.settings.idle
-    // Keep awake: nothing idles until it's turned off, for this session.
+    // Keep awake, the bar's switch on battery: nothing idles until it's turned off, for
+    // this session.
     property bool keepAwake: false
-    readonly property bool idling: !root.keepAwake
-    // Sleep waits for the charger unless [Idle] sleepPluggedIn, and for playing media.
-    readonly property bool sleepAllowed: (UPower.onBattery || root.settings.sleepPluggedIn) && !MediaService.playing
+    // Nothing idles with the charger in, either.
+    readonly property bool idling: !root.keepAwake && UPower.onBattery
+    // Sleep also waits for playing media.
+    readonly property bool sleepAllowed: !MediaService.playing
     property bool screenOff: false
 
     function setKeepAwake(on) {
@@ -33,31 +35,6 @@ Singleton {
     function lock() {
         if (!PowerService.locked && PowerService.lockerAvailable)
             PowerService.runAction("lock");
-    }
-
-    onKeepAwakeChanged: {
-        if (root.keepAwake)
-            ActivityService.publish("idle", {
-                id: "awake",
-                state: "active",
-                label: "Awake",
-                detail: "The screen stays on and the system awake",
-                iconName: "awake",
-                tone: "accent",
-                sortOrder: 50,
-                actions: [{ id: "stop", label: "Let it idle" }]
-            });
-        else
-            ActivityService.clear("idle", "awake");
-    }
-
-    Connections {
-        target: ActivityService
-
-        function onActionRequested(provider, activityId, actionId) {
-            if (provider === "idle" && activityId === "awake" && actionId === "stop")
-                root.keepAwake = false;
-        }
     }
 
     IdleMonitor {

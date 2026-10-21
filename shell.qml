@@ -12,10 +12,10 @@ ShellRoot {
 
     // Services that act on their own, created first rather than when the bar first
     // reads them: idling, the battery's warnings and charge limit, the lid, the radios
-    // and touchpad that keys switch, the night light, and the calendar's reminders. They
-    // run with the defaults while config.ini is invalid, so the laptop still locks.
+    // and touchpad that keys switch, and the night light. They run with the defaults
+    // while config.ini is invalid, so the laptop still locks.
     readonly property var autonomousServices: [IdleService, BatteryService, BrightnessService, DisplayService,
-        RadioService, InputService, NightLightService, CalendarService]
+        RadioService, InputService, NightLightService]
 
     Binding {
         target: Theme

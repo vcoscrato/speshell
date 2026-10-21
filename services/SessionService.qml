@@ -11,8 +11,6 @@ Singleton {
 
     readonly property bool watching: FeatureSupport.supportsBattery
     property bool lidClosed: false
-    // Whether the delay is held, so going to sleep waits for releaseSleep().
-    readonly property bool holdingSleep: inhibitor.running
 
     // The system is about to sleep; it waits until releaseSleep() or a few seconds pass.
     signal aboutToSleep()
