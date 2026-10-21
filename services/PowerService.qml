@@ -3,33 +3,54 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.Services.UPower
 
-// Locking, sleep, logout, restart, and power off, and the [Power] mode that sets how
-// much power Speshell's motion may use.
+// Locking, sleep, hibernate, logout, restart, and power off, and the power mode that sets how
+// much power the system and Speshell's motion may use.
 Singleton {
     id: root
 
-    // How much power Speshell itself may use, from [Power] mode:
-    // - "maximum": theme effects tick with every frame the display shows; recordings
-    //   started outside Speshell are noticed within 2 s.
-    // - "balanced": theme effects tick at 60 fps, and that check runs every 10 s.
-    // - "saver": no theme effects, no interface motion, and that check every minute.
+    // How much power may be used: [Power] mode, or "saver" on battery with [Power]
+    // saverOnBattery, until another mode is picked there.
+    // - "maximum": the performance profile (balanced where there is none); theme effects
+    //   tick with every frame the display shows; recordings started outside Speshell
+    //   are noticed within 2 s.
+    // - "balanced": the balanced profile; theme effects tick at 60 fps, and that check
+    //   runs every 10 s; on battery, 30 fps and every minute.
+    // - "saver": the power-saver profile; no theme effects, no interface motion, and
+    //   that check every minute.
     // Speshell's own tools report their recordings at once in every mode.
-    readonly property string mode: ConfigService.settings.power.mode
+    readonly property string mode: root.onSaver ? (root.batteryMode || "saver") : root.configuredMode
+    readonly property string configuredMode: ConfigService.settings.power.mode
+    readonly property bool saverOnBattery: ConfigService.settings.power.saverOnBattery
+    readonly property bool onBattery: UPower.onBattery
+    readonly property bool onSaver: root.onBattery && root.saverOnBattery
+    // A mode picked while saving on battery, until plugged in.
+    property string batteryMode: ""
+
+    // Whether the system's power profile follows the mode, through power-profiles-daemon.
+    readonly property bool profilesAvailable: FeatureSupport.hasCommand("powerprofilesctl")
+    // Reading it connects to the daemon; its profiles arrive a moment later.
+    readonly property bool hasPerformanceProfile: PowerProfiles.hasPerformanceProfile
 
     readonly property var lockCommand: ConfigService.settings.power.lockCommand
     readonly property string lockerExecutable: String(root.lockCommand[0] || "").trim()
     readonly property bool lockerChecking: !FeatureSupport.commandsKnown
     readonly property bool lockerAvailable: FeatureSupport.hasCommand(root.lockerExecutable)
+    // Whether the locker Speshell started still runs.
+    readonly property bool locked: lockerProcess.running
     property bool busy: false
     property string activeAction: ""
     property string errorMessage: ""
 
     property string lockerPurpose: ""
+    // Whether logind can hibernate: a swap that fits memory, and resume set up.
+    property bool canHibernate: false
 
     function actionLabel(action) {
         if (action === "lock") return "Lock";
         if (action === "sleep") return "Sleep";
+        if (action === "hibernate") return "Hibernate";
         if (action === "logout") return "Log out";
         if (action === "restart") return "Restart";
         if (action === "poweroff") return "Power off";
@@ -42,6 +63,11 @@ Singleton {
             return fallback;
         var firstLine = detail.split("\n")[0].trim();
         return firstLine !== "" ? firstLine : fallback;
+    }
+
+    // Sleep and hibernate lock first, then leave the system to logind.
+    function sleeps(action) {
+        return action === "sleep" || action === "hibernate";
     }
 
     function fail(message) {
@@ -75,6 +101,26 @@ Singleton {
         return true;
     }
 
+    // Picked on battery with saverOnBattery, it lasts until plugged in; otherwise it
+    // becomes [Power] mode.
+    function setMode(mode) {
+        if (root.onSaver)
+            root.batteryMode = mode;
+        else
+            ConfigService.setProperty("Power", "mode", mode);
+    }
+
+    // Always written: until the daemon answers, PowerProfiles.profile is a placeholder.
+    function applyProfile() {
+        if (!root.profilesAvailable)
+            return;
+        PowerProfiles.profile = root.mode === "saver"
+            ? PowerProfile.PowerSaver
+            : (root.mode === "maximum" && root.hasPerformanceProfile
+                ? PowerProfile.Performance
+                : PowerProfile.Balanced);
+    }
+
     function runAction(action) {
         if (root.busy)
             return false;
@@ -83,7 +129,12 @@ Singleton {
         root.busy = true;
         root.activeAction = action;
 
-        if (action === "lock" || action === "sleep") {
+        // Already locked, as after idling: sleep needs no second locker.
+        if (root.sleeps(action) && lockerProcess.running) {
+            sleepProcess.running = true;
+            return true;
+        }
+        if (action === "lock" || root.sleeps(action)) {
             return root.startLocker(action);
         }
 
@@ -128,8 +179,8 @@ Singleton {
                 return;
             }
 
-            if (purpose === "sleep") {
-                suspendProcess.running = true;
+            if (root.sleeps(purpose)) {
+                sleepProcess.running = true;
             }
         }
     }
@@ -149,17 +200,28 @@ Singleton {
     }
 
     Process {
-        id: suspendProcess
-        command: ["systemctl", "suspend"]
+        id: sleepProcess
+        command: ["systemctl", root.activeAction === "hibernate" ? "hibernate" : "suspend"]
         running: false
-        stderr: StdioCollector { id: suspendError }
+        stderr: StdioCollector { id: sleepError }
         onExited: function(exitCode) {
-            if (root.activeAction !== "sleep")
+            if (!root.sleeps(root.activeAction))
                 return;
             if (exitCode === 0)
                 root.finish();
             else
-                root.fail(root.commandError(suspendError, "Could not suspend the system."));
+                root.fail(root.commandError(sleepError, root.activeAction === "hibernate"
+                    ? "Could not hibernate the system." : "Could not suspend the system."));
+        }
+    }
+
+    // Prints ('yes',) when hibernating works.
+    Process {
+        running: true
+        command: ["gdbus", "call", "--system", "--dest", "org.freedesktop.login1",
+            "--object-path", "/org/freedesktop/login1", "--method", "org.freedesktop.login1.Manager.CanHibernate"]
+        stdout: StdioCollector {
+            onStreamFinished: root.canHibernate = text.indexOf("'yes'") >= 0
         }
     }
 
@@ -169,7 +231,7 @@ Singleton {
         stderr: StdioCollector { id: actionError }
         onExited: function(exitCode) {
             var action = root.activeAction;
-            if (action === "" || action === "lock" || action === "sleep")
+            if (action === "" || action === "lock" || root.sleeps(action))
                 return;
             if (exitCode !== 0) {
                 root.fail(root.commandError(
@@ -182,4 +244,9 @@ Singleton {
         }
     }
 
+    onOnSaverChanged: root.batteryMode = ""
+    onModeChanged: root.applyProfile()
+    // At startup: the command probe finishes, then the daemon reports its profiles.
+    onProfilesAvailableChanged: root.applyProfile()
+    onHasPerformanceProfileChanged: root.applyProfile()
 }

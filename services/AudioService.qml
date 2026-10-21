@@ -31,13 +31,15 @@ Singleton {
 
     readonly property string outputDeviceLabel: root.defaultSink ? root.deviceLabel(root.defaultSink, true) : ""
     readonly property string inputDeviceLabel: root.defaultSource ? root.deviceLabel(root.defaultSource, false) : ""
+    // The OSD shows output changes made outside Speshell, such as media keys, and the
+    // microphone's mute.
     property double outputOsdSuppressedUntil: 0
-    // The output level the OSD last saw, so it only shows for real changes.
+    property double inputOsdSuppressedUntil: 0
+    // The values the OSD last saw, so it only shows for real changes.
     property int osdVolumePercent: -1
     property bool osdMuted: false
-
-    // Emitted for output changes made outside Speshell, such as media keys.
-    signal outputOsdRequested(int volumePercent, bool muted)
+    // -1 until known, then 0 or 1.
+    property int osdInputMuted: -1
 
     function clampPercent(value) {
         return Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
@@ -78,8 +80,10 @@ Singleton {
     }
 
     function toggleInputMute() {
-        if (root.sourceAudio)
-            root.sourceAudio.muted = !root.sourceAudio.muted;
+        if (!root.sourceAudio)
+            return;
+        root.inputOsdSuppressedUntil = Date.now() + 1200;
+        root.sourceAudio.muted = !root.sourceAudio.muted;
     }
 
     // Moves volume by one configured scroll step; direction is positive or negative.
@@ -215,6 +219,10 @@ Singleton {
     onDefaultSinkChanged: root.suppressOutputOsd(1200)
     onHasOutputVolumeChanged: root.suppressOutputOsd(1200)
     onSinkAudioChanged: outputOsdDebounce.restart()
+    onSourceAudioChanged: {
+        root.inputOsdSuppressedUntil = Date.now() + 1200;
+        inputOsdDebounce.restart();
+    }
 
     PwObjectTracker {
         objects: [root.defaultSink, root.defaultSource].filter(function(node) { return !!node; })
@@ -229,6 +237,12 @@ Singleton {
         function onMutedChanged() { root.queueOutputOsd(); }
     }
 
+    Connections {
+        target: root.sourceAudio
+
+        function onMutedChanged() { inputOsdDebounce.restart(); }
+    }
+
     Timer {
         id: outputOsdDebounce
         interval: 30
@@ -238,8 +252,28 @@ Singleton {
                 && (root.outputVolumePercent !== root.osdVolumePercent || root.outputMuted !== root.osdMuted);
             root.osdVolumePercent = root.hasOutputVolume ? root.outputVolumePercent : -1;
             root.osdMuted = root.outputMuted;
-            if (changed && Date.now() >= root.outputOsdSuppressedUntil)
-                root.outputOsdRequested(root.outputVolumePercent, root.outputMuted);
+            if (!changed || Date.now() < root.outputOsdSuppressedUntil)
+                return;
+            if (root.outputMuted)
+                OsdService.show("audio-output-muted", "Output muted", root.outputVolumePercent + "%", 0);
+            else
+                OsdService.showPercent(root.outputVolumePercent <= 35 ? "audio-output-low" : "audio-output-high",
+                    "Output volume", root.outputVolumePercent);
+        }
+    }
+
+    // Only the mute: apps adjust the microphone's level on their own.
+    Timer {
+        id: inputOsdDebounce
+        interval: 30
+        repeat: false
+        onTriggered: {
+            const muted = root.sourceAudio ? (root.inputMuted ? 1 : 0) : -1;
+            const changed = root.osdInputMuted >= 0 && muted >= 0 && muted !== root.osdInputMuted;
+            root.osdInputMuted = muted;
+            if (changed && Date.now() >= root.inputOsdSuppressedUntil)
+                OsdService.show(muted ? "audio-input-muted" : "audio-input",
+                    muted ? "Microphone muted" : "Microphone on", "", -1);
         }
     }
 }

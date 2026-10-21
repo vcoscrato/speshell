@@ -1,8 +1,6 @@
 pragma Singleton
 import QtQuick
 import Quickshell
-import Quickshell.Services.UPower
-import "../components/Icons.js" as Icons
 
 // The bar's panels: which apply to this machine, the icon and few words that sum up
 // each on its bar button, and requests to open one in the focused screen's bar, from
@@ -44,7 +42,7 @@ Singleton {
 
     function isSupported(panel) {
         if (panel === "battery")
-            return FeatureSupport.supportsBattery;
+            return BatteryService.available;
         if (panel === "bluetooth")
             return FeatureSupport.supportsBluetooth;
         if (panel === "display")
@@ -70,6 +68,8 @@ Singleton {
         if (panel === "display")
             return BrightnessService.available ? "brightness" : "display";
         if (panel === "network") {
+            if (RadioService.airplaneMode)
+                return "airplane";
             if (VpnService.active)
                 return "vpn";
             if (NetworkService.wiredDevice !== null)
@@ -79,13 +79,8 @@ Singleton {
         }
         if (panel === "bluetooth")
             return BluetoothService.enabled ? "bluetooth" : "bluetooth-off";
-        if (panel === "battery") {
-            const battery = UPower.displayDevice;
-            if (!battery || !battery.ready)
-                return "battery";
-            return Icons.batteryFor(battery.percentage * 100, battery.state === UPowerDeviceState.Charging
-                || battery.state === UPowerDeviceState.PendingCharge);
-        }
+        if (panel === "battery")
+            return BatteryService.iconName;
         if (panel === "notifications")
             return NotificationService.dndEnabled ? "bell-off" : "bell";
         if (panel === "weather")
@@ -102,6 +97,8 @@ Singleton {
         if (panel === "display" && BrightnessService.available)
             return "Brightness: " + BrightnessService.percent + "%";
         if (panel === "network") {
+            if (RadioService.airplaneMode)
+                return "Airplane mode";
             if (NetworkService.wiredDevice)
                 return "Ethernet";
             const wifi = NetworkService.connectedWifi;
@@ -111,10 +108,8 @@ Singleton {
         }
         if (panel === "bluetooth")
             return BluetoothService.enabled ? "Bluetooth on" : "Bluetooth off";
-        if (panel === "battery") {
-            const battery = UPower.displayDevice;
-            return battery && battery.ready ? "Battery: " + Math.round(battery.percentage * 100) + "%" : "Battery";
-        }
+        if (panel === "battery")
+            return BatteryService.ready ? "Battery: " + Math.round(BatteryService.percent) + "% · " + BatteryService.detail : "Battery";
         if (panel === "clipboard") {
             const count = ClipboardService.history.length;
             return count > 0 ? "Clipboard (" + count + " item" + (count === 1 ? "" : "s") + ")" : "Clipboard";
@@ -128,6 +123,17 @@ Singleton {
         if (panel === "weather")
             return WeatherService.status === "unknown" ? "Weather: location not found" : WeatherService.summary || "Weather";
         return root.labels[panel] || "";
+    }
+
+    // Text beside a panel's icon on its bar button: the battery's charge, unless it
+    // rests plugged in.
+    function text(panel) {
+        return panel === "battery" ? BatteryService.barText : "";
+    }
+
+    // The color of a panel's bar button icon when its state calls for one, else "".
+    function tone(panel) {
+        return panel === "battery" ? BatteryService.alertTone : "";
     }
 
     function request(panel, toggle) {

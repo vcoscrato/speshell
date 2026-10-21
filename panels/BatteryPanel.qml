@@ -1,43 +1,31 @@
+pragma ComponentBehavior: Bound
 import QtQuick
-import Quickshell.Services.UPower
 import qs.components
+import qs.services
 import qs.theme
-import "../components/Format.js" as Format
 
-// The laptop battery's charge, whether it charges, and the time to full or empty.
+// The laptop battery's charge, whether it charges, and the time to full or empty; its
+// power draw and health; the charge limit and the power mode; and the charge of other
+// devices.
 Card {
     id: root
 
-    readonly property var battery: UPower.displayDevice
-    readonly property bool ready: root.battery !== null && root.battery.ready
-    readonly property real percent: root.ready ? root.battery.percentage * 100 : 0
-    readonly property bool charging: root.ready && (root.battery.state === UPowerDeviceState.Charging
-        || root.battery.state === UPowerDeviceState.PendingCharge)
-    readonly property bool full: root.ready && root.battery.state === UPowerDeviceState.FullyCharged
-    readonly property color tone: root.charging || root.full
-        ? Theme.success
-        : (root.percent <= 10 ? Theme.error : (root.percent <= 25 ? Theme.warning : Theme.accent))
+    readonly property color tone: Theme.toneColor(BatteryService.tone)
+
+    readonly property var modeOptions: [
+        { value: "saver", label: "Saver" },
+        { value: "balanced", label: "Balanced" },
+        { value: "maximum", label: "Maximum" }
+    ]
+    readonly property var limitOptions: [
+        { value: 60, label: "60%" },
+        { value: 80, label: "80%" },
+        { value: 90, label: "90%" },
+        { value: 100, label: "Full" }
+    ]
 
     title: "Battery"
     iconName: "battery"
-
-    // "2 h 5 min", to the minute, or "" when unknown.
-    function duration(seconds) {
-        return seconds > 0 ? Format.duration(Math.max(60, Math.round(seconds / 60) * 60)) : "";
-    }
-
-    readonly property string detail: {
-        if (!root.ready)
-            return "";
-        if (root.full)
-            return "Fully charged";
-        if (root.charging) {
-            const toFull = root.duration(root.battery.timeToFull);
-            return toFull !== "" ? "Charging · full in " + toFull : "Charging";
-        }
-        const toEmpty = root.duration(root.battery.timeToEmpty);
-        return toEmpty !== "" ? toEmpty + " left" : "On battery";
-    }
 
     Item {
         width: parent.width
@@ -48,7 +36,7 @@ Card {
             role: "display"
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
-            text: root.ready ? Math.round(root.percent) + "%" : "—"
+            text: BatteryService.ready ? Math.round(BatteryService.percent) + "%" : "—"
             font.features: { "tnum": 1 }
         }
 
@@ -58,7 +46,7 @@ Card {
             anchors.right: gauge.left
             anchors.rightMargin: Theme.spacingMedium
             anchors.verticalCenter: parent.verticalCenter
-            text: root.detail
+            text: BatteryService.detail
             elide: Text.ElideRight
             color: Theme.subtext
         }
@@ -83,7 +71,7 @@ Card {
                 Rectangle {
                     x: 3
                     y: 3
-                    width: (frame.width - 6) * Math.max(0, Math.min(1, root.percent / 100))
+                    width: (frame.width - 6) * Math.max(0, Math.min(1, BatteryService.percent / 100))
                     height: frame.height - 6
                     radius: Theme.borderRadius
                     color: root.tone
@@ -103,6 +91,114 @@ Card {
                 radius: 1
                 color: Theme.overlay
             }
+        }
+    }
+
+    // Watts in or out, and the capacity left of the battery's design.
+    Row {
+        visible: BatteryService.watts > 0 || BatteryService.health >= 0
+        spacing: Theme.spacingLarge
+
+        Row {
+            visible: BatteryService.watts > 0
+            spacing: Theme.spacingTiny
+
+            AppIcon {
+                anchors.verticalCenter: parent.verticalCenter
+                name: "plug"
+                size: Theme.iconSizeSmall
+                iconColor: Theme.subtext
+            }
+
+            Label {
+                anchors.verticalCenter: parent.verticalCenter
+                role: "caption"
+                text: (BatteryService.charging ? "Charging at " : "Using ") + BatteryService.watts.toFixed(1) + " W"
+                color: Theme.subtext
+            }
+        }
+
+        Row {
+            visible: BatteryService.health >= 0
+            spacing: Theme.spacingTiny
+
+            AppIcon {
+                anchors.verticalCenter: parent.verticalCenter
+                name: "battery-health"
+                size: Theme.iconSizeSmall
+                iconColor: BatteryService.health < 50 ? Theme.warning : Theme.subtext
+            }
+
+            Label {
+                anchors.verticalCenter: parent.verticalCenter
+                role: "caption"
+                text: "Health " + Math.round(BatteryService.health) + "%"
+                color: BatteryService.health < 50 ? Theme.warning : Theme.subtext
+            }
+        }
+    }
+
+    SettingRow {
+        visible: BatteryService.supportsChargeLimit
+        label: "Charge limit"
+        info: "Stops charging there, and starts again 5 points below, to keep the battery healthy "
+            + "when the laptop stays plugged in. Full charges it all the way."
+
+        SegmentedControl {
+            options: root.limitOptions
+            currentValue: BatteryService.activeChargeLimit
+            onValueSelected: value => BatteryService.setChargeLimit(value)
+        }
+    }
+
+    Notice {
+        visible: BatteryService.chargeLimitError !== ""
+        detail: BatteryService.chargeLimitError
+        toneColor: Theme.error
+    }
+
+    SettingRow {
+        label: "Power mode"
+        info: (PowerService.profilesAvailable
+                ? "Sets the system's power profile and Speshell's animations together."
+                : "Sets how much Speshell animates.")
+            + (PowerService.onSaver ? " Picked now, it lasts until plugged in." : "")
+
+        SegmentedControl {
+            options: root.modeOptions
+            currentValue: PowerService.mode
+            onValueSelected: value => PowerService.setMode(value)
+        }
+    }
+
+    SettingRow {
+        label: "Saver on battery"
+        info: "Switches to Saver when unplugged, and back to the mode picked while plugged in."
+
+        ToggleSwitch {
+            checked: PowerService.saverOnBattery
+            tooltipText: "Saver on battery"
+            onToggled: on => ConfigService.setProperty("Power", "saverOnBattery", on ? "true" : "false")
+        }
+    }
+
+    DeviceSection {
+        visible: BatteryService.peripherals.length > 0
+        title: "Devices"
+        count: BatteryService.peripherals.length
+    }
+
+    Repeater {
+        model: BatteryService.peripherals
+
+        delegate: DeviceRow {
+            required property var modelData
+
+            title: modelData.name
+            subtitle: modelData.percent + "%"
+            subtitleColor: modelData.percent <= BatteryService.lowLevel ? Theme.warning : Theme.subtext
+            iconName: modelData.iconName
+            primaryEnabled: false
         }
     }
 }

@@ -5,7 +5,7 @@ import qs.components
 import qs.theme
 import qs.services
 
-// The wired and Wi-Fi connections, NetworkManager's VPNs, and the networks nearby.
+// The wired and Wi-Fi connections, NetworkManager's VPNs, Tailscale, and the networks nearby.
 Card {
     id: root
     title: "Network"
@@ -20,6 +20,16 @@ Card {
 
     headerActions: Row {
         spacing: Theme.spacingSmall
+
+        // Lit while every radio is off.
+        HeaderButton {
+            id: airplaneButton
+            visible: RadioService.available
+            iconName: "airplane"
+            iconColor: RadioService.airplaneMode ? Theme.accent : airplaneButton.containsMouse ? Theme.text : Theme.subtext
+            tooltipText: RadioService.airplaneMode ? "Turn airplane mode off" : "Turn airplane mode on"
+            onClicked: RadioService.setAirplaneMode(!RadioService.airplaneMode)
+        }
 
         HeaderButton {
             iconName: "refresh"
@@ -38,6 +48,13 @@ Card {
     }
 
     pinnedContent: [
+        Notice {
+            visible: RadioService.airplaneMode
+            heading: "Airplane mode"
+            detail: "Wi-Fi, Bluetooth, and mobile broadband are off."
+            toneColor: Theme.accent
+        },
+
         DeviceRow {
             visible: NetworkService.wiredDevice !== null
             title: NetworkService.wiredDevice ? NetworkService.wiredDevice.name : "Ethernet"
@@ -184,6 +201,41 @@ Card {
                     color: Theme.error
                     wrapMode: Text.WordWrap
                 }
+            }
+        },
+
+        DeviceRow {
+            visible: TailscaleService.available && TailscaleService.backendState !== ""
+            title: TailscaleService.connected && TailscaleService.tailnet !== "" ? "Tailscale · " + TailscaleService.tailnet : "Tailscale"
+            subtitle: TailscaleService.subtitle()
+            iconName: "vpn"
+            current: TailscaleService.connected
+            busy: TailscaleService.switching && TailscaleService.authUrl === ""
+            primaryEnabled: !TailscaleService.connected && !TailscaleService.switching
+            actions: {
+                if (TailscaleService.authUrl !== "")
+                    return [{ text: "Open login", actionId: "login" }, { text: "Cancel", actionId: "cancel" }];
+                if (TailscaleService.connected && !TailscaleService.switching)
+                    return [{ text: "Disconnect", actionId: "disconnect" }];
+                return [];
+            }
+            onPrimaryTriggered: TailscaleService.connect()
+            onActionTriggered: actionId => {
+                if (actionId === "login")
+                    TailscaleService.openLogin();
+                else if (actionId === "cancel")
+                    TailscaleService.cancel();
+                else
+                    TailscaleService.disconnect();
+            }
+
+            Label {
+                role: "caption"
+                visible: TailscaleService.errorText !== ""
+                width: parent.width
+                text: TailscaleService.errorText
+                color: Theme.error
+                wrapMode: Text.WordWrap
             }
         },
 

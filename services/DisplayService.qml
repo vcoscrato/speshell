@@ -6,7 +6,8 @@ import Quickshell.Io
 import "Shell.js" as Shell
 
 // Hyprland's monitors for the Displays panel: a draft of modes, positions, and layout
-// that applies on request and reverts unless kept.
+// that applies on request and reverts unless kept. With the lid closed and another
+// display on, the laptop's own display turns off until the lid opens.
 Singleton {
     id: root
 
@@ -39,6 +40,8 @@ Singleton {
     readonly property bool canMirror: root.monitors.length > 1
     readonly property bool mirrored: root.detectLayoutMode(root.monitors) === "mirror"
     property bool mirrorQueued: false
+    // The laptop's display as it was before the closed lid turned it off, or null.
+    property var lidParkedMonitor: null
 
     function monitorName(monitor) {
         return monitor && monitor.name ? String(monitor.name) : "";
@@ -643,6 +646,42 @@ Singleton {
         };
     }
 
+    // ── The lid ────────────────────────────────────────────
+    function isInternal(monitor) {
+        return /^(eDP|LVDS|DSI)-/.test(root.monitorName(monitor));
+    }
+
+    // Turns the laptop's display off while the lid is closed and another display is
+    // on, and back on as it was once the lid opens or the last other display goes.
+    // Waits while a change in the Displays panel awaits Keep.
+    function followLid() {
+        if (!HyprlandService.running || root.displayEditingLocked || root.hasPending)
+            return;
+        const internal = root.monitors.find(monitor => root.isInternal(monitor) && !monitor.disabled);
+        const othersOn = root.monitors.some(monitor => !root.isInternal(monitor) && !monitor.disabled);
+        if (SessionService.lidClosed && internal && othersOn && !root.lidParkedMonitor) {
+            root.lidParkedMonitor = root.cloneMonitor(internal);
+            root.runLidCommand(root.commandForDraftMonitor(Object.assign(root.cloneMonitor(internal), { disabled: true })));
+        } else if (root.lidParkedMonitor && (!SessionService.lidClosed || !othersOn)) {
+            const parked = root.lidParkedMonitor;
+            root.lidParkedMonitor = null;
+            root.runLidCommand(root.commandForDraftMonitor(parked));
+        }
+    }
+
+    function runLidCommand(args) {
+        if (args.length === 0)
+            return;
+        Quickshell.execDetached(["hyprctl"].concat(args));
+        refreshDebounce.restart();
+    }
+
+    Connections {
+        target: SessionService
+
+        function onLidClosedChanged() { root.refresh(); }
+    }
+
     // ── Actions ────────────────────────────────────────────
     function refresh() {
         if (HyprlandService.running && !monitorsProc.running) {
@@ -736,6 +775,8 @@ Singleton {
                         Qt.callLater(root.revertDisplayChanges);
                     } else if (root.mirrorQueued) {
                         Qt.callLater(root.runQueuedMirror);
+                    } else {
+                        Qt.callLater(root.followLid);
                     }
                 }
             } catch(e) {

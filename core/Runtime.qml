@@ -124,6 +124,69 @@ Scope {
         }
     }
 
+    // For laptop keys: each change shows the OSD. `state` is on, off, or toggle.
+    IpcHandler {
+        target: "brightness"
+
+        function up(): void { BrightnessService.stepFromKey(1); }
+        function down(): void { BrightnessService.stepFromKey(-1); }
+        function set(percent: int): void {
+            BrightnessService.setPercent(percent);
+            BrightnessService.commit();
+            OsdService.showPercent("brightness", "Brightness", BrightnessService.percent);
+        }
+        function get(): string { return BrightnessService.available ? String(BrightnessService.percent) : ""; }
+        function keyboard(): void { BrightnessService.cycleKeyboard(); }
+    }
+
+    IpcHandler {
+        target: "awake"
+
+        function set(state: string): bool {
+            if (state !== "on" && state !== "off" && state !== "toggle")
+                return false;
+            IdleService.setKeepAwake(state === "toggle" ? !IdleService.keepAwake : state === "on");
+            return true;
+        }
+        function get(): string { return IdleService.keepAwake ? "on" : "off"; }
+    }
+
+    IpcHandler {
+        target: "touchpad"
+
+        function set(state: string): bool {
+            if (!InputService.available || (state !== "on" && state !== "off" && state !== "toggle"))
+                return false;
+            InputService.setFromKey(state === "toggle" ? !InputService.touchpadEnabled : state === "on");
+            return true;
+        }
+        function get(): string { return InputService.available ? (InputService.touchpadEnabled ? "on" : "off") : ""; }
+    }
+
+    IpcHandler {
+        target: "airplane"
+
+        function set(state: string): bool {
+            if (!RadioService.available || (state !== "on" && state !== "off" && state !== "toggle"))
+                return false;
+            RadioService.setAirplaneMode(state === "toggle" ? !RadioService.airplaneMode : state === "on", true);
+            return true;
+        }
+        function get(): string { return RadioService.available ? (RadioService.airplaneMode ? "on" : "off") : ""; }
+    }
+
+    IpcHandler {
+        target: "nightlight"
+
+        function set(state: string): bool {
+            if (!NightLightService.available || (state !== "on" && state !== "off" && state !== "toggle"))
+                return false;
+            NightLightService.setFromKey(state === "toggle" ? !NightLightService.enabled : state === "on");
+            return true;
+        }
+        function get(): string { return NightLightService.available ? (NightLightService.enabled ? "on" : "off") : ""; }
+    }
+
     IpcHandler {
         target: "theme"
 
@@ -161,7 +224,7 @@ Scope {
 
     LauncherOverlay {}
 
-    VolumeOsdWindow {}
+    LevelOsdWindow {}
 
     NotificationToastWindow {}
 }

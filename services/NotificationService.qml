@@ -121,7 +121,10 @@ Singleton {
     }
 
     // alwaysShow lets a notice the user asked for, like the timer, through Do Not Disturb.
-    function addInternalNotification(id, summary, body, alwaysShow) {
+    // A critical one (urgency 2), like a nearly empty battery, stays until dismissed.
+    // A notice replaces the one shown with its id.
+    function addInternalNotification(id, summary, body, alwaysShow, urgency) {
+        var critical = urgency === 2;
         var entry = {
             id: "internal:" + String(id || "notice"),
             desktopEntry: "",
@@ -129,12 +132,13 @@ Singleton {
             appIcon: "",
             summary: String(summary || "Speshell notice"),
             body: String(body || ""),
-            urgency: 1,
+            urgency: critical ? 2 : 1,
             time: new Date()
         };
         root.prependHistory(entry);
+        root.dismissInternal(id);
 
-        if (!alwaysShow && !root.showsPopup(1))
+        if (!alwaysShow && !root.showsPopup(entry.urgency))
             return;
 
         root.pushPopup(Object.assign({}, entry, {
@@ -144,8 +148,15 @@ Singleton {
             defaultAction: null,
             actions: [],
             resident: false,
-            expiresAt: Date.now() + 8000
+            expiresAt: critical ? -1 : Date.now() + 8000
         }));
+    }
+
+    // Takes Speshell's notice `id` off the screen, as when what it warned of is over.
+    function dismissInternal(id) {
+        var internalId = "internal:" + String(id || "notice");
+        root.activePopups.filter(function(popup) { return popup.id === internalId; })
+            .forEach(function(popup) { root.removePopup(popup.popupId); });
     }
 
     function removeHistoryAt(index) {

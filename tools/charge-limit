@@ -1,0 +1,58 @@
+#!/bin/sh
+# Sets a battery's charge limit, as root through pkexec: charging stops at PERCENT
+# and starts again 5 points below; 100 charges fully again.
+# usage: charge-limit BATTERY PERCENT (BATTERY as in /sys/class/power_supply, 50-100)
+set -eu
+
+battery=${1:-}
+percent=${2:-}
+case $battery in
+  ''|*[!A-Za-z0-9_-]*) echo "charge-limit: not a battery name: $battery" >&2; exit 2 ;;
+esac
+case $percent in
+  ''|*[!0-9]*) echo "charge-limit: not a percentage: $percent" >&2; exit 2 ;;
+esac
+if [ "$percent" -lt 50 ] || [ "$percent" -gt 100 ]; then
+  echo "charge-limit: the limit must be 50-100, not $percent" >&2
+  exit 2
+fi
+
+dir=/sys/class/power_supply/$battery
+end=$dir/charge_control_end_threshold
+start=$dir/charge_control_start_threshold
+types=$dir/charge_types
+if [ ! -w "$end" ]; then
+  echo "charge-limit: $battery has no charge limit" >&2
+  exit 1
+fi
+
+# Firmware rejects a start threshold at or above the end one, so write the pair in
+# the order that keeps them apart. A start threshold some firmware won't take (0 on
+# Dell) is left as it is.
+write_start() {
+  [ ! -w "$start" ] || { echo "$1" > "$start"; } 2>/dev/null || true
+}
+
+write_thresholds() {
+  if [ "$1" -ge "$(cat "$end")" ]; then
+    echo "$1" > "$end"
+    write_start "$2"
+  else
+    write_start "$2"
+    echo "$1" > "$end"
+  fi
+}
+
+# Where charge_types picks the charging mode (Dell), Custom uses the thresholds and
+# Standard charges fully.
+if [ "$percent" -eq 100 ]; then
+  write_thresholds 100 0
+  if [ -w "$types" ] && grep -qw Standard "$types"; then
+    echo Standard > "$types"
+  fi
+else
+  write_thresholds "$percent" $((percent - 5))
+  if [ -w "$types" ] && grep -qw Custom "$types"; then
+    echo Custom > "$types"
+  fi
+fi

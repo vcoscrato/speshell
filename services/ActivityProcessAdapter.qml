@@ -4,8 +4,8 @@ import Quickshell
 import Quickshell.Io
 
 // Detects wf-recorder and the dictation tool (tools/dictate). Polling only runs
-// when one of them is installed, and slows down while nothing is active and as the
-// power mode saves more. Speshell's tools run `speshell activity refresh` as they
+// when one of them is installed, and slows down while nothing is active, as the
+// power mode saves more, and on battery. Speshell's tools run `speshell activity refresh` as they
 // start and stop, which probes right away, so polling only catches the rest.
 Scope {
     id: root
@@ -122,8 +122,10 @@ Scope {
         }
     }
 
-    // Seconds between probes, while something is active and while nothing is.
-    readonly property var pollSeconds: ({ maximum: [1, 2], balanced: [2, 10], saver: [10, 60] })[PowerService.mode]
+    // Seconds between probes, while something is active and while nothing is. On
+    // battery, balanced probes as seldom as saver.
+    readonly property string pollMode: PowerService.onBattery && PowerService.mode === "balanced" ? "saver" : PowerService.mode
+    readonly property var pollSeconds: ({ maximum: [1, 2], balanced: [2, 10], saver: [10, 60] })[root.pollMode]
         || [2, 10]
 
     Timer {

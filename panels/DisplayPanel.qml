@@ -168,6 +168,18 @@ Card {
         }
 
         HeaderButton {
+            id: nightLightButton
+            visible: NightLightService.available
+            iconName: "night-light"
+            iconColor: NightLightService.errorText !== "" ? Theme.error
+                : NightLightService.active ? Theme.accent
+                : nightLightButton.containsMouse ? Theme.text : Theme.subtext
+            tooltipText: NightLightService.errorText !== "" ? "Night light failed: " + NightLightService.errorText
+                : NightLightService.enabled ? "Turn the night light off" : "Turn the night light on"
+            onClicked: NightLightService.setEnabled(!NightLightService.enabled)
+        }
+
+        HeaderButton {
             iconName: "refresh"
             busy: root.busy
             enabled: !root.busy
@@ -569,6 +581,44 @@ Card {
                         width: 32
                         horizontalAlignment: Text.AlignRight
                         anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
+
+                SettingRow {
+                    visible: root.canControlSelectedBrightness && BatteryService.available
+                    label: "On battery"
+                    info: "Unplugging lowers the screen to this at most, and plugging in brings it back."
+
+                    SegmentedControl {
+                        options: [{ value: 0, label: "As is" }, { value: 30, label: "30%" },
+                            { value: 50, label: "50%" }, { value: 70, label: "70%" }]
+                        currentValue: BrightnessService.batteryPercent
+                        onValueSelected: value => ConfigService.setProperty("Backlight", "batteryPercent", value)
+                    }
+                }
+
+                // The laptop's keyboard, beside its display: a few firmware steps.
+                SettingRow {
+                    id: keyboardRow
+
+                    readonly property var stepNames: [["Off", "On"], ["Off", "Low", "High"], ["Off", "Low", "Medium", "High"]]
+
+                    visible: root.canControlSelectedBrightness && BrightnessService.keyboardAvailable
+                        && BrightnessService.keyboardMax > 0
+                    label: "Keyboard"
+                    info: "The keyboard backlight. Dimming on idle turns it off until you're back."
+
+                    SegmentedControl {
+                        options: {
+                            const names = keyboardRow.stepNames[BrightnessService.keyboardMax - 1];
+                            const steps = [];
+                            for (let level = 0; level <= BrightnessService.keyboardMax; level++)
+                                steps.push({ value: level, label: names ? names[level]
+                                    : (level === 0 ? "Off" : Math.round(level * 100 / BrightnessService.keyboardMax) + "%") });
+                            return steps;
+                        }
+                        currentValue: BrightnessService.keyboardLevel
+                        onValueSelected: value => BrightnessService.setKeyboardLevel(value)
                     }
                 }
             }

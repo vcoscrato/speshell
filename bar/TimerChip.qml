@@ -12,11 +12,13 @@ BarButton {
     required property var timer
 
     readonly property bool isSet: root.timer.isSet
+    // In a crowded bar: the time left alone.
+    property bool compact: false
 
     iconName: root.isSet && root.timer.paused ? "media-pause" : "timer"
     iconColor: Theme.accent
     text: !root.isSet ? (root.timer.name || "New timer")
-        : (root.timer.name !== "" ? root.timer.name + "  " : "") + Format.clock(root.timer.remainingSeconds)
+        : (root.timer.name !== "" && !root.compact ? root.timer.name + "  " : "") + Format.clock(root.timer.remainingSeconds)
     tabularDigits: true
     label: !root.isSet ? "Set this timer"
         : (root.timer.name || "Timer") + " · " + (root.timer.paused ? "paused"

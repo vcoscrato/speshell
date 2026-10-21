@@ -227,6 +227,51 @@ if [[ "${1:-}" == "timer" ]]; then
   exit 0
 fi
 
+if [[ "${1:-}" == "brightness" ]]; then
+  shift
+  case "${1:-get}" in
+    up|down|get|keyboard)
+      ipc_call brightness "${1:-get}"
+      ;;
+    set)
+      if [[ $# -ne 2 || ! "$2" =~ ^[0-9]+$ ]]; then
+        printf 'usage: speshell brightness set PERCENT\n' >&2
+        exit 2
+      fi
+      ipc_call brightness set "$2" >/dev/null
+      ;;
+    *)
+      printf 'speshell: unknown brightness action: %s\n' "$1" >&2
+      printf 'usage: speshell brightness [get | up | down | set PERCENT | keyboard]\n' >&2
+      exit 2
+      ;;
+  esac
+  exit 0
+fi
+
+# Switches: speshell awake|touchpad|airplane|nightlight [get | on | off | toggle]
+if [[ "${1:-}" == "awake" || "${1:-}" == "touchpad" || "${1:-}" == "airplane" || "${1:-}" == "nightlight" ]]; then
+  target="$1"
+  shift
+  case "${1:-get}" in
+    get)
+      ipc_call "$target" get
+      ;;
+    on|off|toggle)
+      if [[ "$(ipc_call "$target" set "$1")" != "true" ]]; then
+        printf 'speshell: no %s switch here\n' "$target" >&2
+        exit 1
+      fi
+      ;;
+    *)
+      printf 'speshell: unknown %s action: %s\n' "$target" "$1" >&2
+      printf 'usage: speshell %s [get | on | off | toggle]\n' "$target" >&2
+      exit 2
+      ;;
+  esac
+  exit 0
+fi
+
 if [[ "${1:-}" == "theme" ]]; then
   shift
   action="${1:-get}"

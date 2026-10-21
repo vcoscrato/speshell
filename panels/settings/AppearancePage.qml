@@ -176,16 +176,20 @@ Column {
         }
     }
 
+    // A laptop picks it in the Battery panel.
     SettingRow {
+        visible: !FeatureSupport.supportsBattery
         label: "Power use"
         info: "Maximum animates the theme's effects at your display's refresh rate, Balanced at 60 fps. "
             + "Saver turns them off along with the interface's motion. Saving modes also look less often "
-            + "for recordings started outside Speshell. The sliders set how fast each kind of effect plays."
+            + "for recordings started outside Speshell. With power-profiles-daemon, the system's power "
+            + "profile follows: performance, balanced, or power-saver. The sliders set how fast each "
+            + "kind of effect plays."
 
         SelectMenu {
             options: root.powerOptions
             currentValue: PowerService.mode
-            onValueSelected: value => ConfigService.setProperty("Power", "mode", value)
+            onValueSelected: value => PowerService.setMode(value)
         }
     }
 

@@ -4,6 +4,7 @@
 // outline icon, or one of Speshell's own in Tabler's style. Apps' and tray items'
 // icons come from the icon theme instead.
 var files = ({
+    "airplane": "tabler/plane",
     "alert": "tabler/alert-triangle",
     "apps": "tabler/apps",
     "audio-input": "tabler/microphone",
@@ -12,6 +13,7 @@ var files = ({
     "audio-output-high": "tabler/volume",
     "audio-output-low": "tabler/volume-2",
     "audio-output-muted": "tabler/volume-off",
+    "awake": "tabler/coffee",
     "bar": "tabler/layout-navbar",
     "back": "tabler/arrow-back-up",
     "battery": "tabler/battery",
@@ -21,6 +23,7 @@ var files = ({
     "battery-medium": "tabler/battery-2",
     "battery-high": "tabler/battery-3",
     "battery-full": "tabler/battery-4",
+    "battery-health": "tabler/heartbeat",
     "bell": "tabler/bell",
     "bell-off": "tabler/bell-off",
     "bell-clear": "tabler/bell-x",
@@ -51,7 +54,9 @@ var files = ({
     "device-watch": "tabler/device-watch",
     "folder-open": "tabler/folder-open",
     "github": "tabler/brand-github",
+    "hibernate": "tabler/zzz",
     "info": "tabler/info-circle",
+    "keyboard": "tabler/keyboard",
     "loader": "tabler/loader-2",
     "location": "tabler/map-pin",
     "lock": "tabler/shield-lock",
@@ -61,11 +66,14 @@ var files = ({
     "media-pause": "tabler/player-pause",
     "media-play": "tabler/player-play",
     "media-previous": "tabler/player-track-prev",
+    "meeting": "tabler/video",
     "missing": "tabler/help-circle",
+    "night-light": "tabler/sunset",
     "notes": "tabler/pencil",
     "palette": "tabler/palette",
     "photo": "tabler/photo",
     "network-wired": "tabler/network",
+    "plug": "tabler/plug",
     "plus": "tabler/plus",
     "qrcode": "tabler/qrcode",
     "record": "tabler/player-record",
@@ -82,6 +90,8 @@ var files = ({
     "text-scan": "tabler/text-scan-2",
     "timer": "tabler/hourglass-high",
     "tools": "tabler/tool",
+    "touchpad": "tabler/hand-finger",
+    "touchpad-off": "tabler/hand-finger-off",
     "tray-fallback": "tabler/circle-dashed",
     "trash": "tabler/trash",
     "vpn": "tabler/shield-lock",
@@ -114,9 +124,9 @@ function fileFor(name) {
     return Object.prototype.hasOwnProperty.call(files, requested) ? files[requested] : files.missing;
 }
 
-// The battery icon for a charge in percent.
-function batteryFor(percentage, charging) {
-    if (charging) return "battery-charging";
+// The battery icon for a charge in percent, with the plug while plugged in.
+function batteryFor(percentage, pluggedIn) {
+    if (pluggedIn) return "battery-charging";
     if (percentage > 90) return "battery-full";
     if (percentage > 65) return "battery-high";
     if (percentage > 35) return "battery-medium";

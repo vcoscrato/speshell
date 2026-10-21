@@ -272,10 +272,30 @@ function build(document, errors) {
         },
         power: {
             mode: enumValue(document, "Power", "mode", "balanced", ["maximum", "balanced", "saver"], errors),
+            saverOnBattery: booleanValue(document, "Power", "saverOnBattery", true, errors),
             lockCommand: [lockCommand].concat(sectionList(document, "Power.Arguments", errors))
         },
+        battery: {
+            lowLevel: integerValue(document, "Battery", "lowLevel", 20, 5, 50, errors),
+            criticalLevel: integerValue(document, "Battery", "criticalLevel", 10, 2, 30, errors),
+            chargeLimit: integerValue(document, "Battery", "chargeLimit", 100, 50, 100, errors)
+        },
+        // Minutes idle; 0 never.
+        idle: {
+            dimAfter: realValue(document, "Idle", "dimAfter", 2, 0, 240, errors),
+            lockAfter: realValue(document, "Idle", "lockAfter", 5, 0, 240, errors),
+            screenOffAfter: realValue(document, "Idle", "screenOffAfter", 6, 0, 240, errors),
+            sleepAfter: realValue(document, "Idle", "sleepAfter", 15, 0, 240, errors),
+            sleepPluggedIn: booleanValue(document, "Idle", "sleepPluggedIn", false, errors)
+        },
         backlight: {
-            device: stringValue(document, "Backlight", "device", "", errors, true)
+            device: stringValue(document, "Backlight", "device", "", errors, true),
+            // 0 leaves the brightness alone on battery.
+            batteryPercent: integerValue(document, "Backlight", "batteryPercent", 0, 0, 100, errors)
+        },
+        nightLight: {
+            enabled: booleanValue(document, "NightLight", "enabled", false, errors),
+            temperature: integerValue(document, "NightLight", "temperature", 4000, 1000, 6500, errors)
         },
         tools: {
             ocrLanguages: codesValue(document, "Tools", "ocrLanguages", "eng", /^[A-Za-z0-9_]+$/, "+", errors) || "eng",

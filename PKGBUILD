@@ -15,8 +15,11 @@ depends=(
   'networkmanager'
   'pipewire'
   'procps-ng'
+  'polkit'
   'quickshell>=0.3.0'
   'systemd'
+  'upower'
+  'util-linux'
   'which'
   'wireplumber'
 )
@@ -24,9 +27,11 @@ makedepends=('git' 'just' 'qt6-shadertools')
 optdepends=(
   'hyprland: workspaces in the bar and the Displays panel'
   'curl: downloading the dictation model'
-  'brightnessctl: brightness controls'
+  'brightnessctl: brightness and keyboard backlight controls, and dimming on idle'
+  'power-profiles-daemon: the system power profile following the power mode'
+  'dankcalendar-bin: your calendars in the clock panel (AUR)'
   'cliphist: clipboard history'
-  'hyprlock: default screen locker for power actions'
+  'hyprlock: default screen locker for power actions and locking on idle'
   'matugen: theming other apps from the Speshell palette'
   'openconnect: OpenConnect VPN logins'
   'libsecret: remembering VPN passwords in the keyring'
@@ -92,5 +97,28 @@ TryExec=speshell
 Terminal=false
 NoDisplay=true
 Categories=Utility;
+EOF
+
+  # The user at the seat sets the battery's charge limit without a password, as
+  # UPower lets them turn its own charge threshold on and off.
+  install -Dm644 /dev/stdin \
+    "$pkgdir/usr/share/polkit-1/actions/io.github.vcoscrato.speshell.policy" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>Speshell</vendor>
+  <vendor_url>https://github.com/vcoscrato/speshell</vendor_url>
+  <action id="io.github.vcoscrato.speshell.charge-limit">
+    <description>Set the battery charge limit</description>
+    <message>Authentication is required to set the battery charge limit</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/share/speshell/tools/charge-limit</annotate>
+  </action>
+</policyconfig>
 EOF
 }

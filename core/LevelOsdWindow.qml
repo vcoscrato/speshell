@@ -5,18 +5,18 @@ import qs.components
 import qs.services
 import qs.theme
 
-// The volume shown at the bottom of the screen when it changes from outside Speshell,
-// as with media keys.
+// What OsdService shows at the bottom of the screen: a level, as with volume and
+// brightness keys, or a state, as with the microphone's mute.
 OsdWindow {
     id: root
 
-    property int displayedVolume: 0
-    property bool displayedMuted: false
+    property string displayedIcon: "info"
+    property string displayedTitle: ""
+    property string displayedValue: ""
+    // 0 to 1, or -1 without a bar.
+    property real displayedLevel: -1
 
     readonly property color indicatorColor: Theme.accent
-    readonly property string indicatorIcon: root.displayedMuted
-        ? "audio-output-muted"
-        : (root.displayedVolume <= 35 ? "audio-output-low" : "audio-output-high")
 
     card: osdCard
     implicitWidth: 316
@@ -33,15 +33,17 @@ OsdWindow {
     }
     // qmllint enable missing-property
 
-    WlrLayershell.namespace: "speshell-volume-osd"
+    WlrLayershell.namespace: "speshell-osd"
 
     Connections {
-        target: AudioService
+        target: OsdService
 
-        function onOutputOsdRequested(volumePercent, muted) {
+        function onRequested(iconName, title, value, level) {
             root.targetScreen = HyprlandService.focusedScreen();
-            root.displayedVolume = Math.max(0, Math.min(100, Math.round(Number(volumePercent) || 0)));
-            root.displayedMuted = !!muted;
+            root.displayedIcon = iconName;
+            root.displayedTitle = title;
+            root.displayedValue = value;
+            root.displayedLevel = level;
             hideTimer.restart();
             root.present();
         }
@@ -79,7 +81,7 @@ OsdWindow {
                 id: disc
                 anchors.verticalCenter: parent.verticalCenter
                 size: Theme.controlHeight * 1.5
-                iconName: root.indicatorIcon
+                iconName: root.displayedIcon
                 lit: true
             }
 
@@ -90,21 +92,24 @@ OsdWindow {
 
                 Item {
                     width: parent.width
-                    height: volumeValue.implicitHeight
+                    height: valueLabel.implicitHeight
 
                     Label {
                         role: "section"
                         anchors.left: parent.left
+                        anchors.right: valueLabel.left
+                        anchors.rightMargin: Theme.spacingSmall
                         anchors.verticalCenter: parent.verticalCenter
-                        text: root.displayedMuted ? "Output muted" : "Output volume"
+                        text: root.displayedTitle
+                        elide: Text.ElideRight
                     }
 
                     Label {
-                        id: volumeValue
+                        id: valueLabel
                         role: "heading"
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
-                        text: root.displayedVolume + "%"
+                        text: root.displayedValue
                         color: root.indicatorColor
                         font.features: { "tnum": 1 }
                     }
@@ -112,13 +117,14 @@ OsdWindow {
 
                 // As the timer's progress bar.
                 Rectangle {
+                    visible: root.displayedLevel >= 0
                     width: parent.width
                     height: Theme.spacingTiny
                     radius: height / 2
                     color: Theme.surface2
 
                     Rectangle {
-                        width: root.displayedMuted ? 0 : parent.width * root.displayedVolume / 100
+                        width: parent.width * Math.max(0, Math.min(1, root.displayedLevel))
                         height: parent.height
                         radius: parent.radius
                         color: root.indicatorColor

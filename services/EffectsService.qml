@@ -27,8 +27,8 @@ Singleton {
     readonly property real wallpaperSpeed: ConfigService.settings.appearance.wallpaperTransitionSpeed
     readonly property real controlsSpeed: ConfigService.settings.appearance.controlEffectsSpeed
     // Frames per second of effects, passed on as `frameRate`: 0 ticks with every frame
-    // the display shows.
-    readonly property int frameRate: PowerService.mode === "maximum" ? 0 : 60
+    // the display shows. Balanced halves them on battery.
+    readonly property int frameRate: PowerService.mode === "maximum" ? 0 : (PowerService.onBattery ? 30 : 60)
 
     readonly property Component launcherTransition: root.enabled && root.launcherSpeed > 0
         ? root.optional("launcherTransition") : null

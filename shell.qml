@@ -10,6 +10,13 @@ import qs.core
 ShellRoot {
     id: root
 
+    // Services that act on their own, created first rather than when the bar first
+    // reads them: idling, the battery's warnings and charge limit, the lid, the radios
+    // and touchpad that keys switch, the night light, and the calendar's reminders. They
+    // run with the defaults while config.ini is invalid, so the laptop still locks.
+    readonly property var autonomousServices: [IdleService, BatteryService, BrightnessService, DisplayService,
+        RadioService, InputService, NightLightService, CalendarService]
+
     Binding {
         target: Theme
         property: "textScale"

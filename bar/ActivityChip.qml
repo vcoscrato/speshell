@@ -12,6 +12,8 @@ BarButton {
     required property var activity
 
     readonly property var actions: root.activity.actions
+    // In a crowded bar: the running time alone.
+    property bool compact: false
     property double nowMs: Date.now()
 
     function act(index) {
@@ -22,7 +24,7 @@ BarButton {
     iconName: root.activity.iconName
     iconColor: root.activity.tone !== "neutral" ? Theme.toneColor(root.activity.tone)
         : (root.pointerInside ? Theme.text : Theme.subtextBright)
-    text: root.activity.label + "  "
+    text: (root.compact ? "" : root.activity.label + "  ")
         + Format.clock((root.nowMs - root.activity.startedAt) / 1000)
     tabularDigits: true
     label: [root.activity.label, root.activity.detail,

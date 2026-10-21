@@ -14,6 +14,10 @@ import qs.theme
 //
 // The window covers the screen so dropdowns, menus, and labels can draw beside the
 // bar, and takes input only on the bar until one of them opens.
+//
+// Short of room on the screen, as on a laptop, the bar goes compact before it grows
+// past the screen's edge: the clock drops the date, the weather its temperature, and
+// the timers and what's running their names, each still in its hover label.
 PanelWindow {
     id: root
 
@@ -58,6 +62,19 @@ PanelWindow {
         color: Theme.controlFill
         border.width: Theme.borderWidth
         border.color: Theme.controlBorder
+    }
+
+    // Keep awake, also for idle daemons other than Speshell's.
+    IdleInhibitor {
+        id: awakeInhibitor
+        window: root
+    }
+
+    // Not a binding on `enabled`: one that first creates IdleService loops.
+    Binding {
+        target: awakeInhibitor
+        property: "enabled"
+        value: IdleService.keepAwake
     }
 
     onDropdownOpenChanged: PanelService.openDropdowns += root.dropdownOpen ? 1 : -1
@@ -126,6 +143,7 @@ PanelWindow {
     exclusionMode: ExclusionMode.Normal
     exclusiveZone: root.settings.margin + root.settings.height + root.settings.gap
     mask: Region { item: root.overlayOpen ? content : strip }
+    onWidthChanged: strip.updateCompact()
 
     WlrLayershell.namespace: "speshell-bar"
     WlrLayershell.layer: WlrLayer.Top
@@ -165,8 +183,8 @@ PanelWindow {
 
             // The clock stays centered unless a side crowds it, with the track's
             // controls before it and the weather and the timers after. Short of
-            // room, the bar grows wider than its setting rather than overlap or drop
-            // anything.
+            // room, the bar grows wider than its setting rather than overlap, and
+            // goes compact once it spans the screen.
             readonly property real gap: Theme.spacingMedium
             readonly property real middleStart: leftRow.x + leftRow.width + strip.gap
             readonly property real middleEnd: rightRow.x - strip.gap
@@ -174,6 +192,36 @@ PanelWindow {
             readonly property real afterClock: afterClockRow.width > 0 ? afterClockRow.width + Theme.spacingTiny : 0
             readonly property real requiredWidth: root.edgePadding * 2 + leftRow.width + rightRow.width
                 + strip.gap * 2 + strip.beforeClock + clockButton.width + strip.afterClock
+            // What going compact saves, so the bar knows its full width while compact.
+            readonly property real compactSavings: clockMetrics.advanceWidth(clockButton.dateText + "   ")
+                + (weatherButton.visible && WeatherService.ready
+                    ? chipMetrics.advanceWidth(WeatherService.temperatureText(WeatherService.current.temperature)) + Theme.spacingSmall
+                    : 0)
+                + TimerService.timers.reduce((sum, timer) => sum + (timer.isSet && timer.name !== ""
+                    ? chipMetrics.advanceWidth(timer.name + "  ") : 0), 0)
+                + ActivityService.activities.reduce((sum, activity) => sum + chipMetrics.advanceWidth(activity.label + "  "), 0)
+            // Set, not bound: going compact changes the width it is judged by.
+            property bool compact: false
+
+            function updateCompact() {
+                strip.compact = strip.requiredWidth + (strip.compact ? strip.compactSavings : 0) > root.width;
+            }
+
+            onRequiredWidthChanged: strip.updateCompact()
+            onCompactSavingsChanged: strip.updateCompact()
+
+            FontMetrics {
+                id: clockMetrics
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeNormal
+                font.weight: Font.DemiBold
+            }
+
+            FontMetrics {
+                id: chipMetrics
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeSmall
+            }
 
             x: Math.round((root.width - width) / 2)
             y: root.atTop ? root.settings.margin : root.height - root.settings.margin - root.settings.height
@@ -246,6 +294,9 @@ PanelWindow {
 
             BarButton {
                 id: clockButton
+
+                readonly property string dateText: Qt.formatDateTime(clock.date, "ddd d MMM")
+
                 size: root.itemSize
                 labelAbove: !root.atTop
                 x: Math.max(strip.middleStart + strip.beforeClock, Math.min(strip.middleEnd - strip.afterClock - width,
@@ -253,7 +304,8 @@ PanelWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 open: root.dropdownButton === clockButton
                 horizontalPadding: Theme.spacingLarge
-                text: Qt.formatDateTime(clock.date, "ddd d MMM") + "   " + Qt.formatDateTime(clock.date, "HH:mm")
+                label: strip.compact ? Qt.formatDateTime(clock.date, "dddd d MMMM") : ""
+                text: (strip.compact ? "" : clockButton.dateText + "   ") + Qt.formatDateTime(clock.date, "HH:mm")
                 fontSize: Theme.fontSizeNormal
                 fontWeight: Font.DemiBold
                 onClicked: pointer => root.toggleDropdown("clock", clockButton, pointer)
@@ -287,7 +339,7 @@ PanelWindow {
                     open: root.dropdownButton === weatherButton
                     label: PanelService.status("weather")
                     iconName: PanelService.icon("weather")
-                    text: WeatherService.ready ? WeatherService.temperatureText(WeatherService.current.temperature) : ""
+                    text: WeatherService.ready && !strip.compact ? WeatherService.temperatureText(WeatherService.current.temperature) : ""
                     tabularDigits: true
                     onClicked: pointer => root.toggleDropdown("weather", weatherButton, pointer)
                 }
@@ -313,6 +365,7 @@ PanelWindow {
                                 required property var modelData
 
                                 timer: chip.modelData
+                                compact: strip.compact
                                 size: root.itemSize - Theme.spacingMicro * 2
                                 labelAbove: !root.atTop
                                 open: root.dropdownButton === chip
@@ -328,6 +381,7 @@ PanelWindow {
                                 required property var modelData
 
                                 activity: modelData
+                                compact: strip.compact
                                 size: root.itemSize - Theme.spacingMicro * 2
                                 labelAbove: !root.atTop
                             }
@@ -415,6 +469,14 @@ PanelWindow {
                                 open: root.dropdownButton === button
                                 label: PanelService.status(button.modelData)
                                 iconName: PanelService.icon(button.modelData)
+                                text: PanelService.text(button.modelData)
+                                tabularDigits: true
+                                iconColor: {
+                                    const tone = PanelService.tone(button.modelData);
+                                    if (tone !== "")
+                                        return Theme.toneColor(tone);
+                                    return button.open ? Theme.accent : (button.pointerInside ? Theme.text : Theme.subtextBright);
+                                }
                                 onClicked: pointer => root.toggleDropdown(button.modelData, button, pointer)
                                 onWheeled: delta => root.step(button.modelData, delta)
                                 onRightClicked: root.cycleDevice(button.modelData)

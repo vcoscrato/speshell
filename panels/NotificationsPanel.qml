@@ -27,10 +27,11 @@ Card {
     headerActions: Row {
         spacing: Theme.spacingSmall
 
-        HeaderButton {
-            anchors.verticalCenter: parent.verticalCenter
+        ActionButton {
             visible: root.notifList.length > 0
+            text: "Clear"
             iconName: "bell-clear"
+            compact: true
             tooltipText: "Clear notifications"
             onClicked: NotificationService.clearHistory()
         }

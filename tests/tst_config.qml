@@ -40,11 +40,35 @@ TestCase {
             { tag: "not a boolean", text: "[Weather]\nenabled = yes", message: "Expected true or false" },
             { tag: "unknown choice", text: "[Bar]\nposition = left", message: "Expected one of" },
             { tag: "unknown power mode", text: "[Power]\nmode = turbo", message: "Expected one of" },
+            { tag: "charge limit too low", text: "[Battery]\nchargeLimit = 30", message: "Expected a value from 50 to 100" },
+            { tag: "night light too cold", text: "[NightLight]\ntemperature = 9000", message: "Expected a value from 1000 to 6500" },
+            { tag: "idle minutes negative", text: "[Idle]\nlockAfter = -1", message: "Expected a value from 0 to 240" },
             { tag: "insecure URL", text: "[Launcher]\nsearchUrl = http://example.com/?q={query}", message: "must use HTTPS" },
             { tag: "missing placeholder", text: "[Launcher]\nsearchUrl = https://example.com/", message: "exactly one {query}" },
             { tag: "not a language", text: "[Tools]\ndictationLanguages = english", message: "is not a language code" },
             { tag: "malformed line", text: "[Appearance]\ntextScale 1.2", message: "Expected 'key = value'" }
         ];
+    }
+
+    // A laptop's defaults: warnings at 20 and 10%, no charge limit, the brightness left
+    // alone on battery, no night light, and idling that dims, locks, and turns the
+    // screen off, sleeping only on battery.
+    function test_laptopDefaults() {
+        var config = Config.defaults();
+        compare(config.battery.lowLevel, 20);
+        compare(config.battery.criticalLevel, 10);
+        compare(config.battery.chargeLimit, 100);
+        compare(config.backlight.batteryPercent, 0);
+        compare([config.nightLight.enabled, config.nightLight.temperature], [false, 4000]);
+        compare([config.idle.dimAfter, config.idle.lockAfter, config.idle.screenOffAfter, config.idle.sleepAfter], [2, 5, 6, 15]);
+        compare(config.idle.sleepPluggedIn, false);
+    }
+
+    function test_idleTakesFractionsAndZero() {
+        var result = Config.parseAndValidate("[Idle]\ndimAfter = 0.5\nsleepAfter = 0\n");
+        verify(result.ok, messages(result));
+        compare(result.config.idle.dimAfter, 0.5);
+        compare(result.config.idle.sleepAfter, 0);
     }
 
     // The tools take Tesseract's "eng+por" and a list of Whisper codes, however they're separated.

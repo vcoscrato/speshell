@@ -2,13 +2,19 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.components
 import qs.theme
+import "../services/CalendarEvents.js" as CalendarEvents
 
 // A month of days, starting on the locale's first day of the week, with today marked.
-// The arrows or the wheel change the month; Today comes back to this one.
+// The arrows or the wheel change the month; Today comes back to this one. Days with
+// `marks` get a dot, and with `selectable` a click picks one.
 Item {
     id: root
 
     property date today: new Date()
+    property date selected: root.today
+    property bool selectable: false
+    // The dot's color by day, keyed yyyy-MM-dd.
+    property var marks: ({})
     // The month shown, as its first day.
     property date month: new Date(root.today.getFullYear(), root.today.getMonth(), 1)
     readonly property bool showingToday: root.month.getFullYear() === root.today.getFullYear()
@@ -24,6 +30,8 @@ Item {
     function shift(months) {
         root.month = new Date(root.month.getFullYear(), root.month.getMonth() + months, 1);
     }
+
+    signal picked(date day)
 
     function goToToday() {
         root.month = new Date(root.today.getFullYear(), root.today.getMonth(), 1);
@@ -119,24 +127,54 @@ Item {
 
                     required property int index
                     readonly property int day: cell.index - root.leadingBlanks + 1
+                    readonly property bool inMonth: cell.day > 0 && cell.day <= root.dayCount
+                    readonly property date date: new Date(root.month.getFullYear(), root.month.getMonth(), cell.day)
                     readonly property bool isToday: root.showingToday && cell.day === root.today.getDate()
+                    readonly property bool isSelected: root.selectable && cell.inMonth
+                        && cell.date.toDateString() === root.selected.toDateString()
                     readonly property int weekday: (root.firstWeekday + cell.index) % 7
+                    readonly property string mark: cell.inMonth ? root.marks[CalendarEvents.dateKey(cell.date)] || "" : ""
 
                     width: days.width / 7
                     height: root.cellHeight
 
                     Rectangle {
+                        id: back
                         anchors.centerIn: parent
-                        visible: cell.isToday
+                        visible: cell.isToday || cell.isSelected || hover.hovered && root.selectable && cell.inMonth
                         width: Math.min(cell.width, cell.height) - Theme.spacingTiny
                         height: width
                         radius: Theme.borderRadius
-                        color: Theme.accent
+                        color: cell.isToday ? Theme.accent : cell.isSelected ? Theme.selectedFill : Theme.controlFill
+                        border.width: cell.isSelected ? Theme.borderWidth : 0
+                        border.color: cell.isToday ? Theme.crust : Theme.selectedBorder
+                    }
+
+                    Rectangle {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.bottom: back.bottom
+                        anchors.bottomMargin: Theme.spacingTiny
+                        visible: cell.mark !== ""
+                        width: 4
+                        height: 4
+                        radius: 2
+                        color: cell.isToday ? Theme.crust : cell.mark
+                    }
+
+                    HoverHandler {
+                        id: hover
+                        enabled: root.selectable && cell.inMonth
+                        cursorShape: Qt.PointingHandCursor
+                    }
+
+                    TapHandler {
+                        enabled: root.selectable && cell.inMonth
+                        onTapped: root.picked(cell.date)
                     }
 
                     Label {
                         anchors.centerIn: parent
-                        visible: cell.day > 0 && cell.day <= root.dayCount
+                        visible: cell.inMonth
                         text: cell.day
                         font.weight: cell.isToday ? Font.Bold : Font.Normal
                         font.features: { "tnum": 1 }

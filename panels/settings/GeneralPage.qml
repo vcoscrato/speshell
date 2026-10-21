@@ -1,10 +1,13 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import qs.components
 import qs.services
 import qs.theme
 import "Settings.js" as Settings
+import "../../components/Format.js" as Format
 
-// Settings › General: text size, volume scroll step, and toasts on screen.
+// Settings › General: text size, volume scroll step, toasts on screen, the touchpad,
+// and what idling does.
 Column {
     id: root
 
@@ -21,6 +24,15 @@ Column {
         { value: 2, label: "2%" },
         { value: 5, label: "5%" },
         { value: 10, label: "10%" }
+    ]
+    // Minutes; 0 never.
+    readonly property var idleOptions: [0, 1, 2, 3, 5, 6, 10, 15, 30, 60]
+        .map(minutes => ({ value: minutes, label: minutes === 0 ? "Never" : Format.duration(minutes * 60) }))
+    readonly property var idleSteps: [
+        { key: "dimAfter", label: "Dim the screen", info: "Dims the screen and turns the keyboard backlight off." },
+        { key: "lockAfter", label: "Lock", info: "Locks the session with the screen locker." },
+        { key: "screenOffAfter", label: "Turn the screen off", info: "Turns the displays off, on Hyprland." },
+        { key: "sleepAfter", label: "Sleep", info: "Locks and suspends, on battery unless set below. Playing media holds it off." }
     ]
     readonly property var toastOptions: [
         { value: 1, label: "1" },
@@ -71,6 +83,61 @@ Column {
             options: root.toastOptions
             currentValue: toastsRow.count
             onValueSelected: value => ConfigService.setProperty("Notifications", "maxVisible", value)
+        }
+    }
+
+    // Not saved: Hyprland's config turns it on again at each start.
+    SettingRow {
+        visible: InputService.available
+        label: "Touchpad"
+        info: "Turns the touchpad off until you turn it on again or Hyprland restarts. "
+            + "speshell touchpad toggle does it from a key."
+
+        ToggleSwitch {
+            checked: InputService.touchpadEnabled
+            tooltipText: InputService.touchpadEnabled ? "Turn the touchpad off" : "Turn the touchpad on"
+            onToggled: on => InputService.setTouchpadEnabled(on)
+        }
+    }
+
+    Label {
+        role: "section"
+        topPadding: Theme.spacingSmall
+        text: "When idle"
+    }
+
+    Repeater {
+        model: root.idleSteps
+
+        delegate: SettingRow {
+            id: idleRow
+
+            required property var modelData
+            readonly property real minutes: root.settings.idle[idleRow.modelData.key]
+
+            visible: idleRow.modelData.key !== "screenOffAfter" || HyprlandService.running
+            label: idleRow.modelData.label
+            info: Settings.explain(idleRow.modelData.info, root.idleOptions, idleRow.minutes,
+                Format.duration(idleRow.minutes * 60))
+
+            SelectMenu {
+                options: root.idleOptions
+                currentValue: idleRow.minutes
+                fallbackLabel: Format.duration(idleRow.minutes * 60) + " · Custom"
+                onValueSelected: value => ConfigService.setProperty("Idle", idleRow.modelData.key, value)
+            }
+        }
+    }
+
+    SettingRow {
+        visible: BatteryService.available
+        label: "Sleep when plugged in"
+        info: "Sleeps on idle with the charger in too."
+
+        ToggleSwitch {
+            checked: root.settings.idle.sleepPluggedIn
+            tooltipText: "Sleep when plugged in"
+            onToggled: on => ConfigService.setProperty("Idle", "sleepPluggedIn", on ? "true" : "false")
         }
     }
 }

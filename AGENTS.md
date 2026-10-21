@@ -10,7 +10,7 @@ timeout 5s quickshell --no-color -p .
 
 ## Architecture
 
-- `shell.qml` starts strict config loading, binds the theme to the active palette and text scale, and gates either `Runtime` or `ConfigErrorWindow`.
+- `shell.qml` starts strict config loading, binds the theme to the active palette and text scale, creates the services that act on their own (idle, battery, lid), and gates either `Runtime` or `ConfigErrorWindow`.
 - `core/` composes the runtime (IPC, notification server) and holds the launcher, wallpaper, OSD, toast, and config-error windows.
 - `bar/` is the bar on each screen: its buttons, the workspaces, the media controls, the tray, and the dropdown that hosts one panel at a time.
 - `panels/` holds the panels the bar opens, one `<Name>Panel.qml` each and the parts they share; `panels/settings/` holds the Settings pages.
@@ -29,6 +29,7 @@ Prefer deleting unused QML modules over keeping broad helper surfaces. This repo
 - Whether a command is installed is `FeatureSupport.hasCommand()`; add what a service needs to `wantedCommands`.
 - Check UI changes with `just shot <theme> [panels…]`, which renders the real bar offscreen.
 - Style through `Theme` tokens: spacing, control heights, icon sizes, radii, and interaction states (`controlFill`, `selectedFill`, `tint*`, `disabledOpacity`, `Theme.alpha()`). Add a token only when several components share the value.
+- Laptop hardware goes through its own services: `BatteryService` (charge, warnings, charge limit through `tools/charge-limit` and pkexec), `IdleService`, `SessionService` (logind's lid and sleep), `BrightnessService` (backlight and keyboard), `RadioService` (rfkill), and `InputService` (touchpad). Each gates on the hardware being there, so a desktop shows none of it. Changes from outside Speshell's panels go to `OsdService`.
 - When UI changes system state, call a small domain service (for example `AudioService.stepOutputVolume()` or `BrightnessService.setPercent()`) instead of running processes or writing backend objects from panels.
 
 ## Packaging Notes

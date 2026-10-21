@@ -5,7 +5,7 @@ import qs.components
 import qs.services
 import qs.theme
 
-// Lock, and the session's power actions, each asking for a second click.
+// Lock, Keep awake, and the session's power actions, each asking for a second click.
 Card {
     id: root
 
@@ -18,6 +18,7 @@ Card {
 
     readonly property var actions: [
         { id: "sleep", label: "Sleep", detail: "Lock and suspend", iconName: "sleep", tone: "accent" },
+        { id: "hibernate", label: "Hibernate", detail: "Lock and save to disk", iconName: "hibernate", tone: "accent" },
         { id: "logout", label: "Log out", detail: "End this session", iconName: "logout", tone: "warning" },
         { id: "restart", label: "Restart", detail: "Reboot the system", iconName: "restart", tone: "warning" },
         { id: "poweroff", label: "Power off", detail: "Shut down", iconName: "power", tone: "error" }
@@ -28,7 +29,7 @@ Card {
     function canRun(action) {
         if (PowerService.busy)
             return false;
-        if (action === "lock" || action === "sleep")
+        if (action === "lock" || PowerService.sleeps(action))
             return PowerService.lockerAvailable;
         return true;
     }
@@ -82,22 +83,40 @@ Card {
         }
     }
 
-    Grid {
-        id: actionGrid
+    ActionTile {
         width: parent.width
-        columns: 2
+        label: "Keep awake"
+        detail: IdleService.keepAwake ? "On until you turn it off: nothing dims, locks, or sleeps"
+            : "Hold off dimming, locking, and sleeping on idle"
+        iconName: "awake"
+        active: IdleService.keepAwake
+        onActivated: {
+            root.cancelConfirmation();
+            IdleService.setKeepAwake(!IdleService.keepAwake);
+        }
+    }
+
+    // Two to a row; with an odd count, the last takes a row to itself.
+    Flow {
+        id: actionGrid
+
+        readonly property var shown: root.actions.filter(action => action.id !== "hibernate" || PowerService.canHibernate)
+
+        width: parent.width
         spacing: Theme.spacingSmall
 
         Repeater {
-            model: root.actions
+            model: actionGrid.shown
 
             delegate: ActionTile {
                 id: tile
 
                 required property var modelData
+                required property int index
                 readonly property bool pending: root.pendingAction === tile.modelData.id
+                readonly property bool alone: tile.index === actionGrid.shown.length - 1 && actionGrid.shown.length % 2 === 1
 
-                width: (actionGrid.width - actionGrid.spacing) / 2
+                width: tile.alone ? actionGrid.width : (actionGrid.width - actionGrid.spacing) / 2
                 label: PowerService.activeAction === tile.modelData.id ? "Working…"
                     : tile.pending ? tile.modelData.label + "?" : tile.modelData.label
                 detail: tile.pending ? "Click again to confirm" : tile.modelData.detail

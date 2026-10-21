@@ -12,9 +12,10 @@ This is Speshell, pronounced *special*. My [Quickshell](https://quickshell.outfo
 ## Features
 
 - A bar on every screen: workspaces, the clock with the weather and your timers, the playing track, the tray, and a button for each panel
-- Clock panel: a clock face in the theme's style beside the month
+- Clock panel: a clock face in the theme's style beside the month, and your calendars' events, to add, change, delete, and join (see [Calendar](#calendar))
 - Weather panel: the conditions now, the next hours, and the week
 - Panels for audio output and input, displays and brightness, network (Wi-Fi, and NetworkManager's VPN and WireGuard profiles), Bluetooth, battery, notifications with Do Not Disturb, media, power, Markdown notes, clipboard history, and tools
+- On a laptop: the battery's charge in the bar, low-battery warnings, a charge limit, dimming, locking, and sleeping on idle, hibernating, a lower brightness on battery, locking before the lid sleeps it, the laptop's display off while docked with the lid closed, and an OSD for brightness, the keyboard backlight, the microphone, the touchpad, and airplane mode (see [Laptops](#laptops))
 - Launcher: apps, a calculator, web searches and your own bangs, themes and wallpapers
 - Tools: timers, dictation, copy text from the screen (OCR), screenshots, screen recording, QR codes, color picker
 - What's running, as chips in the bar: screen recording, dictation, and anything that publishes over IPC
@@ -24,9 +25,9 @@ Panels for missing hardware or tools hide themselves. Speshell runs on any Wayla
 
 ## Requirements
 
-Quickshell ≥ 0.3, PipeWire/WirePlumber, NetworkManager, BlueZ, libnotify.
+Quickshell ≥ 0.3, PipeWire/WirePlumber, NetworkManager, BlueZ, libnotify, UPower, polkit.
 
-Optional: Hyprland (workspaces, the Displays panel), `brightnessctl`, `openconnect` (OpenConnect VPN logins), `libsecret` (remembering VPN passwords in the keyring), `hyprlock`, `matugen` (app themes), `cliphist`, `wl-clipboard`, `xdg-utils`, and the tools' programs below.
+Optional: Hyprland (workspaces, the Displays panel), `brightnessctl`, `openconnect` (OpenConnect VPN logins), `libsecret` (remembering VPN passwords in the keyring), `hyprlock`, `power-profiles-daemon` (power profiles), `matugen` (app themes), `cliphist`, `wl-clipboard`, `xdg-utils`, and the tools' programs below.
 
 ## Install
 
@@ -49,6 +50,8 @@ hl.bind("SUPER + SPACE", hl.dsp.exec_cmd("speshell launcher toggle"))
 hl.bind("SUPER + C", hl.dsp.exec_cmd("speshell panel toggle clock"))
 ```
 
+Speshell dims, locks, and sleeps on idle by itself (see [Laptops](#laptops)), so leave hypridle or swayidle out, or set the `[Idle]` steps to 0.
+
 The first run seeds `~/.config/speshell/config.ini`; upgrades never touch it or `~/.local/share/speshell`.
 
 ## The bar
@@ -62,6 +65,12 @@ The Speshell mark at the left opens the launcher, followed by the screen's works
 Common options are in the **Settings** panel. Everything else is in `~/.config/speshell/config.ini`, documented by [`config.example.ini`](config.example.ini). Edits apply on save; an invalid file keeps the previous settings and shows the error.
 
 The weather, on with `[Weather] enabled`, comes from [Open-Meteo](https://open-meteo.com/) for `[Weather] location`, or, left empty, for where [ipinfo.io](https://ipinfo.io/) places your IP address. Click the place in the weather panel's header to change it. Units follow your locale's measurement system.
+
+### Calendar
+
+The clock panel shows your calendars through [Dux Calendar](https://github.com/duxlabs-dev/dux-calendar)'s daemon, which signs in to Google, Microsoft, iCloud, CalDAV, and iCal feeds, keeps them synced, and sends their reminders. Install it (`dankcalendar-bin` on the AUR) and Speshell starts the daemon and asks you to connect Google in the clock panel; add the others with `dcal account add`. Speshell runs only the daemon, never Dux's own window.
+
+The month marks the days with events; click a day for its events below. Click an event to change or delete it, or **+** to add one on the day picked: the times take `9:30`, `14:00`, or `2pm`. Meetings get a Join button. A change to a repeating event reaches every occurrence; one can be deleted alone. Changes made elsewhere arrive with Dux's sync, every five minutes or at once with the refresh button.
 
 ## Launcher
 
@@ -104,11 +113,48 @@ hl.bind("SUPER + R", hl.dsp.exec_cmd("speshell tool record"))
 hl.bind("SUPER + SHIFT + R", hl.dsp.exec_cmd("speshell tool record screen"))
 ```
 
+## Power
+
+`[Power] mode` sets how much power the system and Speshell use: `maximum`, `balanced` (the default), or `saver` (see [Themes](#themes) for what each does to the effects). With `power-profiles-daemon`, the system's power profile follows: performance (balanced where there is none), balanced, or power-saver. `saverOnBattery` (on by default) switches to `saver` when the laptop is unplugged and back once it is plugged in; a mode picked in the Battery panel while unplugged lasts until then. A laptop sets both in the Battery panel; a desktop picks the mode in Settings › Appearance.
+
+## Laptops
+
+Speshell treats a laptop as one: what follows shows with a battery, a backlight, or a lid, and stays out of the way on a desktop.
+
+**The bar** shows the battery's charge beside its icon, unless the laptop rests plugged in, full or at its charge limit. Below `[Battery] lowLevel` (20%) the icon turns yellow and a notification says how long is left; below `criticalLevel` (10%) it turns red and a notification stays on screen, through Do Not Disturb, until you plug in. UPower's own critical action, hibernating or powering off at 2%, still runs after.
+
+Short of room on the screen, the bar goes compact before it grows past the edge: the clock drops the date, the weather its temperature, and the timers and chips their names. Hovering each still says it all.
+
+**The Battery panel** shows the charge, the time to full or empty, the power draw, and the battery's health (its capacity against its design), and the charge of devices like a mouse or headphones. With a battery that has `charge_control_end_threshold`, the charge limit stops charging at 60, 80, or 90% and starts again 5 points below, which keeps a battery that's mostly plugged in healthy; Full charges it all the way, and leaves the firmware's own setting alone at startup. The packaged polkit rule lets you change it without a password; from a checkout, polkit asks.
+
+**Idle**, by `[Idle]` and in Settings › General: after 2 minutes the screen dims and the keyboard backlight goes off, at 5 the session locks with `[Power] lockCommand`, at 6 the displays turn off (Hyprland), and at 15 the laptop sleeps, on battery only unless `sleepPluggedIn = true`. Input undoes each step. Apps can hold idling off, as video players do; playing media holds off sleep; and **Keep awake** in the Power panel, or `speshell awake on`, holds it all off and shows a chip in the bar until clicked. Whatever puts the system to sleep, closing the lid included, locks first.
+
+**Hibernate** shows in the Power panel when logind can hibernate (a swap that fits memory, and resume set up), and locks first as Sleep does.
+
+**On battery**, by `[Backlight] batteryPercent` or beside the brightness in the Displays panel: unplugging lowers the screen to that at most, and plugging in brings it back, unless you turned it up since.
+
+**Night light**, by `[NightLight]`: with `hyprsunset` installed (Hyprland), the Displays panel's header and `speshell nightlight toggle` warm every display to `temperature` (4000 K). Speshell runs hyprsunset itself, so don't also start one from Hyprland's config.
+
+**The lid**: with another display on, closing the lid turns the laptop's display off (Hyprland), and opening it, or unplugging the last other display, brings it back as it was.
+
+**Keys**: the OSD shows changes made outside Speshell's panels: volume, brightness, the keyboard backlight, the microphone's mute, the touchpad, and airplane mode. Brightness keys that run `brightnessctl` already show it. Airplane mode is also in the Network panel's header, the keyboard backlight beside the laptop display's brightness in the Displays panel, and the touchpad in Settings › General.
+
+```lua
+hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd("speshell brightness up"), { locked = true, repeating = true })
+hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("speshell brightness down"), { locked = true, repeating = true })
+hl.bind("XF86KbdBrightnessUp", hl.dsp.exec_cmd("speshell brightness keyboard"), { locked = true })
+hl.bind("XF86TouchpadToggle", hl.dsp.exec_cmd("speshell touchpad toggle"), { locked = true })
+hl.bind("XF86RFKill", hl.dsp.exec_cmd("speshell airplane toggle"), { locked = true })
+hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"), { locked = true })
+```
+
+On battery, Balanced also runs the theme's effects at 30 fps and looks for recordings started outside Speshell once a minute.
+
 ## Themes
 
 Speshell ships Cosmos (the default), four elements (Fire, Air, Water, and Earth), and Relâmpago, a racing theme. Each has a palette, a wallpaper, launcher and wallpaper effects, a still painted backdrop behind the bar and its panels, themed slider and switch knobs with small effects as you use them, and a clock face (see [extras/](extras/README.md)). Pick one in Settings › Appearance or with `!theme`.
 
-Set `drawWallpaper = true` under `[Appearance]` to let Speshell draw the desktop background. It is off by default so another wallpaper tool can stay in charge. `launcherTransitionSpeed`, `wallpaperTransitionSpeed`, and `controlEffectsSpeed` (0–3, default 1) speed up or slow down each kind of effect, and 0 turns it off. `[Power] mode` sets their frame rate: `maximum` animates at the display's refresh rate, `balanced` (the default) at 60 fps, and `saver` turns the effects off along with the interface's own motion. `shuffleAtLaunch` picks at random each time Speshell starts: `wallpaper` (another wallpaper of the theme), `theme` (another theme), or `both`; the default is `off`. Settings › Appearance sets all of these.
+Set `drawWallpaper = true` under `[Appearance]` to let Speshell draw the desktop background. It is off by default so another wallpaper tool can stay in charge. `launcherTransitionSpeed`, `wallpaperTransitionSpeed`, and `controlEffectsSpeed` (0–3, default 1) speed up or slow down each kind of effect, and 0 turns it off. `[Power] mode` sets their frame rate: `maximum` animates at the display's refresh rate, `balanced` (the default) at 60 fps, and `saver` turns the effects off along with the interface's own motion. `shuffleAtLaunch` picks at random each time Speshell starts: `wallpaper` (another wallpaper of the theme), `theme` (another theme), or `both`; the default is `off`. Settings › Appearance sets all of these, and the power mode on a desktop (see [Power](#power)).
 
 Each theme remembers the wallpaper last set for it, so switching back to a theme brings that wallpaper back; a theme you have not picked a wallpaper for starts with its first.
 
@@ -147,6 +193,8 @@ speshell tool list | dictate [cancel] | ocr | screenshot [region|screen] | recor
 speshell timer get | start LENGTH [NAME] | add LENGTH [NAME] | pause|resume|toggle|stop [NAME]
 speshell activity set ID STATE LABEL [DETAIL] [ICON] [TONE]
 speshell activity list | clear ID | refresh
+speshell brightness get | up | down | set PERCENT | keyboard
+speshell awake|touchpad|airplane|nightlight get | on | off | toggle
 ```
 
 ## Development
@@ -157,6 +205,6 @@ just shaders   # compile effect shaders; needed once in a checkout
 just shot fire # the bar in a theme with each panel open, offscreen, and a contact sheet
 ```
 
-`bin/speshell` run from a checkout uses that checkout. Hardware behavior is checked by hand with [`tests/manual.md`](tests/manual.md); agent notes are in [AGENTS.md](AGENTS.md).
+`bin/speshell` run from a checkout uses that checkout. Agent notes are in [AGENTS.md](AGENTS.md).
 
 Icons are a subset of [Tabler Icons](https://github.com/tabler/tabler-icons) (MIT), in `assets/icons/tabler/`, and a few of Speshell's own in their style, in `assets/icons/speshell/`.
