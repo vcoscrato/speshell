@@ -27,11 +27,11 @@ Card {
     headerActions: Row {
         spacing: Theme.spacingSmall
 
-        HeaderButton {
-            anchors.verticalCenter: parent.verticalCenter
+        ActionButton {
             visible: root.notifList.length > 0
+            text: "Clear all"
             iconName: "bell-clear"
-            tooltipText: "Clear notifications"
+            compact: true
             onClicked: NotificationService.clearHistory()
         }
 
@@ -72,13 +72,13 @@ Card {
         return notification.appName || "Notification";
     }
 
-    // The second line: the body when the summary leaves one, else the app.
-    function detailText(notification) {
+    // The body, when the summary doesn't already say it.
+    function bodyText(notification) {
         var summary = root.compactText(notification.summary);
         var body = root.compactText(notification.body);
         if (summary !== "" && body !== "" && body !== summary)
-            return body;
-        return root.compactText(notification.appName);
+            return String(notification.body).trim();
+        return "";
     }
 
     function iconSource(notification) {
@@ -135,6 +135,10 @@ Card {
                 required property int index
                 readonly property bool expanded: root.expandedNotificationId
                     === root.notificationKey(notificationRow.modelData)
+                readonly property string body: root.bodyText(notificationRow.modelData)
+                // Only a row cut short has more to show.
+                readonly property bool expandable: expanded
+                    || summaryText.truncated || detailLabel.truncated
 
                 width: ListView.view.width
                 height: expanded
@@ -145,10 +149,10 @@ Card {
                 clip: true
                 color: notifMouse.containsMouse ? Theme.cardHover : Theme.controlFill
 
-                Accessible.role: Accessible.Button
+                Accessible.role: expandable ? Accessible.Button : Accessible.ListItem
                 Accessible.name: root.primaryText(notificationRow.modelData)
                 Accessible.description: expanded ? "Collapse notification" : "Read full notification"
-                Accessible.onPressAction: root.toggleExpanded(notificationRow.modelData)
+                Accessible.onPressAction: if (expandable) root.toggleExpanded(notificationRow.modelData)
 
                 Behavior on height {
                     NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasing }
@@ -235,11 +239,14 @@ Card {
                         }
                     }
 
+                    // The body when there is one, else the app.
                     Label {
+                        id: detailLabel
                         width: parent.width
-                        text: notificationRow.expanded
-                            ? String(notificationRow.modelData.body || root.compactText(notificationRow.modelData.appName)).trim()
-                            : root.detailText(notificationRow.modelData)
+                        text: notificationRow.body === ""
+                            ? root.compactText(notificationRow.modelData.appName)
+                            : notificationRow.expanded ? notificationRow.body
+                            : root.compactText(notificationRow.body)
                         color: Theme.subtext
                         elide: notificationRow.expanded ? Text.ElideNone : Text.ElideRight
                         wrapMode: notificationRow.expanded ? Text.Wrap : Text.NoWrap
@@ -250,7 +257,7 @@ Card {
                     Label {
                         role: "caption"
                         width: parent.width
-                        visible: notificationRow.expanded && root.compactText(notificationRow.modelData.body) !== ""
+                        visible: notificationRow.expanded && notificationRow.body !== ""
                         text: root.compactText(notificationRow.modelData.appName)
                         color: Theme.overlay
                         elide: Text.ElideRight
@@ -278,6 +285,7 @@ Card {
                 MouseArea {
                     id: notifMouse
                     anchors.fill: parent
+                    enabled: notificationRow.expandable
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     z: 1

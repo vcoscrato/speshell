@@ -3,9 +3,11 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.theme
 
-// A device or network: an icon disc, a title over a detail line, and its actions.
-// `current` marks the active connection; `busy` spins the icon while it changes.
-Rectangle {
+// A device or network: an icon disc, a title over a detail line, and its actions at the
+// right edge, flush with the panel's header. `current` lights the disc for the active
+// connection; `busy` spins it while it changes. What the row holds (a password prompt, an
+// error) lines up under its title.
+Item {
     id: root
 
     property string title: ""
@@ -23,13 +25,7 @@ Rectangle {
     signal actionTriggered(string actionId)
 
     width: parent ? parent.width : 300
-    implicitHeight: contentColumn.implicitHeight + Theme.spacingSmall * 2
-    radius: Theme.borderRadius
-    color: root.current
-        ? Theme.selectedFill
-        : (rowMouse.containsMouse && root.primaryEnabled ? Theme.controlFill : "transparent")
-    border.width: Theme.borderWidth
-    border.color: root.current ? Theme.selectedBorder : "transparent"
+    implicitHeight: contentColumn.implicitHeight + Theme.spacingTiny * 2
 
     Accessible.role: Accessible.Button
     Accessible.name: root.title
@@ -50,7 +46,7 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.margins: Theme.spacingSmall
+        anchors.topMargin: Theme.spacingTiny
         spacing: Theme.spacingSmall
 
         Item {
@@ -79,6 +75,7 @@ Rectangle {
                     role: "title"
                     width: parent.width
                     text: root.title
+                    color: rowMouse.containsMouse && root.primaryEnabled ? Theme.accent : Theme.text
                     elide: Text.ElideRight
                 }
 
@@ -116,7 +113,8 @@ Rectangle {
 
         Column {
             id: expandedColumn
-            width: parent.width
+            x: iconDisc.width + Theme.spacingMedium
+            width: parent.width - expandedColumn.x
             spacing: Theme.spacingSmall
         }
     }

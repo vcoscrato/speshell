@@ -14,9 +14,8 @@ Card {
     readonly property bool wifiReady: NetworkService.wifiOn && NetworkService.wifiDevice !== null
     readonly property bool connecting: NetworkService.connectingNetwork !== null && NetworkService.connectedWifi === null
 
-    // Scanning waits for the refresh button; closing the panel stops it.
-    onPresentedChanged: if (!root.presented && NetworkService.isScanning) NetworkService.stopWifiScan()
-    Component.onDestruction: if (NetworkService.isScanning) NetworkService.stopWifiScan()
+    // Opening reads what NetworkManager already knows; only the refresh button scans.
+    onPresentedChanged: if (root.presented) NetworkService.refreshList()
 
     headerActions: Row {
         spacing: Theme.spacingSmall
@@ -35,8 +34,8 @@ Card {
             iconName: "refresh"
             visible: root.wifiReady
             busy: root.presented && NetworkService.isScanning
-            tooltipText: NetworkService.isScanning ? "Stop Wi-Fi scan" : "Scan for Wi-Fi networks"
-            onClicked: NetworkService.toggleWifiScan()
+            tooltipText: NetworkService.isScanning ? "Scanning for Wi-Fi networks…" : "Scan for Wi-Fi networks"
+            onClicked: NetworkService.scan()
         }
 
         ToggleSwitch {
@@ -206,7 +205,7 @@ Card {
 
         DeviceRow {
             visible: TailscaleService.available && TailscaleService.backendState !== ""
-            title: TailscaleService.connected && TailscaleService.tailnet !== "" ? "Tailscale · " + TailscaleService.tailnet : "Tailscale"
+            title: "Tailscale"
             subtitle: TailscaleService.subtitle()
             iconName: "vpn"
             current: TailscaleService.connected
@@ -240,7 +239,8 @@ Card {
         },
 
         Label {
-            visible: NetworkService.connectError !== "" && NetworkService.passwordRowName === ""
+            visible: NetworkService.connectError !== ""
+                && !NetworkService.displayedNetworks.some(item => item.name === NetworkService.connectErrorName)
             width: parent.width
             text: NetworkService.connectError
             color: Theme.error
@@ -291,9 +291,8 @@ Card {
                     subtitle: NetworkService.networkSubtitle(networkRow.modelData)
                     iconName: NetworkService.signalIcon(networkRow.modelData.signalLevel)
                     busy: networkRow.modelData.stateChanging
-                    primaryEnabled: networkRow.modelData.live && !networkRow.modelData.stateChanging
-                    opacity: networkRow.modelData.live ? 1.0 : Theme.disabledOpacity
-                    actions: networkRow.modelData.live && networkRow.modelData.known && networkRow.modelData.network
+                    primaryEnabled: !networkRow.modelData.stateChanging
+                    actions: networkRow.modelData.network && !networkRow.modelData.stateChanging
                         ? [{ text: "Forget", kind: "danger", actionId: "forget" }]
                         : []
                     onPrimaryTriggered: NetworkService.activate(networkRow.modelData)
@@ -316,15 +315,11 @@ Card {
 
                     Label {
                         role: "caption"
-                        visible: networkRow.prompting && NetworkService.connectErrorName === networkRow.modelData.name
+                        visible: NetworkService.connectErrorName === networkRow.modelData.name && NetworkService.connectError !== ""
                         width: parent.width
                         text: NetworkService.connectError
                         color: Theme.error
                         wrapMode: Text.WordWrap
-                    }
-
-                    Behavior on opacity {
-                        NumberAnimation { duration: Theme.animDuration }
                     }
                 }
             }
@@ -334,12 +329,12 @@ Card {
                 iconName: "wifi"
                 busy: NetworkService.isScanning
                 title: NetworkService.isScanning ? "Looking for networks…"
-                    : (NetworkService.scanRequested ? "No other networks found" : "No scan yet")
+                    : (NetworkService.scannedAtMs > 0 ? "No other networks found" : "No scan yet")
                 detail: NetworkService.isScanning ? ""
-                    : (NetworkService.scanRequested ? "Nothing else is in range right now." : "Scan to see the Wi-Fi networks around you.")
-                actionLabel: NetworkService.isScanning ? "" : (NetworkService.scanRequested ? "Scan again" : "Scan")
+                    : (NetworkService.scannedAtMs > 0 ? "Nothing else is in range right now." : "Scan to see the Wi-Fi networks around you.")
+                actionLabel: NetworkService.isScanning ? "" : (NetworkService.scannedAtMs > 0 ? "Scan again" : "Scan")
                 actionIconName: "refresh"
-                onActivated: NetworkService.startWifiScan()
+                onActivated: NetworkService.scan()
             }
         }
     ]

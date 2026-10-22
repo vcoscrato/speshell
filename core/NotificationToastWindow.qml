@@ -80,11 +80,15 @@ PanelWindow {
                 property bool timed: false
 
                 // Runs from the time left, as when a replaced notification restarts it.
+                // modelData is a copy, so the expiry the service moves is read from it.
                 function startCountdown() {
-                    const duration = Number(toastCard.modelData.duration);
-                    const left = Number(toastCard.modelData.expiresAt) - Date.now();
+                    const popup = NotificationService.popupById(toastCard.modelData.popupId);
                     countdown.stop();
-                    toastCard.timed = duration > 0 && toastCard.modelData.expiresAt >= 0;
+                    if (!popup)
+                        return;
+                    const duration = Number(popup.duration);
+                    const left = Number(popup.expiresAt) - Date.now();
+                    toastCard.timed = duration > 0 && popup.expiresAt >= 0;
                     if (!toastCard.timed)
                         return;
                     toastCard.remaining = Math.max(0, Math.min(1, left / duration));

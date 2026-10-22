@@ -1,9 +1,7 @@
 #version 440
 #extension GL_GOOGLE_include_directive : enable
 // One particle of Earth's control effects, by `kind`: 0 a rock chip, faceted and
-// outlined, its faces shaded by their normals; 1 a puff of dust; 2 a jade shard;
-// 3 a spike of rock (of jade when `seed` is 1 or more) that juts up from the bottom of
-// its square and sinks back; 4 a ring of dust spreading flat along the ground.
+// outlined, its faces shaded by their normals; 1 a puff of dust; 2 a speck of grit.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {
@@ -17,8 +15,6 @@ layout(std140, binding = 0) uniform buf {
     vec4 cLight;
     vec4 cShade;
     vec4 cDust;
-    vec4 cJade;
-    vec4 cGlint;
 } u;
 #include "../../lib/common.glsl"
 
@@ -61,50 +57,20 @@ vec4 dust(vec2 p, float R) {
     return over(c, mix(dirt, u.cLight.rgb, 0.4), cover(-d - R * 0.25) * 0.4 * fade);
 }
 
-vec4 shard(vec2 p, float R) {
-    float w = R * 0.45;
-    float d = max(abs(p.x) - w, abs(p.y) + abs(p.x) * 1.3 - R);
-    vec3 col = p.x < 0.0 ? mix(u.cJade.rgb, u.cLight.rgb, 0.35) : mix(u.cJade.rgb, u.cShade.rgb, 0.3);
-    col = mix(col, u.cGlint.rgb, 0.6 * cover(0.7 - abs(p.x + w * 0.45)) * step(abs(p.y), R * 0.5));
-    vec4 c = over(vec4(0.0), u.cShade.rgb, cover(-d));
-    return over(c, col, cover(-d - 1.0));
-}
-
-vec4 spike(vec2 p, float S) {
-    bool jade = u.seed >= 1.0;
-    float sd = fract(u.seed);
-    float h = S * 0.95 * smoothstep(0.0, 0.2, u.age) * (1.0 - smoothstep(0.6, 1.0, u.age));
-    float base = S * 0.5 - 1.0;
-    float y = base - p.y;                       // height above the base
-    float tipX = (sd - 0.5) * S * 0.25;
-    float halfW = S * mix(0.2, 0.26, sd);
-    // Linear from the base's half width to the tip.
-    float t = clamp(y / max(h, 1e-3), 0.0, 1.0);
-    float cx = tipX * t;
-    float d = max(abs(p.x - cx) - halfW * (1.0 - t), max(-y, y - h));
-    vec3 lit = jade ? mix(u.cJade.rgb, u.cGlint.rgb, 0.35) : u.cLight.rgb;
-    vec3 shade = jade ? mix(u.cJade.rgb, u.cShade.rgb, 0.3) : u.cStone.rgb;
-    vec3 col = p.x < cx ? lit : shade;
-    vec4 c = over(vec4(0.0), u.cShade.rgb, cover(-d + 1.0));
-    return over(c, col, cover(-d));
-}
-
-vec4 ring(vec2 p, float R) {
-    float r = R * (0.3 + 0.7 * sqrt(u.age));
-    vec2 e = p / vec2(1.0, 0.38);
-    float d = abs(length(e) - r);
-    float gaps = step(0.35, vnoise(vec2(atan(e.y, e.x) * 3.0, u.seed * 20.0)));
-    float k = cover(mix(2.6, 1.0, u.age) - d) * gaps * (1.0 - u.age);
-    return over(vec4(0.0), mix(u.cDust.rgb, u.cLight.rgb, 0.5), k * 0.8);
+// A lumpy speck, lit on its upper left, in stone or dust by its seed.
+vec4 grit(vec2 p, float R) {
+    float d = length(p) - R * (0.75 + 0.25 * vnoise(p * 1.5 + u.seed * 30.0));
+    vec3 base = u.seed < 0.5 ? u.cStone.rgb : mix(u.cDust.rgb, u.cStone.rgb, 0.4);
+    vec3 col = mix(base, u.cLight.rgb, 0.5 * step(0.0, dot(p, LIGHT)));
+    return over(vec4(0.0), col, cover(-d));
 }
 
 void main() {
     vec2 p = (qt_TexCoord0 - 0.5) * u.size;
     float R = u.size * 0.5 - 1.0;
-    vec4 c = u.kind < 0.5 ? chip(p, R) : u.kind < 1.5 ? dust(p, R) : u.kind < 2.5 ? shard(p, R)
-           : u.kind < 3.5 ? spike(p, u.size) : ring(p, R);
-    // Chips and shards fade out at the end of their life.
-    if (u.kind < 0.5 || (u.kind > 1.5 && u.kind < 2.5))
+    vec4 c = u.kind < 0.5 ? chip(p, R) : u.kind < 1.5 ? dust(p, R) : grit(p, R);
+    // Stones and grit fade out at the end of their life.
+    if (u.kind < 0.5 || u.kind > 1.5)
         c *= 1.0 - smoothstep(0.75, 1.0, u.age);
     fragColor = c * u.qt_Opacity;
 }

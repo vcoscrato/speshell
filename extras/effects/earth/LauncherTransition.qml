@@ -21,7 +21,7 @@ Item {
     signal closingFinished()
 
     // ── Choreography (seconds) ──────────────────────────────
-    readonly property real enterTime: 1.05
+    readonly property real enterTime: 0.85
     readonly property real exitTime: 0.7
     readonly property real tailTime: 0.25
 

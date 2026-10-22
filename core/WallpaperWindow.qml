@@ -28,16 +28,6 @@ PanelWindow {
         right: true
     }
 
-    // The default wallpaper, under any theme wallpaper: the Speshell mark on the
-    // theme's darkest color.
-    SpeshellMark {
-        anchors.centerIn: parent
-        size: 29 * Math.max(2, Math.round(root.height * 0.16 / 29))
-        leftColor: Theme.surface2
-        // Opaque, so the overlapping strokes do not show their seams.
-        rightColor: Qt.tint(Theme.crust, Theme.alpha(Theme.accent, 0.6))
-    }
-
     WallpaperView {
         anchors.fill: parent
         path: ThemeService.shownWallpaper
@@ -47,5 +37,20 @@ PanelWindow {
         timeScale: EffectsService.wallpaperSpeed
         frameRate: EffectsService.frameRate
         pixelRatio: root.devicePixelRatio
+
+        // The default wallpaper, until the theme's arrives and for themes without
+        // one: the Speshell mark on the theme's darkest color.
+        Rectangle {
+            anchors.fill: parent
+            color: Theme.crust
+
+            SpeshellMark {
+                anchors.centerIn: parent
+                size: 29 * Math.max(2, Math.round(root.height * 0.16 / 29))
+                leftColor: Theme.surface2
+                // Opaque, so the overlapping strokes do not show their seams.
+                rightColor: Qt.tint(Theme.crust, Theme.alpha(Theme.accent, 0.6))
+            }
+        }
     }
 }

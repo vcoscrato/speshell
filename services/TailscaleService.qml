@@ -4,10 +4,10 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Tailscale, through its CLI: whether this device is on the tailnet, its address,
-// and the peers online. Switching it needs the user to be tailscaled's operator
-// (sudo tailscale set --operator=$USER). A login prints a URL, which opens in the
-// browser; the switch waits there until the login finishes.
+// Tailscale, through its CLI: whether this device is on the tailnet. Switching it needs
+// the user to be tailscaled's operator (sudo tailscale set --operator=$USER). A login
+// prints a URL, which opens in the browser; the switch waits there until the login
+// finishes.
 Singleton {
     id: root
 
@@ -16,10 +16,6 @@ Singleton {
     // tailscaled's BackendState: NeedsLogin, NeedsMachineAuth, Stopped, Starting,
     // or Running; "" while tailscaled can't be reached.
     property string backendState: ""
-    property string address: ""
-    property string tailnet: ""
-    property int peerCount: 0
-    property int peersOnline: 0
     readonly property bool connected: root.backendState === "Running"
     readonly property bool switching: root.busyAction !== "" || root.backendState === "Starting"
 
@@ -34,15 +30,8 @@ Singleton {
             return "Finish signing in in your browser";
         if (root.busyAction !== "")
             return root.busyAction === "up" ? "Connecting…" : "Disconnecting…";
-        if (root.backendState === "Running") {
-            const parts = ["Connected"];
-            if (root.address !== "")
-                parts.push(root.address);
-            if (root.peerCount > 0)
-                parts.push(root.peersOnline + " of " + root.peerCount + " online");
-            return parts.join(" · ");
-        }
         return ({
+            Running: "Connected",
             NeedsLogin: "Signed out",
             NeedsMachineAuth: "Waiting for admin approval",
             Starting: "Connecting…"
@@ -61,17 +50,7 @@ Singleton {
         } catch (error) {
             status = null;
         }
-        if (!status) {
-            root.backendState = "";
-            return;
-        }
-        var ips = (status.Self && status.Self.TailscaleIPs) || [];
-        var peers = Object.values(status.Peer || {});
-        root.backendState = status.BackendState || "";
-        root.address = ips.find(ip => ip.indexOf(":") === -1) || ips[0] || "";
-        root.tailnet = (status.CurrentTailnet && status.CurrentTailnet.Name) || "";
-        root.peerCount = peers.length;
-        root.peersOnline = peers.filter(peer => peer.Online).length;
+        root.backendState = (status && status.BackendState) || "";
     }
 
     // Signed out, logging in also brings it up.
@@ -129,7 +108,7 @@ Singleton {
 
     Process {
         id: statusProc
-        command: ["tailscale", "status", "--json"]
+        command: ["tailscale", "status", "--json", "--peers=false"]
         stdout: StdioCollector {
             onStreamFinished: root.parseStatus(text)
         }
