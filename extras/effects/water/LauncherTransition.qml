@@ -80,8 +80,9 @@ Item {
         k: k0
         th0: 2.4
         spin: 1
-        head: root.smooth(root.span(root.enter, 0, 0.42)) * arrive
-        len: fullLen * (1 - root.span(root.enter, 0.42, 0.66))
+        // Eased in and out only gently, so it never races or stalls.
+        head: (0.5 * root.span(root.enter, 0, 0.46) + 0.5 * root.smooth(root.span(root.enter, 0, 0.46))) * arrive
+        len: fullLen * (1 - root.smooth(root.span(root.enter, 0.4, 0.68)))
         tubeWidth: 24
     }
 
@@ -96,7 +97,8 @@ Item {
         k: -0.2
         th0: -0.7
         spin: 1
-        head: root.ease(root.span(root.leave, 0.55, 1)) * (Math.log(root.reach * 3.4 / 22) / 0.2 + 5)
+        // Gathering speed as it leaves, so it is seen unwinding before it whips away.
+        head: Math.pow(root.span(root.leave, 0.55, 1), 1.7) * (Math.log(root.reach * 3.4 / 22) / 0.2 + 5)
         len: Math.min(5, head)
         tubeWidth: 24
     }

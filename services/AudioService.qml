@@ -153,7 +153,8 @@ Singleton {
         return name.indexOf("alsa_input.") === 0 || name.indexOf(".input.") !== -1;
     }
 
-    // The offered output or input devices as {node, label, rawLabel}, in quick-switch order.
+    // The offered output or input devices as {node, label, rawLabel}, in quick-switch order,
+    // and the one in use.
     function devices(isOut) {
         var values = Pipewire.nodes && Pipewire.nodes.values ? Pipewire.nodes.values : [];
         var result = [];
@@ -162,6 +163,9 @@ Singleton {
             if (!node || node.isStream || (isOut ? !node.isSink : !root.isSourceNode(node)))
                 continue;
             var index = root.quickSwitchIndex(node, isOut);
+            // The device in use shows even when the quick switch leaves it out, last.
+            if (index === -2 && node === (isOut ? root.defaultSink : root.defaultSource))
+                index = Number.MAX_SAFE_INTEGER;
             if (index === -2)
                 continue;
             result.push({

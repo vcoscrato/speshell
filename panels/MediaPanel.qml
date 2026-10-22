@@ -170,9 +170,14 @@ Card {
             visible: root.player && root.player.length > 0
 
             Rectangle {
+                id: seekBar
+
+                // Where a drag holds the position, 0 to 1, or -1 while it follows the track.
+                property real dragRatio: -1
+
                 width: parent.width
                 height: 4
-                radius: 2
+                radius: height / 2
                 color: Theme.surface2
 
                 Accessible.role: Accessible.Slider
@@ -183,23 +188,55 @@ Card {
                     : ""
 
                 Rectangle {
-                    width: (root.player && root.player.length > 0)
-                        ? (MediaService.displayedPosition / root.player.length) * parent.width
+                    id: seekFill
+                    width: seekBar.dragRatio >= 0 ? seekBar.dragRatio * parent.width
+                        : (root.player && root.player.length > 0)
+                        ? Math.min(1, MediaService.displayedPosition / root.player.length) * parent.width
                         : 0
                     height: parent.height
-                    radius: 2
+                    radius: parent.radius
                     color: Theme.accent
                 }
 
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: function(mouse) {
-                        if (root.player && root.player.length > 0) {
-                            const ratio = mouse.x / parent.width;
-                            MediaService.seek(ratio * root.player.length);
-                        }
+                // The position's knob, while the pointer is on the bar.
+                Rectangle {
+                    x: seekFill.width - width / 2
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 10
+                    height: 10
+                    radius: 5
+                    color: Theme.accent
+                    opacity: seekArea.containsMouse || seekArea.pressed ? 1 : 0
+
+                    Behavior on opacity {
+                        NumberAnimation { duration: Theme.animDurationFast }
                     }
+                }
+
+                // Taller than the bar, so it is easy to hit; a drag seeks where it lets go.
+                MouseArea {
+                    id: seekArea
+
+                    function ratioAt(x) {
+                        return Math.max(0, Math.min(1, x / seekBar.width));
+                    }
+
+                    anchors.fill: parent
+                    anchors.topMargin: -Theme.spacingSmall
+                    anchors.bottomMargin: -Theme.spacingSmall
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onPressed: mouse => seekBar.dragRatio = seekArea.ratioAt(mouse.x)
+                    onPositionChanged: mouse => {
+                        if (seekArea.pressed)
+                            seekBar.dragRatio = seekArea.ratioAt(mouse.x);
+                    }
+                    onReleased: {
+                        if (root.player && root.player.length > 0)
+                            MediaService.seek(seekBar.dragRatio * root.player.length);
+                        seekBar.dragRatio = -1;
+                    }
+                    onCanceled: seekBar.dragRatio = -1
                 }
             }
 

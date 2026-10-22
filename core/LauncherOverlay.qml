@@ -29,6 +29,8 @@ PanelWindow {
     readonly property bool transitionReady: transitionLoader.status === Loader.Ready
     readonly property var results: LauncherService.results || []
     readonly property int resultCount: root.results.length
+    // Badges name each result's kind, which says nothing while every result shares one.
+    readonly property bool mixedKinds: root.results.some(result => (result.badge || "") !== (root.results[0].badge || ""))
     readonly property int configuredWidth: ConfigService.settings.launcher.width
     readonly property int configuredVisibleRows: ConfigService.settings.launcher.visibleRows
     readonly property int paletteWidth: Math.min(root.configuredWidth, Math.max(320, root.width - Theme.spacingXL * 2))
@@ -403,7 +405,7 @@ PanelWindow {
                         anchors.right: parent.right
                         anchors.rightMargin: Theme.spacingMedium
                         anchors.verticalCenter: parent.verticalCenter
-                        text: resultRow.modelData.badge || ""
+                        text: root.mixedKinds ? resultRow.modelData.badge || "" : ""
                         color: resultRow.index === root.selectedIndex ? Theme.accent : Theme.overlay
                         font.pixelSize: Theme.fontSizeMicro
                         font.weight: Font.Bold

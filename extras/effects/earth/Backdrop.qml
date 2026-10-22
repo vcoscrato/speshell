@@ -1,7 +1,7 @@
 import QtQuick
 
 // Earth backdrop: the panel as a cut through layered rock, cracked here
-// and there, with jade crystals growing from it. Drawn once.
+// and there, with a little jade growing from it low down. Drawn once.
 ShaderEffect {
     id: root
 

@@ -22,6 +22,23 @@ layout(std140, binding = 0) uniform buf {
 layout(binding = 1) uniform sampler2D source;
 #include "../../lib/common.glsl"
 
+// Caustic lines from cells of `size` px: (gap between the nearest two sites'
+// distances, gap between the nearest and the third). The first is zero along the
+// cell borders, the second only where three cells meet, where the light gathers.
+vec2 causticGap(vec2 p, float size) {
+    vec2 g = floor(p / size);
+    float d1 = 1e9, d2 = 1e9, d3 = 1e9;
+    for (int y = -1; y <= 1; y++)
+        for (int x = -1; x <= 1; x++) {
+            vec2 cell = g + vec2(x, y);
+            float d = length(p - (cell + hash2(cell)) * size);
+            if (d < d1) { d3 = d2; d2 = d1; d1 = d; }
+            else if (d < d2) { d3 = d2; d2 = d; }
+            else d3 = min(d3, d);
+        }
+    return vec2(d2 - d1, d3 - d1);
+}
+
 void main() {
     vec2 p = u.rect.xy + qt_TexCoord0 * u.rect.zw;
     vec2 c = u.panel.xy + u.panel.zw * 0.5;
@@ -50,15 +67,25 @@ void main() {
     vec3 water = mix(u.cMid.rgb, u.cDeep.rgb, smoothstep(30.0 - aa, 30.0 + aa, depth));
     water = mix(water, u.cLight.rgb, smoothstep(9.0 + aa, 9.0 - aa, depth));
     water = mix(water, u.cFoam.rgb, smoothstep(3.0 + aa, 3.0 - aa, depth));
-    // Caustics: a net of light focused by the ripples, morphing as they move. Lines
-    // are wider where the ripples crest, with foam-white cores on the brightest.
-    vec2 cq = p + (vec2(n1, n2) - 0.5) * 34.0 + vec2(u.time * 16.0, -u.time * 11.0);
-    float edge = voronoiEdge(cq, 48.0, 0.9);
+    // Caustics: light focused by the moving surface. A net of warped cell borders,
+    // with a fainter one drifting across it: thin along each border, swelling where
+    // the borders meet and gathering to foam there, with a soft glow around them,
+    // and dimming here and there as the surface moves.
+    vec2 warp = vec2(fbm(p / 110.0 + vec2(u.time * 0.35, 0.0)), fbm(p / 110.0 + vec2(4.0, -u.time * 0.3))) - 0.5;
+    vec2 cq = p + (vec2(n1, n2) - 0.5) * 22.0 + warp * 60.0;
+    cq += (vec2(vnoise(cq / 26.0 + u.time * 0.6), vnoise(cq / 26.0 + 17.0 - u.time * 0.6)) - 0.5) * 9.0;
+    vec2 c1 = causticGap(cq + vec2(u.time * 14.0, -u.time * 9.0), 64.0);
+    vec2 c2 = causticGap(rot(cq, 0.9) - vec2(u.time * 8.0, u.time * 12.0) + 40.0, 44.0);
     float crest = n1 + n2;
-    float lineW = 1.6 + 2.4 * smoothstep(0.7, 1.4, crest);
-    float body = step(10.0, depth);
-    water = mix(water, u.cLight.rgb, cover(lineW - edge) * body);
-    water = mix(water, u.cFoam.rgb, cover(lineW * 0.38 - edge) * smoothstep(0.9, 1.3, crest) * body);
+    float on1 = mix(0.3, 1.0, smoothstep(0.3, 0.7, vnoise(cq / 70.0 + 3.0 + u.time * 0.3)));
+    float on2 = smoothstep(0.4, 0.75, vnoise(cq / 55.0 - 7.0 - u.time * 0.25));
+    float near1 = 1.0 + 1.4 * smoothstep(14.0, 0.0, c1.y) + 0.5 * smoothstep(0.8, 1.4, crest);
+    float near2 = 1.0 + 1.2 * smoothstep(10.0, 0.0, c2.y);
+    float body = smoothstep(8.0, 16.0, depth);
+    float glow = cover(3.0 * near1 - c1.x) * on1 * 0.22;
+    float line = max(cover(1.0 * near1 - c1.x) * on1 * 0.75, cover(0.8 * near2 - c2.x) * on2 * 0.4);
+    water = mix(water, u.cLight.rgb, max(glow, line) * body);
+    water = mix(water, u.cFoam.rgb, cover(2.2 - c1.y) * on1 * 0.85 * body);
 
     float tint = wet * 0.78;
     vec3 col = mix(content.rgb, water * max(content.a, 0.85), tint);

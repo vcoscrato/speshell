@@ -152,7 +152,7 @@ Item {
                         font.weight: cell.isToday ? Font.Bold : Font.Normal
                         font.features: { "tnum": 1 }
                         color: cell.isToday
-                            ? Theme.crust
+                            ? Theme.onAccent
                             : (cell.weekday === 0 || cell.weekday === 6 ? Theme.subtext : Theme.text)
                     }
                 }

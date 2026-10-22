@@ -34,7 +34,7 @@ void main() {
             float fi = float(i);
             float x = u.origin.x + (fi / 8.0 - 0.5) * 2.0 * u.spread + (hash(vec2(fi, 4.0)) - 0.5) * 60.0;
             float grow = 1.0 - pow(1.0 - u.dust, 2.5);
-            float r = mix(8.0, 30.0 + 34.0 * hash(vec2(fi, 5.0)), grow);
+            float r = mix(8.0, 20.0 + 26.0 * hash(vec2(fi, 5.0)), grow);
             vec2 cp = vec2(x + (x - u.origin.x) * 0.35 * grow, u.origin.y - r * 0.4 - 46.0 * grow * hash(vec2(fi, 6.0)));
             // Lumpy cauliflower outline from two noise octaves.
             vec2 rel = p - cp;
@@ -46,8 +46,8 @@ void main() {
             // Lit from above: the lower part of each puff is in shade.
             shade = max(shade, cover(-d) * cover(rel.y - r * 0.2));
         }
-        float thin = 1.0 - smoothstep(0.55, 1.0, u.dust);
-        float dustA = cover_ * thin * 0.72;
+        float thin = 1.0 - smoothstep(0.3, 0.75, u.dust);
+        float dustA = cover_ * thin * 0.55;
         col = mix(u.cDust.rgb, u.cDustShade.rgb, shade);
         a = dustA;
         col *= a;
@@ -76,12 +76,12 @@ void main() {
             float ang = u.burst * (h.y - 0.5) * 16.0;
             vec2 lp = mat2(cos(ang), -sin(ang), sin(ang), cos(ang)) * (p - pos);
             float size = 4.0 + 8.0 * hash(vec2(fi, 11.0));
-            float d = max(abs(lp.x) - size, abs(lp.y) - size * 0.7);
+            float d = max(max(abs(lp.x) - size, abs(lp.y) - size * 0.7), (lp.x + lp.y) * 0.75 - size * 0.55);
             float fade = 1.0 - smoothstep(0.8, 1.2, u.burst);
             float chip = cover(-d) * fade;
             float rim = cover(-d + 1.5) * fade;
             col = mix(col, u.cDark.rgb, rim);
-            col = mix(col, u.cRock.rgb, chip);
+            col = mix(col, lp.y < 0.0 ? u.cDust.rgb : u.cRock.rgb, chip);
             a = max(a, rim);
         }
     }

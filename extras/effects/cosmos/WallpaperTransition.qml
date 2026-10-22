@@ -64,6 +64,7 @@ Item {
         property real lens: 40 * (1 - root.sweep * 0.6)
         property real ringWidth: 3
         property real ring: root.sweep > 0 ? 1 - Math.pow(root.sweep, 4) : 0
+        property real debris: 1
         property color cHot: root.hot
         property color cGlow: root.warm
         property color cHaze: root.violet

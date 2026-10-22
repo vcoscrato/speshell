@@ -1,10 +1,13 @@
 import QtQuick
 import "common"
+import "common/Colors.js" as Colors
 
 // Earth's effects on Speshell's controls. A knob dragged along a slider kicks up
 // chips of rock and dust behind it, which arc, bounce on the track, and tumble away;
-// let go, it settles in dust. Picking something knocks pebbles and a jade shard loose
-// from it. A switch turned on throws chips; turned off, it settles in dust.
+// let go, it settles in dust. Picking something earthbends it: spikes of rock jut up
+// either side of it and sink back, a jade shard and chips fly up, and a ring of dust
+// spreads under it. A switch turned on jabs a spike up and throws chips; turned off,
+// it settles in dust.
 Item {
     id: root
 
@@ -21,7 +24,7 @@ Item {
 
     function chip(x, y, vx, vy, floor) {
         bits.spawn({ x: x, y: y, vx: vx, vy: vy, floor: floor, life: rnd(0.55, 0.85),
-                     size: Math.round(rnd(7, 12)), angle: rnd(0, 360), spin: rnd(-600, 600),
+                     size: Math.round(rnd(8, 13)), angle: rnd(0, 360), spin: rnd(-600, 600),
                      props: { kind: 0, seed: Math.random(), z: 1 } });
     }
 
@@ -31,8 +34,18 @@ Item {
     }
 
     function shard(x, y) {
-        bits.spawn({ x: x, y: y, vx: rnd(-60, 60), vy: -rnd(200, 280), life: 0.6, size: 11,
+        bits.spawn({ x: x, y: y, vx: rnd(-60, 60), vy: -rnd(240, 320), life: 0.65, size: 15,
                      angle: rnd(-30, 30), spin: rnd(-300, 300), props: { kind: 2, seed: Math.random(), z: 2 } });
+    }
+
+    // A spike of rock, or of jade, standing on `base` and jutting `size` px up.
+    function spike(x, base, size, jade, delay) {
+        bits.spawn({ x: x, y: base - size / 2, gravity: 0, life: 0.5, delay: delay, size: size,
+                     angle: rnd(-12, 12), props: { kind: 3, seed: (jade ? 1 : 0) + Math.random(), z: 1 } });
+    }
+
+    function ring(x, y, size) {
+        bits.spawn({ x: x, y: y, gravity: 0, life: 0.45, size: size, props: { kind: 4, seed: Math.random(), z: 0 } });
     }
 
     function slide(at, dx) {
@@ -58,17 +71,22 @@ Item {
     function pick(area, at) {
         var cx = at.x, cy = at.y;
         var floor = area.y + area.height + 6;
-        for (var i = 0; i < 5; i++)
-            root.chip(cx + rnd(-area.width, area.width) * 0.3, cy, rnd(-130, 130), -rnd(170, 320), floor);
+        var base = Math.min(cy + 9, floor);
+        root.ring(cx, base, 46);
+        root.spike(cx - rnd(11, 14), base, Math.round(rnd(15, 19)), false, 0);
+        root.spike(cx + rnd(11, 14), base, Math.round(rnd(13, 17)), false, 0.04);
         root.shard(cx, cy);
-        root.puff(area.x + 4, floor - 4, -30, 20);
-        root.puff(area.x + area.width - 4, floor - 4, 30, 20);
+        for (var i = 0; i < 4; i++)
+            root.chip(cx + rnd(-8, 8), cy, rnd(-150, 150), -rnd(170, 300), floor);
+        root.puff(cx - 14, base - 3, -30, 18);
+        root.puff(cx + 14, base - 3, 30, 18);
     }
 
     function toggle(area, on) {
         var x = on ? area.x + area.width - area.height / 2 : area.x + area.height / 2;
         var cy = area.y + area.height / 2, floor = area.y + area.height + 6;
         if (on) {
+            root.spike(x + area.height / 2 + 3, area.y + area.height + 2, 18, true, 0);
             for (var i = 0; i < 4; i++)
                 root.chip(x, cy, rnd(-40, 160), -rnd(180, 300), floor);
         } else {
@@ -87,7 +105,7 @@ Item {
                 property real seed: 0
                 property real kind: 0
                 property real size: width
-                property color cStone: root.theme ? root.theme.overlay : "#677052"
+                property color cStone: root.theme ? Colors.mix(root.theme.overlay, root.theme.subtext, 0.4) : "#7f8669"
                 property color cLight: root.theme ? root.theme.subtextBright : "#c6c6ad"
                 property color cShade: root.theme ? root.theme.crust : "#0d0f0a"
                 property color cDust: root.theme ? root.theme.peach : "#d99a5a"

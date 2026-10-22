@@ -3,9 +3,10 @@ import "common"
 import "Bolt.js" as Bolt
 import "common/Colors.js" as Colors
 
-// Relâmpago's knob for Speshell's sliders and switches: a racing wheel that
-// rolls as it travels, carrying a bolt decal along the filled track behind it, with
-// electricity crackling along the track and around the wheel while held or hovered.
+// Relâmpago's knob for Speshell's sliders and switches: a cartoon racing wheel that
+// rolls as it travels, blurring and trailing speed dashes as it speeds along, and
+// carries a bolt decal along the filled track behind it; held or hovered, a charge
+// runs along the decal and zaps flick out round the wheel.
 Item {
     id: root
 
@@ -18,8 +19,11 @@ Item {
 
     readonly property real size: Math.min(width, height)
     property real glow: root.pressed || root.hovered ? 1 : 0
+    // Lags the knob, so the gap between them is how fast it moves.
+    property real trail: root.travel
 
     Behavior on glow { NumberAnimation { duration: 150 } }
+    Behavior on trail { SpringAnimation { spring: 9; damping: 1 } }
 
     // The crackle runs only while it shows.
     Loader {
@@ -41,6 +45,7 @@ Item {
         property real back: reach
         // Rolling: one turn per circumference travelled.
         property real turn: root.travel / Math.max(1, root.size / 2)
+        property real speed: Math.max(-1, Math.min(1, (root.travel - root.trail) / 24))
         property real glow: root.glow
         property real dim: root.checked ? 0 : 1
         property real time: crackle.item ? crackle.item.clock : 0

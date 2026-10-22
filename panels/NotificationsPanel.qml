@@ -14,7 +14,7 @@ Card {
     iconName: "bell"
 
     property var notifList: NotificationService.notificationHistory
-    readonly property int maxVisibleNotifications: 3
+    readonly property int maxVisibleNotifications: 5
     property bool presented: false
 
     // Now, to the half minute, for how long ago each notification came.
@@ -27,11 +27,10 @@ Card {
     headerActions: Row {
         spacing: Theme.spacingSmall
 
-        ActionButton {
+        HeaderButton {
+            anchors.verticalCenter: parent.verticalCenter
             visible: root.notifList.length > 0
-            text: "Clear"
             iconName: "bell-clear"
-            compact: true
             tooltipText: "Clear notifications"
             onClicked: NotificationService.clearHistory()
         }

@@ -8,7 +8,8 @@ layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {
     mat4 qt_Matrix;
     float qt_Opacity;
-    vec4 rect;         // this item's rect on screen (px)
+    vec4 area;         // this item's rect on screen (px)
+    vec4 rect;         // the panel's rect on screen (px)
     vec2 center;       // vortex eye (px)
     float wind;        // 1 wound up .. 0 settled
     float spin;
@@ -19,7 +20,7 @@ layout(binding = 1) uniform sampler2D source;
 #include "../../lib/common.glsl"
 
 void main() {
-    vec2 p = u.rect.xy + qt_TexCoord0 * u.rect.zw;
+    vec2 p = u.area.xy + qt_TexCoord0 * u.area.zw;
     vec2 rel = p - u.center;
     float r = length(rel);
     // Inner parts lag furthest behind, so the panel looks wrung out.

@@ -2,7 +2,7 @@ import QtQuick
 import "Flame.js" as Flame
 import "common"
 
-// Fire launcher transition: an ember flares, a burning edge sweeps the panel into
+// Fire launcher transition: an ember flares and throws sparks, a burning edge sweeps the panel into
 // view, and flames simmer around it while open. Closing burns a hole through the
 // middle of the panel that spreads outward until it is gone. Reopening mid-exit
 // opens it the usual way: the hole's burning edge dies down while a new front sweeps
@@ -31,6 +31,7 @@ Item {
     property real phaseStart: 0
     property bool sparkPending: true
     property bool exitDone: false
+    property bool closedOnce: false   // a reopen mid-exit has no ember
 
     // sweep: 0..1 progress of the entrance front; burn: 0..1 progress of the exit hole;
     // refill: reopened mid-exit, the entrance front is filling the hole.
@@ -55,6 +56,8 @@ Item {
     onActiveChanged: {
         phaseStart = clock.clock;
         exitDone = false;
+        if (!active)
+            closedOnce = true;
         // Reopened mid-exit: the entrance front starts over at once, filling the hole.
         if (active && burn > 0 && !refill) {
             refill = true;
@@ -140,17 +143,21 @@ Item {
         fragmentShader: Qt.resolvedUrl("qsb/Burn.qsb")
     }
 
-    // ── Ignition ember ──
-    Rectangle {
-        readonly property real k: Math.min(1, root.phaseAge / root.igniteTime)
-        visible: root.active && root.sparkPending
+    // ── Ignition ember: flares, throws sparks, and collapses as the front sets out ──
+    ShaderEffect {
+        visible: root.active && !root.closedOnce && root.phaseAge < root.igniteTime + 0.3
         x: root.revealOrigin.x - width / 2
         y: root.revealOrigin.y - height / 2
-        width: 6 + 26 * k
-        height: width
-        radius: width / 2
-        color: root.core
-        border.color: Flame.glow(root.theme)
-        border.width: 3
+        width: 240
+        height: 240
+        property size resolution: Qt.size(width, height)
+        property real age: root.phaseAge
+        property real ignite: root.igniteTime
+        property color cCore: root.core
+        property color cMid: Flame.mid(root.theme)
+        property color cOuter: Flame.outer(root.theme)
+        property color cEdge: Flame.edge(root.theme)
+        property color cGlow: Flame.glow(root.theme)
+        fragmentShader: Qt.resolvedUrl("qsb/LauncherTransition.ember.qsb")
     }
 }

@@ -2,9 +2,11 @@
 #extension GL_GOOGLE_include_directive : enable
 // Rocks held aloft around the open launcher: faceted boulders that rise out of the
 // ground one after another, bob and tumble slowly while the launcher is open, and
-// drop back when it closes. Each is a convex polygon with a lit top face and sides
-// in flat tones by facing; pebbles circle the bigger ones. Behind them a ring of
-// small stones circles far out, and dust motes rise past in front.
+// drop back when it closes. Each is a convex polygon read as a faceted rock: a top
+// face that slides as the rock rocks, and side faces, each in one of four flat bands
+// by how its normal meets a single light at the top left; a ring of dust turns under
+// the bigger ones and pebbles circle them. Behind them a ring of small stones circles
+// far out, and dust motes rise past in front.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {
@@ -24,6 +26,8 @@ layout(std140, binding = 0) uniform buf {
 #include "../../lib/common.glsl"
 
 const int ROCKS = 7;
+// Toward the light: up and to the left, and out of the screen.
+const vec3 LIGHT3 = vec3(-0.42, -0.62, 0.66);
 const int SIDES = 7;
 // Rest position as a fraction of the panel plus a px offset (xy, zw), and the size
 // (px). Older GLSL targets have no constant arrays.
@@ -74,7 +78,7 @@ void drawChip(inout vec3 col, inout float a, vec2 p, vec2 pos, float size, float
     vec2 lp = rot(ang) * o;
     float d = chip(lp, size, seed);
     // Top-lit: the half facing the light is the light tone.
-    vec3 c = mix(shade, lit, cover(dot(o, -light) / max(size, 1.0) + 0.1));
+    vec3 c = mix(shade, lit, cover(dot(o, light) / max(size, 1.0) + 0.1));
     vec3 withEdge = mix(u.cEdge.rgb, c, cover(-d - 1.0));
     over(col, a, withEdge, cover(-d + 0.6) * alpha);
 }
@@ -187,16 +191,27 @@ void main() {
             }
         }
 
+        // A ring of dust kicked up under each bigger rock, turning slowly.
+        if (size > 13.0 && abs(rel.y - size * 1.15) < size * 0.6 && abs(rel.x) < size * 1.8) {
+            vec2 er = vec2(rel.x / 1.45, (rel.y - size * 1.15) / 0.32) / size;
+            float ring = abs(length(er) - 1.0) * size;
+            float ra = atan(er.y, er.x);
+            float gaps = step(0.42, vnoise(vec2(ra * 2.5 - u.time * 1.4 * (mod(fi, 2.0) * 2.0 - 1.0), fi * 3.0)));
+            over(col, a, mix(u.cLight.rgb, u.cMid.rgb, step(0.0, er.y)), cover(1.6 - ring) * gaps * 0.45 * rise * (1.0 - drop) * above);
+        }
+
         if (dot(rel, rel) <= size * size * 2.6) {
-            // Tumbles slowly, so its lit faces change as it turns.
+            // A faceted rock seen in 3D: a top face and a ring of side faces. It turns
+            // in the plane and rocks its top to and fro, so the top face slides about
+            // and the faces turn through the light, which stays put at the top left.
             float spin = (hash(vec2(fi, 2.3)) - 0.5) * 0.9;
-            float ang = seed + u.time * spin + 0.14 * sin(u.time * 0.8 + seed * 1.3);
+            float ang = seed + u.time * spin;
+            vec2 tilt = 0.42 * vec2(sin(u.time * 0.7 + seed * 1.3), cos(u.time * 0.55 + seed * 2.1));
             mat2 R = rot(ang);
             vec2 lp = R * rel;
-            // Convex polygon: the furthest of SIDES jittered half-planes, and the facet it belongs to.
-            float d = -1e3;
+            vec2 topAt = R * (tilt * size * 0.42);
+            float d = -1e3, dTop = -1e3;
             vec2 facet = vec2(0.0);
-            float dTop = -1e3;
             for (int k = 0; k < SIDES; k++) {
                 float fk = float(k);
                 float th = (fk + 0.35 * hash(vec2(fi, fk))) * 6.2831853 / float(SIDES);
@@ -204,21 +219,22 @@ void main() {
                 float reach = size * (0.82 + 0.3 * hash(vec2(fk, fi + 3.0)));
                 float dk = dot(lp, nrm) - reach;
                 if (dk > d) { d = dk; facet = nrm; }
-                // The top face: the same polygon, shrunk and nudged toward the light.
-                dTop = max(dTop, dot(lp - R * light * size * 0.22, nrm) - reach * 0.55);
+                dTop = max(dTop, dot(lp - topAt, nrm) - reach * 0.56);
             }
-            vec2 worldN = transpose(R) * facet;
-            float lit = dot(worldN, light);
-            vec3 rock = lit > 0.35 ? u.cMid.rgb : (lit > -0.4 ? mix(u.cMid.rgb, u.cDark.rgb, 0.5) : u.cDark.rgb);
-            rock = mix(rock, u.cLight.rgb, cover(-dTop));
-            // A jagged crack across the bigger rocks.
-            if (size > 15.0) {
-                float along = dot(lp, vec2(-0.6, 0.8));
-                float zig = (abs(fract(along / 9.0 + fi * 0.37) - 0.5) - 0.25) * 6.0;
-                float crack = abs(dot(lp, vec2(0.8, 0.6)) - size * 0.1 + zig);
-                rock = mix(rock, u.cDark.rgb, cover(0.9 - crack) * cover(-d - 3.0) * step(along, size * 0.3));
-            }
-            vec3 c = mix(u.cEdge.rgb, rock, cover(-d));
+            // Normals on screen: the top faces the viewer, leaning with the tilt; a side
+            // face leans out along its edge, more so on the side the top has slid from.
+            vec2 sideN = transpose(R) * facet;
+            vec3 n = cover(-dTop) > 0.5
+                ? normalize(vec3(tilt, 1.0))
+                : normalize(vec3(sideN, 0.55 + dot(sideN, tilt)));
+            // Flat bands of one light: lit, mid, shade, dark.
+            float lit = dot(n, LIGHT3);
+            vec3 rock = lit > 0.72 ? u.cLight.rgb
+                      : lit > 0.38 ? mix(u.cMid.rgb, u.cLight.rgb, 0.35)
+                      : lit > 0.0 ? u.cMid.rgb : u.cDark.rgb;
+            // The ridge round the top face.
+            rock = mix(rock, mix(rock, u.cEdge.rgb, 0.45), cover(0.7 - abs(dTop)) * cover(-d - 2.0));
+            vec3 c = mix(u.cEdge.rgb, rock, cover(-d - 0.4));
             over(col, a, c, cover(-d + 1.6) * above);
         }
 

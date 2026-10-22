@@ -1,4 +1,5 @@
 import QtQuick
+import "common/Colors.js" as Colors
 
 // Cosmos's knob for Speshell's sliders and switches: a banded planet whose moon
 // orbits as it travels, ringed while held or hovered.
@@ -27,7 +28,9 @@ Item {
         property real glow: root.glow
         property real dim: root.checked ? 0 : 1
         property color cBody: root.theme ? root.theme.accent : "#fe8019"
-        property color cBand: root.theme ? root.theme.peach : "#fe8019"
+        // Taken toward the darkest, so the bands show whatever the accent: in Cosmos the
+        // accent and peach are the same orange.
+        property color cBand: Colors.mix(root.theme ? root.theme.peach : "#fe8019", cShade, 0.3)
         property color cLight: root.theme ? root.theme.text : "#ebdbb2"
         property color cShade: root.theme ? root.theme.crust : "#1b1b1b"
         property color cRing: root.theme ? root.theme.subtextBright : "#d5c4a1"

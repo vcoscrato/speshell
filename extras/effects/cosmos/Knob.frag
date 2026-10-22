@@ -2,7 +2,9 @@
 #extension GL_GOOGLE_include_directive : enable
 // Cosmos's knob: a banded planet, lit from the top left, whose bands turn as it rolls
 // and whose moon orbits as it travels, passing behind it. Held or hovered, a ring
-// tilts around it. The item is larger than the knob, to fit the moon and the ring.
+// tilts around it. The planet fills the knob's square, its dark rim reaching just past it
+// so it caps the track's end at 100%; the moon and the ring draw outside, in an item
+// larger than the knob.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {
@@ -23,7 +25,8 @@ layout(std140, binding = 0) uniform buf {
 
 void main() {
     vec2 p = (qt_TexCoord0 - 0.5) * u.area;
-    float R = u.size * 0.5 - 1.0;
+    // The rim's outer edge sits half a pixel past the square, the body's colour inside it.
+    float R = u.size * 0.5 + 0.5;
     vec4 o = vec4(0.0);
 
     // The ring, tilted: its far half behind the planet, its near half in front.
@@ -50,13 +53,17 @@ void main() {
     // Turning clockwise as it travels right, like a rolling ball.
     float c = cos(u.turn), s = sin(u.turn);
     vec2 q = mat2(c, -s, s, c) * p;
-    float bands = sin(q.y / R * 5.0 + 1.3 * sin(q.x / R * 2.0));
-    vec3 col = mix(u.cBody.rgb, u.cBand.rgb, band(bands, 0.35));
+    // Two broad bands across it, few enough to read at a knob's size.
+    float bands = sin(q.y / R * 2.6 + 0.4 + 0.9 * sin(q.x / R * 1.6));
+    vec3 col = mix(u.cBody.rgb, u.cBand.rgb, band(bands, 0.45));
     col = mix(col, u.cLight.rgb, 0.35 * band(-dot(p, vec2(0.6, 0.8)), R * 0.45));
     col = mix(col, u.cShade.rgb, 0.55 * band(dot(p, vec2(0.6, 0.8)), R * 0.25));
     col = mix(col, u.cShade.rgb, 0.45 * u.dim);
+    // A lit limb on the top left, so the planet reads against an accent-coloured fill.
+    float limb = band(-dot(p / R, vec2(0.6, 0.8)) - 0.35, 0.0) * (1.0 - cover(-d - 2.6));
+    col = mix(col, u.cLight.rgb, 0.6 * limb * (1.0 - u.dim));
     o = over(o, u.cShade.rgb, cover(-d));
-    o = over(o, col, cover(-d - 1.2));
+    o = over(o, col, cover(-d - 1.4));
 
     o = over(o, u.cRing.rgb, ring * front);
     if (!moonBehind) {

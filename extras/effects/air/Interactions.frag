@@ -2,8 +2,7 @@
 #extension GL_GOOGLE_include_directive : enable
 // One particle of Air's control effects, by `kind`: 0 a wisp of wind, a bent stroke
 // that streams out and blows away along its path (the item turns with it); 1 a leaf,
-// tumbling; 2 a curl of wind, arms spiralling out around a point; 3 a speck of dust;
-// 4 a streak of wind, long and thin, blowing past a slider's knob.
+// tumbling; 2 a curl of wind, arms spiralling out around a point; 3 a speck of dust.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {
@@ -78,26 +77,9 @@ vec4 speck(vec2 p, float R) {
     return over(c, u.cWind.rgb, cover(R * 0.5 - length(p)) * 0.85 * (1.0 - u.age));
 }
 
-// A streak of wind: a long thin line with a slow wave that streams in head first and
-// thins away tail first.
-vec4 streak(vec2 p, float R) {
-    float t = (p.x + R) / (2.0 * R);
-    float head = min(1.0, 0.35 + u.age * 2.4), tail = max(0.0, u.age * 1.7 - 0.6);
-    float along = (t - tail) / max(head - tail, 0.01);
-    if (along < 0.0 || along > 1.0)
-        return vec4(0.0);
-    float cy = R * 0.05 * sin(t * 7.0 + u.seed * 40.0 - u.age * 9.0);
-    float w = 0.3 + 1.0 * pow(sin(3.1415927 * along), 0.7) * (0.35 + 0.65 * along);
-    float d = abs(p.y - cy);
-    float fade = smoothstep(0.0, 0.12, u.age) * (1.0 - u.age * u.age);
-    vec4 c = over(vec4(0.0), u.cOutline.rgb, cover(w + 1.0 - d) * fade * 0.5);
-    return over(c, u.cWind.rgb, cover(w - d + 0.3) * fade * 0.9);
-}
-
 void main() {
     vec2 p = (qt_TexCoord0 - 0.5) * u.size;
     float R = u.size * 0.5 - 1.0;
-    vec4 c = u.kind < 0.5 ? wisp(p, R) : u.kind < 1.5 ? leaf(p, R) : u.kind < 2.5 ? eddy(p, R)
-           : u.kind < 3.5 ? speck(p, R) : streak(p, R);
+    vec4 c = u.kind < 0.5 ? wisp(p, R) : u.kind < 1.5 ? leaf(p, R) : u.kind < 2.5 ? eddy(p, R) : speck(p, R);
     fragColor = c * u.qt_Opacity;
 }

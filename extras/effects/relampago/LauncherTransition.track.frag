@@ -1,8 +1,9 @@
 #version 440
 #extension GL_GOOGLE_include_directive : enable
-// Everything around the racing launcher, outside the panel: speed lines streaming
-// past in three depths, the near ones hot-headed with a red tail; arcs of
-// electricity crackling along the panel's border; the skid marks it leaves as it
+// Everything around the racing launcher, outside the panel: cartoon speed dashes
+// streaming past in three depths, the near ones outlined, in yellow, orange, and red,
+// all round it while it races and only trailing off behind it once it stands; arcs
+// of electricity crackling along the panel's border; the skid marks it leaves as it
 // brakes; and the two trails of fire its tires lay down as it tears away.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
@@ -14,6 +15,7 @@ layout(std140, binding = 0) uniform buf {
     vec4 rect;          // px, the panel where it is drawn now
     float radius;       // its corner radius
     float lines;        // 0..1 speed lines
+    float calm;         // 0..1 how far they have drawn back to trail behind it
     float spread;       // how far above and below the panel they reach, 1 at rest
     float travel;       // px the scenery has streamed past
     float arcs;         // 0..1 electric crackle on the border
@@ -31,24 +33,22 @@ layout(std140, binding = 0) uniform buf {
 } u;
 #include "../../lib/common.glsl"
 
-// One depth of speed lines: dashes in some rows, streaming left, thickest at their
-// leading (left) end. Returns (coverage, outline coverage, 0..1 along from the head).
-vec3 speedLines(vec2 p, float k, float rowH, float density, float speed, float width) {
+// One depth of speed dashes: round-capped dashes in some rows, streaming left.
+// Returns (signed distance to the nearest, 0..1 which color).
+vec2 speedLines(vec2 p, float k, float rowH, float density, float speed, float width) {
     float row = floor(p.y / rowH);
     vec4 h = vec4(hash(vec2(row, k * 7.0 + 1.0)), hash(vec2(row, k * 7.0 + 2.0)),
                   hash(vec2(row, k * 7.0 + 3.0)), hash(vec2(row, k * 7.0 + 4.0)));
     if (h.x > density)
-        return vec3(0.0);
-    float cy = (row + 0.5 + (h.y - 0.5) * 0.5) * rowH;
-    float period = rowH * mix(30.0, 70.0, h.z);
-    float len = period * mix(0.18, 0.42, h.w);
-    float s = mod(p.x + u.travel * speed * mix(0.85, 1.2, h.y) + h.z * period * 3.0, period);
-    float t = s / len;                           // 0 head .. 1 tail
-    if (t > 1.0)
-        return vec3(0.0);
-    float w = width * pow(1.0 - t, 0.7) * smoothstep(0.0, 0.04, t);
-    float d = abs(p.y - cy);
-    return vec3(cover(w - d + 0.3), cover(w + 1.0 - d) * clamp(2.0 * w, 0.0, 1.0), t);
+        return vec2(1e3, 0.0);
+    float cy = (row + 0.5 + (h.y - 0.5) * 0.3) * rowH;
+    float period = rowH * mix(14.0, 30.0, h.z);
+    float len = period * mix(0.2, 0.45, h.w);
+    float x = p.x + u.travel * speed * mix(0.85, 1.2, h.y) + h.z * period * 3.0;
+    float s = mod(x, period);
+    float w = width * mix(0.7, 1.0, h.w);
+    float d = length(vec2(max(0.0, max(w - s, s - len + w)), p.y - cy)) - w;
+    return vec2(d, hash(vec2(floor(x / period), row + k)));
 }
 
 void main() {
@@ -64,25 +64,30 @@ void main() {
     }
     vec4 col = vec4(0.0);
 
-    // ── Speed lines, far to near, in a band around the panel ──
+    // ── Speed dashes, far to near: all round the panel while it races, then only
+    //    a few trailing off behind it ──
     if (u.lines > 0.0) {
         float edgeFade = smoothstep(0.0, 160.0, p.x) * smoothstep(0.0, 160.0, u.resolution.x - p.x);
+        float behind = smoothstep(0.0, 30.0, u.rect.x - p.x) * exp(-max(0.0, u.rect.x - p.x - 40.0) / 140.0)
+                     * (1.0 - smoothstep(h.y * 0.75, h.y * 0.95, abs(p.y - c.y)));
         for (int i = 0; i < 3; i++) {
             float k = float(i);
             float spread = (40.0 + 20.0 * k) * u.spread;
-            float env = exp(-max(0.0, abs(p.y - c.y) - h.y * 0.9) / spread) * edgeFade * u.lines;
+            float env = exp(-max(0.0, abs(p.y - c.y) - h.y * 0.9) / spread) * edgeFade;
+            env = mix(env, behind * (k > 0.5 ? 1.0 : 0.0), u.calm) * u.lines;
             if (env < 0.01)
                 continue;
-            vec3 l = speedLines(p, k, 7.0 + 5.0 * k, 0.32 - 0.06 * k, 0.45 + 0.45 * k, 0.6 + 0.65 * k);
-            if (i < 2) {
-                col = over(col, u.cLine.rgb, l.x * (0.22 + 0.2 * k) * env);
+            vec2 l = speedLines(p, k, 9.0 + 6.0 * k, 0.3 - 0.06 * k, 0.45 + 0.45 * k, 0.8 + 0.7 * k);
+            if (l.x > 3.0)
+                continue;
+            if (i == 0) {
+                col = over(col, u.cLine.rgb, cover(-l.x) * 0.25 * env);
             } else {
-                // Near: a hot head trailing off into racing red, outlined.
-                vec3 lc = mix(u.cCore.rgb, u.cGlow.rgb, smoothstep(0.02, 0.15, l.z));
-                lc = mix(lc, u.cEdge.rgb, smoothstep(0.2, 0.45, l.z));
-                lc = mix(lc, u.cPaint.rgb, smoothstep(0.5, 0.8, l.z));
-                col = over(col, u.cRubber.rgb, l.y * 0.5 * env);
-                col = over(col, lc, l.x * env);
+                // Nearer: outlined in rubber, yellow, orange, or red.
+                vec3 lc = l.y < 0.4 ? u.cGlow.rgb : l.y < 0.75 ? u.cEdge.rgb : u.cPaint.rgb;
+                lc = mix(lc, u.cLine.rgb, k < 1.5 ? 0.35 : 0.0);
+                col = over(col, u.cRubber.rgb, cover(1.2 - l.x) * env * (0.5 + 0.4 * (k - 1.0)));
+                col = over(col, lc, cover(-l.x) * env * (0.55 + 0.45 * (k - 1.0)));
             }
         }
     }
@@ -108,15 +113,15 @@ void main() {
             // Arcs out from the border and back, jagged.
             float seed = slot * 3.0 + k;
             float amp = 18.0 * pow(sin(3.1415927 * tt), 0.6);
-            #define ARC(x) (2.0 + amp * (0.5 + 0.8 * zig((x) / 9.0, seed) + 0.45 * zig((x) / 3.5, seed + 1.0)))
+            #define ARC(x) (2.0 + amp * (0.5 + 0.9 * zig((x) / 13.0, seed) + 0.2 * zig((x) / 5.0, seed + 1.0)))
             float off = ARC(du);
             float off2 = ARC(du + 1.0);
             #undef ARC
             float d = abs(sd - off) / sqrt(1.0 + (off2 - off) * (off2 - off));
             float on = step(0.3, hash(vec2(floor(u.time * 36.0), seed))) * (1.0 - life / 0.38) * u.arcs;
             float w = 0.8 + 0.7 * sin(3.1415927 * tt);
-            col = over(col, u.cEdge.rgb, cover(w + 5.0 - d) * 0.35 * on);
-            col = over(col, u.cGlow.rgb, cover(w + 1.4 - d) * on);
+            col = over(col, u.cRubber.rgb, cover(w + 2.6 - d) * on);
+            col = over(col, u.cGlow.rgb, cover(w + 1.2 - d) * on);
             col = over(col, u.cCore.rgb, cover(w - d) * on);
         }
     }

@@ -2,9 +2,10 @@ import QtQuick
 import "common"
 import "Bolt.js" as Bolt
 
-// Relâmpago wallpaper transition: lightning forks down the screen and splits the old
-// wallpaper along its path, and the two halves race off to either side, their torn
-// edges glowing, embers spilling into the gap.
+// Relâmpago wallpaper transition: a cartoon bolt strikes down the screen, bursting
+// in a starburst where it lands, and splits the old wallpaper along its path; the
+// two halves race off to either side, their torn edges inked and glowing, speed
+// dashes streaming off them and embers spilling into the gap.
 Item {
     id: root
 
@@ -48,10 +49,12 @@ Item {
         property var source: outgoingTex
         property size resolution: Qt.size(width, height)
         property real progress: root.progress
+        readonly property real seed: Math.random()
         property color cCore: Bolt.core(root.theme)
         property color cGlow: Bolt.glow(root.theme)
         property color cEdge: Bolt.edge(root.theme)
         property color cPaint: Bolt.paint(root.theme)
+        property color cRubber: Bolt.rubber(root.theme)
         fragmentShader: Qt.resolvedUrl("qsb/WallpaperTransition.qsb")
     }
 }

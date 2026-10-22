@@ -11,6 +11,8 @@ layout(std140, binding = 0) uniform buf {
     vec4 rect;          // this item's rect on screen (px)
     vec4 panel;         // the panel's rect on screen (px)
     float radius;       // panel corner radius
+    vec2 origin;        // the portal's center
+    float circle;       // the portal's radius: the panel shows only inside it
     vec2 center;        // orbit center
     float halfWidth;    // orbit scale: the innermost orbit sits just past this
     float spread;       // 0..1 orbit size, from collapsed to full
@@ -99,10 +101,12 @@ void main() {
     vec2 p = u.rect.xy + qt_TexCoord0 * u.rect.zw;
     vec4 acc = vec4(0.0);
 
-    // Corona: a warm haze hugging the panel.
+    // Corona: a warm haze hugging what the portal shows of the panel, so it never
+    // outlines the part still hidden.
     vec2 ph = u.panel.zw * 0.5;
     float sd = sdRoundRect(p - (u.panel.xy + ph), ph, u.radius);
-    acc = over(acc, u.cGlow.rgb, u.cGlow.a * u.glow * exp(-max(sd, 0.0) / 26.0));
+    float shown = max(sd, length(p - u.origin) - u.circle);
+    float corona = u.cGlow.a * u.glow * exp(-max(shown, 0.0) / 26.0) * smoothstep(0.0, 1.5, shown);
 
     // Orbit lines, brighter on the near side.
     vec2 q = rot(p - u.center, -TILT);
@@ -144,6 +148,8 @@ void main() {
     }
     acc = bodies * u.fade + acc * (1.0 - bodies.a * u.fade);
 
-    // Nothing draws over the panel.
-    fragColor = acc * smoothstep(0.0, 1.5, sd) * u.qt_Opacity;
+    // Nothing draws over the panel; the corona goes under the orbits and bodies.
+    acc *= smoothstep(0.0, 1.5, sd);
+    acc = acc + vec4(u.cGlow.rgb, 1.0) * corona * (1.0 - acc.a);
+    fragColor = acc * u.qt_Opacity;
 }

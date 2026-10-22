@@ -126,6 +126,8 @@ Item {
         property rect rect: Qt.rect(x, y, width, height)
         property rect panel: root.panelRect
         property real radius: 10
+        property point origin: root.origin
+        property real circle: root.eased * root.revealMax
         property point center: Qt.point(root.cx, root.cy)
         property real halfWidth: root.halfWidth
         property real spread: root.spread
@@ -170,6 +172,7 @@ Item {
         property real lens: 14 * (1 - root.eased)
         property real ringWidth: 1
         property real ring: root.open > 0 && root.open < 1 ? 1 : 0
+        property real debris: 0
         property color cHot: root.hot
         property color cGlow: root.warm
         property color cHaze: root.violet

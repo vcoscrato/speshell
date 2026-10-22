@@ -14,7 +14,8 @@ import qs.theme
 //
 // A timer and a screen recording run throughout, so the bar's chips and the panels
 // that show them have something to show. Env: SHOTS (space-separated), OUT, SHOT_QUERY
-// (typed into the launcher), SHOT_MEDIA=1 to show the playing track; shot.sh
+// (typed into the launcher), SHOT_MEDIA=1 to show the playing track, SHOT_SAMPLES=1 to
+// fill the notifications with made-up ones; shot.sh
 // picks the theme in the data directory it gives.
 ShellRoot {
     id: shell
@@ -50,6 +51,8 @@ ShellRoot {
             id: "screen-recording", state: "active", label: "Recording", iconName: "screen-recording",
             tone: "error", startedAt: Date.now() - 78000, actions: [{ id: "stop", label: "Stop and save" }]
         });
+        if (Quickshell.env("SHOT_SAMPLES") === "1")
+            shell.fillSamples();
         shell.bar = shell.create("bar/Bar.qml", { modelData: Quickshell.screens[0] });
         // The playing track's cover is someone else's art; SHOT_MEDIA=1 keeps it.
         if (Quickshell.env("SHOT_MEDIA") !== "1")
@@ -58,6 +61,24 @@ ShellRoot {
         shell.shots = ["bar"].concat(asked.length > 0 ? asked
             : Object.keys(PanelService.labels).filter(panel => PanelService.isSupported(panel)).concat(["launcher"]));
         shell.advance();
+    }
+
+    // Made-up notifications, so the panel shows its list rather than its empty state.
+    function fillSamples() {
+        const minutes = count => new Date(Date.now() - count * 60000);
+        NotificationService.notificationHistory = [
+            { id: 1, appName: "Firefox", appIcon: "firefox", summary: "Download complete",
+                body: "speshell-0.3.tar.gz finished downloading.", urgency: 1, time: minutes(2) },
+            { id: 2, appName: "Calendar", appIcon: "org.gnome.Calendar", summary: "Standup in 10 minutes",
+                body: "Weekly sync with the team, room 2 or the usual call link.", urgency: 1, time: minutes(14) },
+            { id: 3, appName: "Battery", appIcon: "", summary: "Battery low",
+                body: "15% left. Plug in soon.", urgency: 2, time: minutes(48) },
+            { id: 4, appName: "Signal", appIcon: "signal-desktop", summary: "Ana",
+                body: "Are we still on for tonight? I can bring the board games if you want, or we just talk.",
+                urgency: 1, time: minutes(95) },
+            { id: 5, appName: "Thunderbird", appIcon: "thunderbird", summary: "3 new messages",
+                body: "", urgency: 1, time: minutes(240) }
+        ];
     }
 
     function advance() {

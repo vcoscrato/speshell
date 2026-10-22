@@ -54,7 +54,9 @@ Item {
         property size resolution: Qt.size(width, height)
         property point center: root.center
         property real eye: root.eye
-        property real twist: 1.1 * Math.sin(Math.PI * Math.min(1, root.sweep * 1.4))
+        // Wrung hardest while the eye is a third open, still turning as it rushes out.
+        property real twist: 1.25 * Math.sin(Math.PI * Math.min(1, root.sweep * 1.15))
+        property real time: clock.simTime
         property real spin: root.spin
         property color cRim: root.theme ? Colors.mix(root.theme.rosewater, root.theme.sky, 0.25) : "#cfe3f3"
         property color cHaze: root.theme ? root.theme.rosewater : "#e9f2fa"

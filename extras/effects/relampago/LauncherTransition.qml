@@ -2,12 +2,13 @@ import QtQuick
 import "common"
 import "Bolt.js" as Bolt
 
-// Relâmpago launcher transition: the launcher races in from the left in a streak of
-// red with a bolt through it, brakes hard, leaving skid marks and a shower of
-// sparks, and rocks to a stop in a puff of tire smoke as lightning strikes all
-// around it. While open, speed lines stream past it, electricity crackles along its
-// border, and now and then a bolt strikes it.
-// Closing, it tears away to the right on two trails of fire.
+// Relâmpago launcher transition, drawn like a cartoon: the launcher races in from
+// the left, stretched by its speed, in a streak of glossy red with a bolt decal
+// through it, brakes hard, leaving skid marks and a shower of sparks, and squashes
+// to a stop with a comic starburst, in puffs of tire smoke, as lightning strikes all
+// around it. While open, speed dashes trail off behind it, electricity crackles
+// along its border, and now and then a bolt strikes it.
+// Closing, it squats, stretches, and tears away to the right on two trails of fire.
 Item {
     id: root
 
@@ -35,6 +36,10 @@ Item {
     property real driveX: -root.farLeft
     property real speed: 0
     property real lean: 0
+    // Squash and stretch: > 0 stretched along x, < 0 squashed; a spring toward
+    // how fast it goes, kicked as it stops and launches.
+    property real stretch: 0
+    property real stretchVel: 0
     property real travel: 0
     property real skidAge: -1                  // s since it stopped; < 0 before
     property real fireAge: -1                  // s since it tore away; < 0 before
@@ -100,6 +105,9 @@ Item {
             root.lean += (want - root.lean) * Math.min(1, dt * 18);
             if (root.enter >= 1 && root.leave === 0)
                 root.lean = 0;
+            var stretchTo = Math.min(0.2, Math.abs(v) / 9000);
+            root.stretchVel += (380 * (stretchTo - root.stretch) - 13 * root.stretchVel) * dt;
+            root.stretch = Math.max(-0.2, Math.min(0.25, root.stretch + root.stretchVel * dt));
             root.travel += dt * (650 + Math.abs(v) * 0.5);
 
             if (root.skidAge >= 0)
@@ -134,6 +142,7 @@ Item {
     // Skidded to its mark: smoke from the tires, sparks off the front, and lightning.
     function stopped() {
         root.skidAge = 0;
+        root.stretchVel -= 4.5;
         var x0 = root.panelRect.x, w = root.panelRect.width;
         for (var i = 0; i < 6; i++)
             bits.emit(bits.smoke, { x: x0 + w * bits.rnd(0.05, 0.3), y: root.floorY + bits.rnd(0, 12),
@@ -147,6 +156,10 @@ Item {
             bits.emit(bits.spark, { x: x0 + w * bits.rnd(0.78, 0.95), y: root.floorY + 6, vx: bits.rnd(60, 320),
                                     vy: bits.rnd(-260, -60), gravity: 800, life: bits.rnd(0.35, 0.6),
                                     size: Math.round(bits.rnd(18, 28)), orient: true });
+        // A comic impact off its front, behind it, and a glint on its paint.
+        behind.emit(behind.star, { x: x0 + w + 6, y: root.floorY - root.panelRect.height * 0.35, life: 0.32,
+                                   size: Math.round(Math.min(200, root.panelRect.height * 0.55)), angle: bits.rnd(0, 360) });
+        bits.emit(bits.glint, { x: x0 + 18, y: root.panelRect.y + 6, life: 0.45, size: 30, delay: 0.12 });
         // Lightning strikes it from all around as it stops.
         for (i = 0; i < 4; i++)
             root.strikeBorder(0.03 + i * bits.rnd(0.05, 0.09));
@@ -176,6 +189,7 @@ Item {
     // Tore away: a burnout, smoke and sparks flung back off the rear.
     function launched() {
         root.fireAge = 0;
+        root.stretchVel -= 3;
         root.skidAge = Math.max(root.skidAge, 0.8);
         for (var i = 0; i < 6; i++)
             bits.emit(bits.smoke, { x: root.rear + bits.rnd(-30, 10), y: root.floorY + bits.rnd(0, 12),
@@ -195,6 +209,8 @@ Item {
         property rect rect: Qt.rect(root.panelRect.x + root.driveX, root.panelRect.y, root.panelRect.width, root.panelRect.height)
         property real radius: 12
         property real lines: root.span(root.enter, 0, 0.12) * (1 - root.span(root.leave, 0.5, 1))
+        // Once it stands, the dashes draw back behind it.
+        property real calm: root.leave > 0 ? 1 - root.span(root.leave, 0, 0.3) : root.span(root.enter, root.arriveEnd, 1)
         property real spread: 1 + Math.min(2.5, Math.abs(root.speed) / 900)
         property real travel: root.travel % 1e6
         property real arcs: root.span(root.enter, root.arriveEnd, 1) * (1 - root.span(root.leave, 0, 0.15))
@@ -213,6 +229,15 @@ Item {
         fragmentShader: Qt.resolvedUrl("qsb/LauncherTransition.track.qsb")
     }
 
+    // Under the racing panel: the starburst it stops in. Shown only while the panel
+    // is drawn here, since the real one lies under this whole item.
+    Bits {
+        id: behind
+        anchors.fill: parent
+        visible: root.capturing
+        theme: root.theme
+    }
+
     // ── The panel, racing; otherwise the real panel shows ──
     ShaderEffectSource {
         id: panelTex
@@ -224,9 +249,9 @@ Item {
     ShaderEffect {
         visible: root.capturing && root.panel !== null
         x: 0
-        y: root.panelRect.y - 24
+        y: root.panelRect.y - 24 - root.panelRect.height * 0.25
         width: root.width
-        height: root.panelRect.height + 48
+        height: root.panelRect.height * 1.25 + 48
         property var source: panelTex
         property point origin: Qt.point(x, y)
         property size resolution: Qt.size(width, height)
@@ -235,11 +260,14 @@ Item {
         property real smear: Math.min(Math.abs(root.speed) * 0.05, 420)
         property real dir: root.speed >= 0 ? 1 : -1
         property real lean: root.lean
+        // Settled by the time the real panel shows again.
+        property real stretch: root.stretch * (root.leave > 0 ? 1 : 1 - root.span(root.enter, 0.85, 1))
         property real heat: Math.min(1, Math.abs(root.speed) / 1600)
         property color cPaint: Bolt.paint(root.theme)
         property color cGlow: Bolt.glow(root.theme)
         property color cEdge: Bolt.edge(root.theme)
         property color cCore: Bolt.core(root.theme)
+        property color cRubber: Bolt.rubber(root.theme)
         fragmentShader: Qt.resolvedUrl("qsb/LauncherTransition.qsb")
     }
 

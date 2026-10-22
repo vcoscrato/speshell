@@ -138,19 +138,6 @@ float cover(float s) {
     return smoothstep(-aa, aa, s);
 }
 
-// A round-headed tube along a log spiral, tapering to a point at the tail.
-// Returns (half-width minus distance, signed offset across the tube in -1..1).
-vec2 tubeStroke(vec2 p, vec2 c, float r0, float k, float th0, float spin,
-                float head, float len, float width) {
-    vec4 sp = spiralCoord(p, c, r0, k, th0, spin, 0.0);
-    float t = (sp.y - (head - len)) / len;
-    if (t < 0.0 || t > 1.0)
-        return vec2(-1e3, 0.0);
-    float capLen = width / max(len * sp.z, 1.0);
-    float w = width * pow(t, 0.5) * sqrt(clamp((1.0 - t) / capLen, 0.0, 1.0));
-    return vec2(w - sp.x, sp.w / max(w, 1.0));
-}
-
 vec2 hash2(vec2 p) {
     return vec2(hash(p), hash(p + 17.31));
 }

@@ -1,5 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import QtQuick.Templates as T
 import qs.components
 import qs.services
 import qs.theme
@@ -28,6 +29,7 @@ Card {
         if (!root.presented)
             root.query = "";
     }
+    onQueryChanged: clipboardRows.positionViewAtBeginning()
     Component.onCompleted: ClipboardService.setViewPresented(root.presented)
     Component.onDestruction: ClipboardService.setViewPresented(false)
 
@@ -38,10 +40,8 @@ Card {
         onClicked: ClipboardService.clearHistory()
     }
 
-    Column {
-        width: parent.width
-        spacing: Theme.spacingSmall
-
+    // The search stays put while the history scrolls under it.
+    pinnedContent: [
         Field {
             visible: root.history.length > 0
             iconName: "search"
@@ -49,7 +49,7 @@ Card {
             placeholder: "Search " + root.history.length + (root.history.length === 1 ? " item" : " items")
             text: root.query
             onEdited: root.query = text
-        }
+        },
 
         Label {
             role: "caption"
@@ -59,93 +59,108 @@ Card {
             elide: Text.ElideRight
             visible: text !== ""
         }
+    ]
 
-        Column {
+    Column {
+        width: parent.width
+        spacing: Theme.spacingSmall
+
+        ListView {
             id: clipboardRows
+
+            readonly property bool scrollable: contentHeight > height + 1
+
             width: parent.width
+            // About a screenful of rows, wider text scaling it with the panel.
+            height: Math.min(contentHeight, Math.round(Theme.panelWidth * 1.5))
+            visible: root.shownHistory.length > 0
+            clip: true
             spacing: Theme.spacingTiny
+            boundsBehavior: Flickable.StopAtBounds
+            flickDeceleration: 3000
+            model: root.shownHistory
 
-            Repeater {
-                model: root.shownHistory
+            T.ScrollBar.vertical: StyledScrollBar {
+                policy: clipboardRows.scrollable ? T.ScrollBar.AsNeeded : T.ScrollBar.AlwaysOff
+            }
 
-                delegate: Rectangle {
-                    id: clipRow
-                    required property var modelData
-                    readonly property bool image: clipRow.modelData.kind === "image"
-                    readonly property bool lastCopied: clipRow.modelData.id === ClipboardService.lastCopiedId
+            delegate: Rectangle {
+                id: clipRow
+                required property var modelData
+                readonly property bool image: clipRow.modelData.kind === "image"
+                readonly property bool lastCopied: clipRow.modelData.id === ClipboardService.lastCopiedId
 
-                    width: clipboardRows.width
-                    height: clipRow.image
-                        ? thumbnailFrame.height + Theme.spacingSmall * 2
-                        : Math.max(Theme.controlHeight + Theme.spacingSmall,
-                            previewText.implicitHeight + Theme.spacingSmall * 2)
+                width: clipboardRows.width - (clipboardRows.scrollable ? Theme.spacingMedium : 0)
+                height: clipRow.image
+                    ? thumbnailFrame.height + Theme.spacingSmall * 2
+                    : Math.max(Theme.controlHeight + Theme.spacingSmall,
+                        previewText.implicitHeight + Theme.spacingSmall * 2)
+                radius: Theme.borderRadius
+                color: clipMouse.containsMouse
+                    ? Theme.cardHover
+                    : (clipRow.lastCopied ? Theme.selectedFill : Theme.controlFill)
+                border.width: Theme.borderWidth
+                border.color: clipRow.lastCopied ? Theme.selectedBorder : Theme.controlBorder
+
+                Accessible.role: Accessible.Button
+                Accessible.name: "Copy clipboard item"
+                Accessible.description: clipRow.modelData.preview
+                Accessible.onPressAction: ClipboardService.copyEntry(clipRow.modelData)
+
+                Rectangle {
+                    id: thumbnailFrame
+                    visible: clipRow.image
+                    anchors.left: parent.left
+                    anchors.leftMargin: Theme.spacingSmall
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 112
+                    height: 64
                     radius: Theme.borderRadius
-                    color: clipMouse.containsMouse
-                        ? Theme.cardHover
-                        : (clipRow.lastCopied ? Theme.selectedFill : Theme.controlFill)
-                    border.width: Theme.borderWidth
-                    border.color: clipRow.lastCopied ? Theme.selectedBorder : Theme.controlBorder
+                    color: Theme.crust
+                    clip: true
 
-                    Accessible.role: Accessible.Button
-                    Accessible.name: "Copy clipboard item"
-                    Accessible.description: clipRow.modelData.preview
-                    Accessible.onPressAction: ClipboardService.copyEntry(clipRow.modelData)
-
-                    Rectangle {
-                        id: thumbnailFrame
-                        visible: clipRow.image
-                        anchors.left: parent.left
-                        anchors.leftMargin: Theme.spacingSmall
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 112
-                        height: 64
-                        radius: Theme.borderRadius
-                        color: Theme.crust
-                        clip: true
-
-                        Image {
-                            id: thumbnail
-                            anchors.fill: parent
-                            source: clipRow.modelData.thumbnail ? "file://" + clipRow.modelData.thumbnail : ""
-                            sourceSize: Qt.size(224, 128)
-                            fillMode: Image.PreserveAspectCrop
-                            asynchronous: true
-                            cache: false
-                        }
-
-                        AppIcon {
-                            anchors.centerIn: parent
-                            visible: thumbnail.status !== Image.Ready
-                            name: "photo"
-                            size: Theme.iconSizeMedium
-                            iconColor: Theme.overlay
-                        }
-                    }
-
-                    Label {
-                        id: previewText
-                        anchors.left: clipRow.image ? thumbnailFrame.right : parent.left
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        anchors.leftMargin: clipRow.image ? Theme.spacingMedium : Theme.spacingSmall
-                        anchors.rightMargin: Theme.spacingSmall
-                        text: clipRow.modelData.preview
-                        font.pixelSize: clipRow.image ? Theme.fontSizeCaption : Theme.fontSizeSmall
-                        color: clipRow.image || clipRow.modelData.kind === "binary"
-                            ? Theme.subtext
-                            : (clipRow.modelData.kind === "link" ? Theme.accent : Theme.text)
-                        wrapMode: Text.Wrap
-                        elide: Text.ElideRight
-                        maximumLineCount: 2
-                    }
-
-                    MouseArea {
-                        id: clipMouse
+                    Image {
+                        id: thumbnail
                         anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: ClipboardService.copyEntry(clipRow.modelData)
+                        source: clipRow.modelData.thumbnail ? "file://" + clipRow.modelData.thumbnail : ""
+                        sourceSize: Qt.size(224, 128)
+                        fillMode: Image.PreserveAspectCrop
+                        asynchronous: true
+                        cache: false
                     }
+
+                    AppIcon {
+                        anchors.centerIn: parent
+                        visible: thumbnail.status !== Image.Ready
+                        name: "photo"
+                        size: Theme.iconSizeMedium
+                        iconColor: Theme.overlay
+                    }
+                }
+
+                Label {
+                    id: previewText
+                    anchors.left: clipRow.image ? thumbnailFrame.right : parent.left
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.leftMargin: clipRow.image ? Theme.spacingMedium : Theme.spacingSmall
+                    anchors.rightMargin: Theme.spacingSmall
+                    text: clipRow.modelData.preview
+                    font.pixelSize: clipRow.image ? Theme.fontSizeCaption : Theme.fontSizeSmall
+                    color: clipRow.image || clipRow.modelData.kind === "binary"
+                        ? Theme.subtext
+                        : (clipRow.modelData.kind === "link" ? Theme.accent : Theme.text)
+                    wrapMode: Text.Wrap
+                    elide: Text.ElideRight
+                    maximumLineCount: 2
+                }
+
+                MouseArea {
+                    id: clipMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: ClipboardService.copyEntry(clipRow.modelData)
                 }
             }
         }

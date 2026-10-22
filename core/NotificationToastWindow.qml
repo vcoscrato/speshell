@@ -56,6 +56,11 @@ PanelWindow {
         width: parent.width
         spacing: Theme.spacingMedium
 
+        // The pointer on any toast holds them all, so one can be read to the end.
+        HoverHandler {
+            onHoveredChanged: NotificationService.setPopupsHeld(hovered)
+        }
+
         Repeater {
             model: NotificationService.activePopups
 
@@ -84,7 +89,8 @@ PanelWindow {
                         return;
                     toastCard.remaining = Math.max(0, Math.min(1, left / duration));
                     countdown.duration = Math.max(0, left);
-                    countdown.start();
+                    if (!NotificationService.popupsHeld)
+                        countdown.start();
                 }
 
                 NumberAnimation {
@@ -99,6 +105,18 @@ PanelWindow {
                     target: toastCard.live
                     function onSummaryChanged() { Qt.callLater(toastCard.startCountdown); }
                     function onBodyChanged() { Qt.callLater(toastCard.startCountdown); }
+                }
+
+                // Holds while the pointer rests on the toasts, and goes on from the expiry
+                // the service moved on.
+                Connections {
+                    target: NotificationService
+                    function onPopupsHeldChanged() {
+                        if (NotificationService.popupsHeld)
+                            countdown.stop();
+                        else
+                            toastCard.startCountdown();
+                    }
                 }
 
                 width: parent.width

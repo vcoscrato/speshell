@@ -2,8 +2,8 @@
 #extension GL_GOOGLE_include_directive : enable
 // Earth backdrop, drawn once over a surface's base color: a cut through
 // layered rock. Strata of slightly different stone tilt and buckle across the panel,
-// a few layers are cracked into blocks, pebbles lie scattered, and clusters of jade
-// crystal grow out of the rock, cel-shaded by facet. It stays a few percent off the
+// a few layers are cracked into blocks, pebbles lie scattered, and two small, faint
+// clusters of jade crystal grow out of the walls near the bottom, cel-shaded by facet. It stays a few percent off the
 // base so text reads.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
@@ -68,21 +68,21 @@ void main() {
         col = mix(col, mix(u.cText.rgb, u.cDeep.rgb, 0.4 + 0.5 * lower), body * 0.16);
     }
 
-    // Jade: a cluster low on the right and a smaller one high on the left.
+    // Jade: two small clusters growing out of the walls near the bottom, where a
+    // tall panel runs out of content, faint enough to stay with the rock.
     vec3 jade = u.cAccent.rgb;
-    for (int i = 0; i < 9; i++) {
+    for (int i = 0; i < 7; i++) {
         float fi = float(i);
-        bool big = i < 6;
-        vec2 base = big ? vec2(u.size.x - 30.0, H * 0.70) : vec2(120.0, H * 0.56);
-        float spread = big ? 1.0 : 0.6;
-        float a = (big ? -1.95 : -1.1) + (hash(vec2(fi, 1.0)) - 0.5) * (big ? 1.5 : 1.1);
+        bool right = i < 4;
+        vec2 base = right ? vec2(u.size.x - 6.0, H - 34.0) : vec2(6.0, H - 70.0);
+        float a = (right ? -2.45 : -0.75) + (hash(vec2(fi, 1.0)) - 0.5) * 1.0;
         vec2 dir = vec2(cos(a), sin(a));
-        vec2 root = base + vec2((hash(vec2(fi, 2.0)) - 0.5) * 40.0, (hash(vec2(fi, 3.0)) - 0.5) * 16.0) * spread;
-        float len = (big ? 34.0 : 20.0) + (big ? 46.0 : 22.0) * hash(vec2(fi, 4.0));
-        float w = len * (0.16 + 0.06 * hash(vec2(fi, 5.0)));
+        vec2 root = base + vec2(0.0, (hash(vec2(fi, 3.0)) - 0.5) * 30.0);
+        float len = 14.0 + 20.0 * hash(vec2(fi, 4.0));
+        float w = len * (0.17 + 0.05 * hash(vec2(fi, 5.0)));
         vec2 c = crystal(p, root, dir, len, w);
-        vec3 facet = mix(u.cDeep.rgb, mix(jade, u.cText.rgb, 0.25 * c.y), 0.35 + 0.65 * c.y);
-        col = mix(col, facet, c.x * 0.22);
+        vec3 facet = mix(u.cDeep.rgb, mix(jade, u.cText.rgb, 0.2 * c.y), 0.35 + 0.65 * c.y);
+        col = mix(col, facet, c.x * 0.13);
     }
 
     fragColor = vec4(col, 1.0) * u.qt_Opacity;

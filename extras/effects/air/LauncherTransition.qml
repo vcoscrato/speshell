@@ -167,13 +167,16 @@ Item {
         live: root.capturing
     }
 
+    // Drawn over the square around the eye that the panel's corners sweep through as
+    // it twists, so the wound-up panel is never cut off by its own rect.
     ShaderEffect {
         visible: root.capturing && root.panel !== null
-        x: root.panelRect.x
-        y: root.panelRect.y
-        width: root.panelRect.width
-        height: root.panelRect.height
+        x: root.center.x - root.reach
+        y: root.center.y - root.reach
+        width: 2 * root.reach
+        height: 2 * root.reach
         property var source: panelTex
+        property rect area: Qt.rect(x, y, width, height)
         property rect rect: root.panelRect
         property point center: root.center
         property real wind: root.wind

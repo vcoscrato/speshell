@@ -83,6 +83,7 @@ void main() {
     vec2 q = vec2(px.x, u.resolution.y - px.y) / u.resolution.y;
     float aspect = u.resolution.x / u.resolution.y;
     float minR = 1.3 / u.resolution.y;
+    float aa = 0.75 / u.resolution.y;
     vec2 moon = vec2(aspect * 0.15, 0.82);
     float e = 0.01;
 
@@ -92,7 +93,8 @@ void main() {
         float t = clamp((q.y - HORIZON) / (1.0 - HORIZON), 0.0, 1.0);
         col = mix(mix(rgb(32, 66, 90), rgb(14, 34, 56), steps(min(t * 2.0, 1.0), 5.0)),
                   rgb(5, 11, 22), steps(clamp(t * 1.5 - 0.5, 0.0, 1.0), 5.0));
-        float stars = max(starField(q, 0.012, 0.35, 1.0, 0.0011, minR), starField(q + 0.37, 0.03, 0.45, 7.0, 0.0019, minR));
+        float stars = max(starField(q, 0.012, 0.35, 1.0, 0.0011, minR, aa),
+                          starField(q + 0.37, 0.03, 0.45, 7.0, 0.0019, minR, aa));
         col = mix(col, rgb(226, 238, 246), stars * smoothstep(0.42, 0.7, q.y));
         vec4 a = aurora(q, aspect);
         col = mix(col, a.rgb, a.a);

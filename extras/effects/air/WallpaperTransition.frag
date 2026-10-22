@@ -1,8 +1,9 @@
 #version 440
 #extension GL_GOOGLE_include_directive : enable
 // A whirlwind eye opens at the center and widens until the outgoing wallpaper is
-// gone. Around the eye the wallpaper is wrung into the spin, and the eye's rim is
-// a bright band of air.
+// gone. Its edge is torn into tongues that curl with the spin; around it the
+// wallpaper is wrung into the spin, smeared along it, and the rim is a bright band
+// of air.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {
@@ -13,6 +14,7 @@ layout(std140, binding = 0) uniform buf {
     float eye;         // px, eye radius
     float twist;       // rad, rotation at the rim
     float spin;
+    float time;
     vec4 cRim;
     vec4 cHaze;
     vec4 cGlint;
@@ -25,13 +27,24 @@ void main() {
     vec2 rel = p - u.center;
     float r = length(rel);
     vec2 dir = rel / max(r, 1.0);
-    // The eye is round, with a slow lopsided wobble.
-    float rim = u.eye * (1.0 + 0.12 * (vnoise(dir * 1.5 + 4.0) - 0.5)) ;
+    // The eye is lopsided, and its edge torn into tongues of wind that curl along
+    // spiral arms and drift round with the spin.
+    float eye = max(u.eye, 1.0);
+    vec2 arm = rot(dir, u.spin * (1.6 * log(max(r, 1.0) / eye) - 0.9 * u.time));
+    float tear = fbm(arm * 2.3 + 7.0) - 0.5 + 0.45 * (vnoise(arm * 7.0 + 3.0) - 0.5);
+    float rim = eye * (1.0 + 0.12 * (vnoise(dir * 1.5 + 4.0) - 0.5)) + tear * min(0.3 * eye + 6.0, 110.0);
     float out_ = r - rim;                                  // > 0 outside the eye
 
-    float a = u.twist * u.spin * exp(-max(out_, 0.0) / (0.35 * max(u.eye, 120.0)));
-    vec2 q = mat2(cos(a), -sin(a), sin(a), cos(a)) * rel;
-    vec4 col = texture(source, (u.center + q) / u.resolution);
+    // Wrung into the spin: turned most at the rim, and smeared along the turn there.
+    float k = exp(-max(out_, 0.0) / (0.35 * max(u.eye, 120.0)));
+    float a = u.twist * u.spin * k;
+    float smear = 0.035 * u.twist * u.spin * k * k;
+    vec4 col = vec4(0.0);
+    for (int i = 0; i < 3; i++) {
+        float ai = a + smear * float(i);
+        vec2 q = mat2(cos(ai), -sin(ai), sin(ai), cos(ai)) * rel;
+        col += texture(source, (u.center + q) / u.resolution) * (i == 0 ? 0.5 : 0.25);
+    }
 
     // Near the rim the wallpaper pales into the wind before it is torn away.
     float aa = clamp(fwidth(out_), 1e-3, 1.5);

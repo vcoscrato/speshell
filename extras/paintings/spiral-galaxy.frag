@@ -40,9 +40,10 @@ void main() {
 
     // Stars, in three layers, never smaller than a pixel or so.
     float minR = 1.3 / u.resolution.y;
-    float stars = max(starField(q, 0.011, 0.35, 1.0, 0.0011, minR),
-                      max(starField(q + 0.37, 0.023, 0.5, 7.0, 0.0017, minR),
-                          starField(q + 0.71, 0.06, 0.45, 13.0, 0.0026, minR)));
+    float aa = 0.75 / u.resolution.y;
+    float stars = max(starField(q, 0.011, 0.35, 1.0, 0.0011, minR, aa),
+                      max(starField(q + 0.37, 0.023, 0.5, 7.0, 0.0017, minR, aa),
+                          starField(q + 0.71, 0.06, 0.45, 13.0, 0.0026, minR, aa)));
     col = mix(col, rgb(235, 219, 178), stars);
 
     // The galaxy, tilted toward the viewer: two logarithmic arms around a bulge.
@@ -50,11 +51,18 @@ void main() {
     g.y /= 0.42;
     float r = length(g);
     float th = atan(g.y, g.x);
-    float warp = (fbm(g * 6.0) - 0.5) * 0.9;
+    // Broad, slow warps, so the arms' edges run clean rather than brushy.
+    float warp = (fbm(g * 3.2) - 0.5) * 0.75 + (vnoise(g * 9.0) - 0.5) * 0.12;
     float arm = 0.5 + 0.5 * cos(2.0 * (th - log(max(r, 1e-3)) * 2.6) + warp);
-    float disc = exp(-r / 0.3);
+    // The disc ends at its rim, so the outer arms taper off instead of trailing away.
+    float disc = exp(-r / 0.3) * (1.0 - smoothstep(0.5, 0.9, r));
     float density = pow(arm, 1.4) * disc * 1.1 + 0.22 * exp(-r / 0.16) + exp(-r * r / 0.005) * 1.1;
-    density *= 0.8 + 0.4 * fbm(g * 14.0);
+    density *= 0.86 + 0.28 * fbm(g * 7.0);
+
+    // Depth: a faint glow of the disc's old stars around the arms, in two dim steps.
+    float halo = exp(-r / 0.2) * (1.0 - smoothstep(0.3, 0.62, r));
+    col = mix(col, rgb(46, 36, 42), band(halo + 0.04 * fbm(g * 4.0), 0.2) * 0.8);
+    col = mix(col, rgb(56, 40, 50), band(halo, 0.36) * 0.8);
     // Dust lanes trail just inside the arms.
     float lane = 0.5 + 0.5 * cos(2.0 * (th - log(max(r, 1e-3)) * 2.6) + warp + 0.9);
     density *= 1.0 - 0.55 * smoothstep(0.75, 1.0, lane) * smoothstep(0.03, 0.09, r);
@@ -66,7 +74,7 @@ void main() {
     col = mix(col, rgb(250, 189, 47), band(density, 0.75));
     col = mix(col, rgb(251, 241, 199), band(density, 0.98));
     // Star clusters sparkle along the arms.
-    float clusters = starField(g * vec2(1.0, 0.42) + 0.13, 0.012, 0.6, 21.0, 0.0016, minR) * band(density, 0.2);
+    float clusters = starField(g * vec2(1.0, 0.42) + 0.13, 0.012, 0.6, 21.0, 0.0016, minR, aa) * band(density, 0.2);
     col = mix(col, rgb(251, 241, 199), clusters);
 
     // A few bright stars.

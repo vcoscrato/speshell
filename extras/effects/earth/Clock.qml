@@ -2,7 +2,8 @@ import QtQuick
 import "common"
 
 // Earth's clock face: a carved stone dial, layered and cracked, with jade set at the
-// hours, faceted stone hands, and a pebble rolling round a groove with the seconds.
+// hours, a pale stone hour hand and a jade minute hand, and a gold pebble rolling round
+// a groove with the seconds.
 Item {
     id: root
 
@@ -36,6 +37,7 @@ Item {
         property color cWarm: root.theme ? root.theme.peach : "#d99a5a"
         property color cJade: root.theme ? root.theme.accent : "#5fa57a"
         property color cGlint: root.theme ? root.theme.text : "#e9e6d3"
+        property color cGold: root.theme ? root.theme.yellow : "#d9b44a"
         fragmentShader: Qt.resolvedUrl("qsb/Clock.qsb")
     }
 }

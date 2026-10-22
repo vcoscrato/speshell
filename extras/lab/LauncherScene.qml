@@ -51,8 +51,10 @@ Item {
         theme: swatch
     }
 
-    // Like Speshell, destroy the transition as soon as it reports the exit finished.
+    // Like Speshell, destroy the transition as soon as it reports the exit finished,
+    // and make a new one when it opens again.
     property bool presenting: true
+    onOpenedChanged: if (opened) presenting = true
 
     Loader {
         id: transition

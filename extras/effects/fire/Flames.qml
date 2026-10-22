@@ -17,6 +17,7 @@ Item {
     property real burnR: -1
     property real fieldScale: 1
     property bool clearBehind: true   // keep flames off the panel once the front has passed
+    property real trail: 0            // px behind the front past which flames die fast; 0: no limit
 
     property var theme: null
     property color core: Flame.core(theme)
@@ -70,6 +71,7 @@ Item {
         property real burnR: root.burnR
         property real fieldScale: root.fieldScale
         property real clearBehind: root.clearBehind ? 1 : 0
+        property real trail: root.trail
         fragmentShader: Qt.resolvedUrl("qsb/Flames.sim.qsb")
     }
 

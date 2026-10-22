@@ -1,11 +1,12 @@
 #version 440
 #extension GL_GOOGLE_include_directive : enable
-// One particle of Relâmpago's small effects, by `kind`: 0 a spark, a hot streak
-// along its flight (the item turns with it); 1 a puff of tire smoke, billowing and
-// thinning; 2 a burst, jagged rays of electricity crackling out from the middle;
-// 3 a strike, a forked bolt from the item's top down to its middle, landing in a
-// burst (turn the item to strike from another side); 4 an arc, a bolt flickering
-// along the item's x axis (the item turns with its flight).
+// One particle of Relâmpago's small effects, by `kind`, each drawn like a cartoon,
+// flat and outlined in rubber: 0 a spark, a fat teardrop along its flight (the item
+// turns with it); 1 a puff of tire smoke, lumps that pop up and shrink away; 2 a
+// starburst, a spiky comic impact that pops out and shrinks; 3 a strike, a bold bolt
+// from the item's top down to its middle, landing in a little starburst (turn the
+// item to strike from another side); 4 an arc, a zigzag flickering along the item's
+// x axis (the item turns with its flight); 5 a glint, a four-pointed twinkle.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {
@@ -18,145 +19,212 @@ layout(std140, binding = 0) uniform buf {
     vec4 cCore;
     vec4 cGlow;
     vec4 cEdge;
+    vec4 cPaint;
     vec4 cRubber;
     vec4 cSmoke;
     vec4 cSmokeShade;
 } u;
 #include "../../lib/common.glsl"
 
+const float TAU = 6.2831853;
+
+// The outline's width for a particle of radius R.
+float ink(float R) {
+    return clamp(R * 0.045, 1.0, 3.5);
+}
+
+// A shape at signed distance d (< 0 inside), filled and outlined.
+vec4 inked(vec4 under, float d, vec3 fill, float ow, float a) {
+    vec4 c = over(under, u.cRubber.rgb, cover(ow - d) * a);
+    return over(c, fill, cover(-d) * a);
+}
+
+// Pops out past full size and settles, 0..1 over the first `t` of its life.
+float pop(float t) {
+    float k = clamp(u.age / t, 0.0, 1.0);
+    return 1.0 + 2.7 * (k - 1.0) * (k - 1.0) * (k - 1.0) + 1.7 * (k - 1.0) * (k - 1.0);
+}
+
 vec4 spark(vec2 p, float R) {
-    // A streak from its tail (-R) to its head, shortening as it cools.
-    float len = R * (1.6 - 0.9 * u.age);
-    float t = (p.x + R) / len;                   // 0 tail .. 1 head
-    if (t < 0.0 || t > 1.0)
+    // A teardrop from its tail (-R) to its round head, shortening as it cools.
+    float shrink = 1.0 - smoothstep(0.55, 1.0, u.age);
+    float xh = R * (0.55 - 0.5 * u.age);
+    float xt = -R;
+    float t = clamp((p.x - xt) / (xh - xt), 0.0, 1.0);
+    float w = max(1.4, R * 0.2) * shrink;
+    float d = length(p - vec2(mix(xt, xh, t), 0.0)) - mix(0.25, w, t * t * (3.0 - 2.0 * t));
+    if (w < 0.2)
         return vec4(0.0);
-    float w = (0.4 + 1.2 * t) * (1.0 - 0.5 * u.age);
-    float d = abs(p.y);
-    float fade = 1.0 - smoothstep(0.6, 1.0, u.age);
-    vec3 col = mix(u.cEdge.rgb, u.cGlow.rgb, smoothstep(0.2, 0.7, t));
-    col = mix(col, u.cCore.rgb, smoothstep(0.75, 0.95, t) * (1.0 - u.age));
-    vec4 c = over(vec4(0.0), u.cRubber.rgb, cover(w + 0.9 - d) * 0.45 * fade);
-    return over(c, col, cover(w - d + 0.3) * fade);
+    vec3 col = mix(u.cEdge.rgb, u.cGlow.rgb, smoothstep(0.25, 0.6, t));
+    col = mix(col, u.cCore.rgb, step(0.82, t) * (1.0 - u.age));
+    return inked(vec4(0.0), d, col, ink(R) * 0.9, 1.0);
 }
 
 vec4 smoke(vec2 p, float R) {
-    float grow = 0.45 + 0.55 * (1.0 - pow(1.0 - u.age, 2.0));
-    float fade = (1.0 - u.age) * (1.0 - u.age) * smoothstep(0.0, 0.08, u.age);
-    // Three lumps, heaped and lit from above.
-    float d = 1e3, lit = 0.0;
-    for (int i = 0; i < 3; i++) {
+    // Lumps that pop up, heap, and shrink away rather than fade, lit from above.
+    float grow = mix(0.35, 1.0, pop(0.3)) * (1.0 - 0.85 * smoothstep(0.45, 1.0, u.age));
+    float rise = R * 0.15 * u.age;
+    vec2 q = p + vec2(0.0, rise);
+    float d = 1e3;
+    vec2 lc = vec2(0.0);
+    float lr = 1.0;
+    for (int i = 0; i < 5; i++) {
         float fi = float(i);
-        float a = 6.2831853 * (u.seed + fi / 3.0);
-        vec2 c = vec2(cos(a), sin(a)) * R * 0.32 * grow;
-        float r = R * grow * mix(0.45, 0.62, hash(vec2(fi, u.seed)));
-        float di = length(p - c) - r;
+        float a = TAU * (u.seed + fi / 4.0) + 0.6 * hash(vec2(fi, u.seed + 3.0));
+        vec2 c = i == 4 ? vec2(0.0, -R * 0.08) : vec2(cos(a), sin(a) * 0.8) * R * 0.34 * grow;
+        float r = R * grow * (i == 4 ? 0.5 : mix(0.3, 0.44, hash(vec2(fi, u.seed))));
+        float di = length(q - c) - r;
         if (di < d) {
             d = di;
-            lit = dot((p - c) / r, vec2(-0.45, -0.9));
+            lc = c;
+            lr = r;
         }
     }
-    vec3 col = mix(u.cSmokeShade.rgb, u.cSmoke.rgb, band(lit, 0.1));
-    return over(vec4(0.0), col, cover(-d) * 0.75 * fade);
+    float lit = dot((q - lc) / lr, vec2(-0.45, -0.9));
+    vec3 col = mix(u.cSmokeShade.rgb, u.cSmoke.rgb, band(lit, -0.25));
+    col = mix(col, mix(u.cSmoke.rgb, u.cCore.rgb, 0.45), band(lit, 0.62));
+    float fade = 1.0 - smoothstep(0.85, 1.0, u.age);
+    return inked(vec4(0.0), d, col, ink(R) * 1.1, 0.92 * fade);
 }
 
-// A jagged channel down the item's y axis from y0 to y1 at x(y), two octaves of
-// kinks; returns its distance from p.
-float channel(vec2 p, float y0, float y1, float amp, float seed) {
-    if (p.y < y0 || p.y > y1)
-        return 1e3;
-    float L = y1 - y0;
-    float x = amp * (zig(p.y / (L * 0.22), seed) + 0.32 * zig(p.y / (L * 0.07), seed + 3.0));
-    float x2 = amp * (zig((p.y + 1.0) / (L * 0.22), seed) + 0.32 * zig((p.y + 1.0) / (L * 0.07), seed + 3.0));
-    return abs(p.x - x) / sqrt(1.0 + (x2 - x) * (x2 - x));
+// Signed distance to a star of n spikes, valleys at radius ri, each spike reaching an
+// uneven radius from ro * 0.7 to ro.
+float starDist(vec2 p, float n, float ri, float ro, float seed) {
+    float a = atan(p.y, p.x) / TAU * n;
+    float k = floor(a);
+    float d = 1e3;
+    float inside = 0.0;
+    for (int j = -1; j <= 1; j++) {
+        float c = k + float(j);
+        float v0 = c * TAU / n, v1 = (c + 1.0) * TAU / n, vt = (c + 0.5) * TAU / n;
+        float rt = ro * mix(0.7, 1.0, hash(vec2(mod(c, n), seed)));
+        vec2 a0 = vec2(cos(v0), sin(v0)) * ri;
+        vec2 a1 = vec2(cos(v1), sin(v1)) * ri;
+        vec2 tip = vec2(cos(vt), sin(vt)) * rt;
+        d = min(d, min(sdSeg(p, a0, tip), sdSeg(p, tip, a1)));
+        if (j == 0) {
+            // Inside this spike's sector when on the inner side of both its edges.
+            vec2 e0 = tip - a0, e1 = a1 - tip;
+            float s0 = e0.x * (p.y - a0.y) - e0.y * (p.x - a0.x);
+            float s1 = e1.x * (p.y - tip.y) - e1.y * (p.x - tip.x);
+            inside = (s0 > 0.0 && s1 > 0.0) || length(p) < ri ? 1.0 : 0.0;
+        }
+    }
+    return inside > 0.5 ? -d : d;
 }
 
-// A bolt's glow, color, and core over `under`, for a channel at distance d.
-vec4 boltOver(vec4 under, float d, float w, float on) {
-    vec4 c = over(under, u.cEdge.rgb, cover(w + 4.0 - d) * 0.4 * on);
-    c = over(c, u.cGlow.rgb, cover(w + 1.6 - d) * on);
-    return over(c, u.cCore.rgb, cover(w * 0.6 - d) * on);
+// A comic impact: a red star of spikes, a yellow one inside it turned half a spike,
+// and a hot core, popping out and shrinking away.
+vec4 starburst(vec2 p, float R, float age, float seed) {
+    float s = mix(0.2, 1.0, pop(0.18)) * (1.0 - smoothstep(0.55, 1.0, age));
+    if (s < 0.02)
+        return vec4(0.0);
+    float n = R > 40.0 ? 11.0 : 8.0;
+    vec2 q = rot(p, 0.25 * age + seed * 6.0) / s;
+    float d0 = starDist(q, n, R * 0.5, R * 0.98, seed);
+    float d1 = starDist(rot(q, 0.5 * TAU / n), n, R * 0.34, R * 0.7, seed + 1.0);
+    float d2 = starDist(q, n, R * 0.18, R * 0.36, seed + 2.0);
+    vec4 c = inked(vec4(0.0), d0 * s, u.cPaint.rgb, ink(R), 1.0);
+    c = over(c, u.cGlow.rgb, cover(-d1 * s));
+    return over(c, u.cCore.rgb, cover(-d2 * s));
 }
 
-// Flickers off and on as it dies.
+// Corner i of n of a cartoon bolt from (0, y0) down to (0, y1): at uneven heights,
+// kicked out alternately left and right by up to `amp`.
+vec2 boltKink(float i, float y0, float y1, float amp, float seed, float n) {
+    if (i < 0.5 || i > n - 0.5)
+        return vec2(0.0, i < 0.5 ? y0 : y1);
+    float f = (i + 0.3 * (hash(vec2(i, seed + 1.0)) - 0.5)) / n;
+    float side = mod(i + floor(seed * 2.0), 2.0) * 2.0 - 1.0;
+    return vec2(side * amp * mix(0.45, 1.0, hash(vec2(i, seed))), mix(y0, y1, f));
+}
+
+// Distance to a cartoon bolt of n runs between boltKink's corners, its stroke
+// tapering from w0 at the top to w1 at the bottom.
+float bolt(vec2 p, float y0, float y1, float amp, float w0, float w1, float seed, float n) {
+    float d = 1e3;
+    vec2 prev = vec2(0.0, y0);
+    for (int i = 1; i <= 5; i++) {
+        float fi = float(i);
+        if (fi > n)
+            break;
+        vec2 cur = boltKink(fi, y0, y1, amp, seed, n);
+        vec2 pa = p - prev, ba = cur - prev;
+        float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+        float t = (mix(prev.y, cur.y, h) - y0) / (y1 - y0);
+        d = min(d, length(pa - ba * h) - mix(w0, w1, t));
+        prev = cur;
+    }
+    return d;
+}
+
+// A bolt at distance d: a flat halo `halo` px wide, the rubber outline, yellow, and
+// a hot core.
+vec4 boltOver(vec4 under, float d, float ow, float w, float halo, float on) {
+    vec4 c = over(under, u.cEdge.rgb, cover(ow + halo - d) * 0.3 * on);
+    c = over(c, u.cRubber.rgb, cover(ow - d) * on);
+    c = over(c, u.cGlow.rgb, cover(-d) * on);
+    return over(c, u.cCore.rgb, cover(-d - w * 0.55) * on);
+}
+
+// Blinks twice as it dies.
 float flicker(float fadeFrom, float fadeTo) {
-    return step(0.3, hash(vec2(floor(u.age * 20.0), u.seed))) * (1.0 - smoothstep(fadeFrom, fadeTo, u.age))
-         + step(u.age, 0.12);
-}
-
-vec4 burst(vec2 p, float R) {
-    // A discharge: jagged rays crackling out from the middle, re-forking as it flickers.
-    float on = min(1.0, flicker(0.4, 0.8));
-    float slot = floor(u.age * 20.0);
-    float r = length(p);
-    float a = atan(p.y, p.x);
-    float reach = R * (0.55 + 0.45 * smoothstep(0.0, 0.15, u.age));
-    float n = 6.0;
-    float k = floor(a / 6.2831853 * n + 0.5);
-    float ra = (k + 0.35 * (hash(vec2(k, u.seed + slot)) - 0.5)) * 6.2831853 / n;
-    float wig = R * 0.12 * zig(r / (R * 0.18), k + u.seed * 13.0 + slot) * smoothstep(0.0, R * 0.3, r);
-    vec2 dir = vec2(cos(ra), sin(ra));
-    float d = abs(dot(p, vec2(-dir.y, dir.x)) - wig);
-    float along = dot(p, dir);
-    float len = reach * mix(0.55, 1.0, hash(vec2(k, u.seed + 7.0)));
-    vec4 c = vec4(0.0);
-    if (along > 0.0 && along < len)
-        c = boltOver(c, d, 1.2 * (1.0 - along / len) + 0.3, on);
-    return over(c, u.cCore.rgb, cover(R * 0.16 * (1.0 - u.age) - r) * on);
+    float k = (u.age - fadeFrom) / (fadeTo - fadeFrom);
+    return step(u.age, fadeFrom) + step(fadeFrom, u.age) * step(k, 1.0) * step(0.5, fract(k * 2.0 + 0.25));
 }
 
 vec4 strike(vec2 p, float R) {
-    // Strikes down from the top to the middle in an instant, forks, and flickers out;
-    // where it lands, a burst.
-    float tip = -R + R * smoothstep(0.0, 0.08, u.age);
+    // Strikes down from the top to the middle in an instant, holds, and blinks out;
+    // where it lands, a little starburst.
+    float tip = -R + R * smoothstep(0.0, 0.07, u.age);
     if (p.y > tip + R * 0.3)
         return vec4(0.0);
-    float on = min(1.0, flicker(0.45, 0.75));
-    vec4 c = vec4(0.0);
-    float d = channel(p, -R, tip, R * 0.28, u.seed * 10.0);
-    // Two forks off the main channel, partway down.
-    for (int i = 0; i < 2; i++) {
-        float fi = float(i);
-        float y0 = -R + R * (0.25 + 0.3 * fi + 0.1 * hash(vec2(fi, u.seed)));
-        if (tip < y0)
-            continue;
-        float side = (hash(vec2(fi, u.seed + 2.0)) < 0.5 ? -1.0 : 1.0);
-        float x0 = R * 0.28 * (zig(y0 / (R * 0.44), u.seed * 10.0) + 0.32 * zig(y0 / (R * 0.14), u.seed * 10.0 + 3.0));
-        vec2 f = p - vec2(x0, y0);
-        f = mat2(0.8, side * 0.6, -side * 0.6, 0.8) * f;
-        float len = R * mix(0.25, 0.45, hash(vec2(fi, u.seed + 4.0)));
-        float df = channel(f, 0.0, len, R * 0.1, u.seed * 10.0 + 9.0 + fi) + 0.6 * f.y / len;
-        d = min(d, df);
-    }
-    float w = 1.3 + min(R * 0.01, 1.2);
-    c = boltOver(c, d, w, on);
-    // The landing: a hot spot with short rays.
-    if (u.age > 0.07) {
-        float r = length(p);
-        float a = atan(p.y, p.x);
-        float rays = 0.5 + 0.5 * cos(a * 7.0 + u.seed * 20.0);
-        float hot = min(R * 0.1, 7.0) * (1.0 - u.age);
-        float land = cover(hot * (0.6 + 0.8 * rays) - r);
-        c = over(c, u.cGlow.rgb, cover(hot * 1.6 - r) * 0.5 * on);
-        c = over(c, u.cCore.rgb, land * on);
+    float on = flicker(0.42, 0.8);
+    float w0 = clamp(R * 0.06, 1.8, 9.0);
+    float ow = ink(R);
+    float d = bolt(p, -R, 0.0, R * 0.22, w0, 0.6, u.seed * 10.0, 4.0);
+    // A fork off its second corner, thin, slanting off.
+    vec2 f0 = boltKink(2.0, -R, 0.0, R * 0.22, u.seed * 10.0, 4.0);
+    float side = f0.x < 0.0 ? 1.0 : -1.0;
+    vec2 f = mat2(0.8, side * 0.6, -side * 0.6, 0.8) * (p - f0);
+    d = min(d, bolt(f, 0.0, R * 0.4, R * 0.08, w0 * 0.5, 0.4, u.seed * 10.0 + 7.0, 2.0));
+    d = max(d, p.y - tip);
+    vec4 c = boltOver(vec4(0.0), d, ow, w0, min(R * 0.04, 6.0), on);
+    if (u.age > 0.06) {
+        float k = clamp((u.age - 0.06) / 0.6, 0.0, 1.0);
+        vec4 s = starburst(p, min(R * 0.22, 26.0), k, u.seed + 3.0);
+        c = s + c * (1.0 - s.a);
     }
     return c;
 }
 
 vec4 arc(vec2 p, float R) {
-    // An arc of electricity along the item's x axis, jumping between kinks that
-    // re-roll as it flickers, thinning toward its tail (-R).
-    float on = min(1.0, flicker(0.3, 0.7));
-    float slot = floor(u.age * 20.0);
+    // A zigzag along the item's x axis, its kinks re-rolling as it flickers,
+    // thinning toward its tail (-R).
+    float on = flicker(0.3, 0.75);
+    float slot = floor(u.age * 14.0);
     vec2 q = vec2(p.y, p.x);
-    float d = channel(q, -R, R, R * 0.35 * (1.0 - u.age * 0.5), u.seed * 10.0 + slot);
-    float t = (p.x + R) / (2.0 * R);
-    return boltOver(vec4(0.0), d, 0.4 + 1.0 * t, on * smoothstep(0.0, 0.2, t));
+    float w = clamp(R * 0.08, 1.0, 2.4) * (1.0 - 0.4 * u.age);
+    float d = bolt(q, -R, R, R * 0.28, 0.3, w, u.seed * 10.0 + slot, 4.0);
+    return boltOver(vec4(0.0), d, ink(R) * 0.8, w, 0.0, on);
+}
+
+vec4 glint(vec2 p, float R) {
+    // A four-pointed twinkle with concave sides, popping out and shrinking.
+    float s = R * pop(0.25) * (1.0 - smoothstep(0.4, 1.0, u.age));
+    if (s < 0.5)
+        return vec4(0.0);
+    vec2 q = abs(rot(p, 0.6 * u.age)) / s;
+    float f = sqrt(q.x) + sqrt(q.y) - 1.0;
+    float d = f * s * 0.45;
+    vec4 c = over(vec4(0.0), u.cGlow.rgb, cover(1.2 - d));
+    return over(c, u.cCore.rgb, cover(-d));
 }
 
 void main() {
     vec2 p = (qt_TexCoord0 - 0.5) * u.size;
     float R = u.size * 0.5 - 1.0;
-    vec4 c = u.kind < 0.5 ? spark(p, R) : u.kind < 1.5 ? smoke(p, R) : u.kind < 2.5 ? burst(p, R)
-           : u.kind < 3.5 ? strike(p, R) : arc(p, R);
+    vec4 c = u.kind < 0.5 ? spark(p, R) : u.kind < 1.5 ? smoke(p, R) : u.kind < 2.5 ? starburst(p, R, u.age, u.seed)
+           : u.kind < 3.5 ? strike(p, R) : u.kind < 4.5 ? arc(p, R) : glint(p, R);
     fragColor = c * u.qt_Opacity;
 }

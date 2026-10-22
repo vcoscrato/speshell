@@ -88,11 +88,15 @@ void main() {
         // thinning stream beads up (Rayleigh–Plateau). The necks never close: cut
         // apart against the panel's straight border, the beads read as a broken line.
         float bulb = 1.0 + 0.4 * exp(-behind / (2.2 * thick)) * (1.0 + 0.3 * sin(t * 13.0 + fi * 2.0));
-        float pinch = mix(0.12, 1.0, smoothstep(0.4, 0.95, tt));
-        float beads = 1.0 - 0.5 * pinch * (0.5 + 0.5 * sin(behind / 7.5 - t * 4.0 + fi * 3.0));
-        float swell = 1.0 + 0.22 * sin(behind / 41.0 + t * 2.3 + fi * 5.0);
+        // The last beads pinch off altogether, so the tail frays into drops.
+        float pinch = mix(0.12, 1.0, smoothstep(0.4, 0.95, tt)) * (1.0 + 0.9 * smoothstep(0.8, 1.0, tt));
+        float beadPhase = behind / 8.5 + 2.5 * vnoise(vec2(behind / 40.0, fi * 5.0 + 1.0)) - t * 4.0 + fi * 3.0;
+        float beads = 1.0 - 0.5 * pinch * (0.5 + 0.5 * sin(beadPhase));
+        // Swelling and slackening on two scales, unevenly, so it never reads as a tube.
+        float swell = 1.0 + 0.2 * sin(behind / 41.0 + t * 2.3 + fi * 5.0)
+                    + 0.3 * (vnoise(vec2(behind / 26.0 - t * 1.7, fi * 7.0 + 2.0)) - 0.5);
         float w = thick * sqrt(clamp(behind / (1.2 * thick), 0.0, 1.0))
-                * pow(clamp(1.0 - tt, 0.0, 1.0), 0.3) * bulb * beads * swell;
+                * pow(smoothstep(1.0, 0.3, tt), 0.65) * bulb * beads * swell;
 
         // Spine: waves start at the head and run down the stream, growing toward the
         // flailing tail; now and then a big one cracks down it like a whip.
@@ -181,8 +185,27 @@ void main() {
             vec2 dp = c + bp + out_ * (u.gap * 0.3 + 30.0 * tau * hash(vec2(seed, fi + fk)))
                     + vec2(0.0, 0.5 * GRAVITY * tau * tau);
             vec2 v = dir * vel * exp(-drag * tau) + vec2(0.0, GRAVITY * tau);
-            float size = mix(2.0, 3.6, hash(vec2(seed + 0.5, fi + fk))) * (1.0 - age * age) * u.flow;
+            float size = mix(2.0, 3.6, hash(vec2(seed + 0.5, fi + fk))) * smoothstep(0.0, 0.12, age) * (1.0 - age * age) * u.flow;
             drops = max(drops, droplet(p, dp, v, size));
+        }
+
+        // Spray flung off the head, mostly outward, falling behind it.
+        vec2 hp = rrPoint(hv.x, h, r);
+        vec2 hdir = normalize(rrPoint(hv.x + 2.0, h, r) - rrPoint(hv.x - 2.0, h, r));
+        vec2 hout = vec2(hdir.y, -hdir.x);
+        for (int k = 0; k < 3; k++) {
+            float fk = float(k);
+            float cyc = t * (2.2 + 0.7 * hash(vec2(fk, fi + 8.0))) + hash(vec2(fk, fi + 5.0));
+            float age = fract(cyc);
+            float seed = floor(cyc);
+            vec3 rnd = vec3(hash(vec2(seed, fi * 3.0 + fk + 9.1)), hash(vec2(seed + 3.3, fi * 3.0 + fk)),
+                            hash(vec2(fi * 3.0 + fk, seed + 6.2)));
+            float side = rnd.y < 0.8 ? 1.0 : -0.6;
+            vec2 dp = c + hp - hdir * (0.3 * w0 + age * (10.0 + 30.0 * rnd.x))
+                    + hout * side * (0.8 * w0 + age * (8.0 + 22.0 * rnd.y))
+                    + vec2(0.0, 0.5 * GRAVITY * age * age * 0.1);
+            float size = mix(1.4, 3.0, rnd.z) * smoothstep(0.0, 0.12, age) * (1.0 - age) * u.flow;
+            drops = max(drops, droplet(p, dp, hdir * vel * 0.6, size));
         }
     }
     float dropIn = cover(drops), dropRim = cover(drops + 1.5);
@@ -192,8 +215,9 @@ void main() {
     col = mix(col, u.cDeep.rgb, cover(n - 0.38));         // the outer side is in shade
     col = mix(col, u.cLight.rgb, cover(-n - 0.12) * cover(0.86 + n));
     // Highlight streaks and bubbles ride along with the water.
-    float streak = band(vnoise(vec2(along / 17.0, own * 9.0)), 0.6);
-    col = mix(col, u.cFoam.rgb, cover(0.17 - abs(n + 0.48 + 0.14 * sin(along / 23.0))) * streak);
+    // Each streak swells and narrows to a point along its length.
+    float streak = 0.2 * smoothstep(0.45, 0.75, vnoise(vec2(along / 19.0, own * 9.0)));
+    col = mix(col, u.cFoam.rgb, cover(streak - 0.03 - abs(n + 0.48 + 0.14 * sin(along / 23.0))));
     vec2 id = vec2(floor(along / 15.0), own);
     vec2 bub = vec2((fract(along / 15.0) - 0.5) * 15.0, (n - (hash(id) - 0.5) * 0.9) * wOwn);
     float bubble = step(0.7, hash(id + 3.3)) * step(5.0, wOwn);

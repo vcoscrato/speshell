@@ -6,7 +6,8 @@
 # sheet of them all in THEME-sheet.png. Uses your config.ini (SHOT_CONFIG names another)
 # with a fresh data directory, so your theme, notes, and app themes stay untouched.
 # SHOT_QUERY is typed into the launcher; SHOT_MEDIA=1 shows the playing track, hidden
-# by default since its cover is someone else's art.
+# by default since its cover is someone else's art; SHOT_SAMPLES=1 fills the
+# notifications with made-up ones.
 set -e
 LAB=$(cd "$(dirname "$0")" && pwd)
 LAB_OUT=${LAB_OUT:-${XDG_CACHE_HOME:-$HOME/.cache}/speshell-lab}
@@ -21,7 +22,7 @@ OUT="$LAB_OUT/shots/$THEME"
 # themes beside it, so the shot runs from a copy of the tree with the scene at its root.
 rm -rf "$WORK" "$OUT" && mkdir -p "$WORK/tree" "$WORK/config/speshell" "$WORK/data/speshell" "$WORK/bin" "$OUT/full"
 tar -C "$SPESHELL_DIR" --exclude=.git -cf - . | tar -C "$WORK/tree" -xf -
-cp "$LAB/ShotShell.qml" "$WORK/tree/shot.qml"
+cp "$LAB/shot/ShotShell.qml" "$WORK/tree/shot.qml"
 # The bar's window is never mapped, so its dropdowns and effects are told they show.
 for binding in "shown: root.visible" "presented: root.visible"; do
     grep -q "$binding" "$WORK/tree/bar/Bar.qml" || { echo "shot.sh: Bar.qml no longer has '$binding'" >&2; exit 1; }
@@ -33,7 +34,7 @@ printf '{"theme":"%s"}\n' "$THEME" > "$WORK/data/speshell/theme.json"
 printf '#!/bin/sh\nexit 0\n' > "$WORK/bin/gsettings" && chmod +x "$WORK/bin/gsettings"
 
 LOG="$WORK/shot.log"
-PATH="$WORK/bin:$PATH" XDG_CONFIG_HOME="$WORK/config" XDG_DATA_HOME="$WORK/data" THEME="$THEME" SHOTS="$*" SHOT_QUERY="${SHOT_QUERY:-}" SHOT_MEDIA="${SHOT_MEDIA:-}" \
+PATH="$WORK/bin:$PATH" XDG_CONFIG_HOME="$WORK/config" XDG_DATA_HOME="$WORK/data" THEME="$THEME" SHOTS="$*" SHOT_QUERY="${SHOT_QUERY:-}" SHOT_MEDIA="${SHOT_MEDIA:-}" SHOT_SAMPLES="${SHOT_SAMPLES:-}" \
     OUT="$OUT/full" QT_FORCE_STDERR_LOGGING=1 timeout 120 quickshell --no-color -p "$WORK/tree/shot.qml" >"$LOG" 2>&1 || true
 grep -E "WARN|ERROR|rror:" "$LOG" | grep -vE "window masks|Registration|notification|quickshell.dbus" || true
 

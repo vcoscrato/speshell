@@ -9,9 +9,10 @@ import Quickshell.Wayland
 // 1/60 s, and every second frame is captured before time moves on, so the 30 fps
 // output is frame-exact however slow capturing is.
 // Env: SCENE (qml file), DURATION (seconds), OUT (directory); EVERY_FRAME captures all
-// 60 frames a second. With PERF set, nothing is captured and the mean real frame time
-// is logged instead, from PERF_FROM seconds (at least 0.5 s, past the warm-up of
-// shader compiles and image loads).
+// 60 frames a second. With PERF set to windows of lab time ("1.3-2.15", or several
+// joined by commas), nothing is captured and the real time of the frames inside them
+// is logged instead, as the mean of their middle half, so a stray stall or two does
+// not count.
 ShellRoot {
     id: lab
     readonly property real duration: Number(Quickshell.env("DURATION") || 3)
@@ -21,8 +22,21 @@ ShellRoot {
     readonly property bool perf: Quickshell.env("PERF") !== null && Quickshell.env("PERF") !== ""
     // Capture all 60 frames a second instead of every second one.
     readonly property bool everyFrame: Quickshell.env("EVERY_FRAME") !== null && Quickshell.env("EVERY_FRAME") !== ""
-    property real perfStart: 0
-    readonly property int perfFrom: Math.max(30, Math.round(Number(Quickshell.env("PERF_FROM") || 0) * 60))
+    readonly property var perfWindows: lab.perf
+        ? Quickshell.env("PERF").split(",").map(w => w.split("-").map(Number)) : []
+    property real lastFrameAt: 0
+    property var frameTimes: []
+
+    function inPerfWindow(t) {
+        return lab.perfWindows.some(w => t > w[0] && t <= w[1]);
+    }
+
+    function logPerf() {
+        const times = lab.frameTimes.slice().sort((a, b) => a - b);
+        const middle = times.slice(Math.floor(times.length / 4), Math.ceil(times.length * 3 / 4));
+        const mean = middle.reduce((sum, t) => sum + t, 0) / Math.max(1, middle.length);
+        console.log("perf:", mean.toFixed(3), "ms per frame over", times.length, "frames");
+    }
 
     PanelWindow {
         implicitWidth: 1
@@ -42,14 +56,18 @@ ShellRoot {
                     return;
                 if (lab.frame / 60 >= lab.duration) {
                     if (lab.perf)
-                        console.log("perf:", ((Date.now() - lab.perfStart) / (lab.frame - lab.perfFrom)).toFixed(3), "ms per frame");
+                        lab.logPerf();
                     Qt.quit();
                     return;
                 }
+                // The time since the last frame is how long the scene took to draw at
+                // the lab time it was given.
+                const now = Date.now();
+                if (lab.perf && lab.inPerfWindow(lab.frame / 60))
+                    lab.frameTimes.push(now - lab.lastFrameAt);
+                lab.lastFrameAt = now;
                 lab.frame++;
                 loader.item.labTime = lab.frame / 60;
-                if (lab.frame === lab.perfFrom)
-                    lab.perfStart = Date.now();
                 if (lab.perf || (!lab.everyFrame && lab.frame % 2 !== 0))
                     return;
                 lab.capturing = true;

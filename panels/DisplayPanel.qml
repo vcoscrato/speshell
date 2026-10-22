@@ -555,15 +555,15 @@ Card {
                     spacing: Theme.spacingSmall
                     visible: root.canControlSelectedBrightness
 
+                    // Labelled as the setting rows around it are.
                     Label {
+                        id: brightnessLabel
                         text: "Brightness"
-                        color: Theme.subtext
-                        width: 70
                         anchors.verticalCenter: parent.verticalCenter
                     }
 
                     StyledSlider {
-                        width: parent.width - 118
+                        width: parent.width - brightnessLabel.width - brightnessValue.width - parent.spacing * 2
                         anchors.verticalCenter: parent.verticalCenter
                         from: BrightnessService.minimumPercent
                         value: BrightnessService.percent
@@ -577,9 +577,11 @@ Card {
                     }
 
                     Label {
+                        id: brightnessValue
                         text: BrightnessService.percent + "%"
                         color: Theme.subtext
                         width: 32
+                        font.features: { "tnum": 1 }
                         horizontalAlignment: Text.AlignRight
                         anchors.verticalCenter: parent.verticalCenter
                     }

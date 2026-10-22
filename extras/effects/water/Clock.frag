@@ -59,6 +59,23 @@ vec2 current(vec2 q, float len, float w) {
     return vec2(d, q.x / halfWidth);
 }
 
+// Caustic lines from cells of `size` px: (gap between the nearest two sites'
+// distances, gap between the nearest and the third). The first is zero along the
+// cell borders, the second only where three cells meet, where the light gathers.
+vec2 causticGap(vec2 p, float size) {
+    vec2 g = floor(p / size);
+    float d1 = 1e9, d2 = 1e9, d3 = 1e9;
+    for (int y = -1; y <= 1; y++)
+        for (int x = -1; x <= 1; x++) {
+            vec2 cell = g + vec2(x, y);
+            float d = length(p - (cell + hash2(cell)) * size);
+            if (d < d1) { d3 = d2; d2 = d1; d1 = d; }
+            else if (d < d2) { d3 = d2; d2 = d; }
+            else d3 = min(d3, d);
+        }
+    return vec2(d2 - d1, d3 - d1);
+}
+
 void main() {
     vec2 p = (qt_TexCoord0 - 0.5) * u.area;
     float R = min(u.area.x, u.area.y) * 0.5 - 1.5;
@@ -71,14 +88,27 @@ void main() {
     water = mix(water, mix(u.cAbyss.rgb, u.cDeep.rgb, 0.45), band(r, R * 0.42));
     water = mix(water, mix(u.cAbyss.rgb, u.cDeep.rgb, 0.62), band(r, R * 0.68));
     water = mix(water, mix(u.cAbyss.rgb, u.cMid.rgb, 0.7), band(r, R * 0.9));
-    // Caustics: two drifting layers of warped cell edges, bright where they cross,
-    // brighter in the shallows.
-    vec2 cq = p + R * 0.05 * vec2(sin(p.y / (R * 0.17) + u.time * 0.7), cos(p.x / (R * 0.15) - u.time * 0.6));
-    float c1 = voronoiEdge(cq + vec2(u.time * 3.0, -u.time * 2.0), R * 0.16, 1.0);
-    float c2 = voronoiEdge(rot(cq, 1.1) - vec2(u.time * 2.0, u.time * 2.6) + 50.0, R * 0.23, 1.0);
-    float shallows = 0.3 + 0.7 * smoothstep(R * 0.15, R * 0.9, r);
-    float lines = (1.0 - smoothstep(0.0, 1.1, c1)) * 0.6 + (1.0 - smoothstep(0.0, 1.3, c2)) * 0.45;
-    water = mix(water, u.cLight.rgb, clamp(lines, 0.0, 1.0) * 0.32 * shallows);
+    // Caustics: a net of warped cell borders, with a fainter one drifting across it.
+    // Its lines are thin and dim here and there, with a soft glow around them, and
+    // the light gathers where they meet; brighter in the shallows.
+    float tm = u.time;
+    vec2 warp = vec2(vnoise(p / (R * 0.5) + vec2(tm * 0.12, 0.0)), vnoise(p / (R * 0.5) + vec2(4.0, -tm * 0.1))) - 0.5;
+    vec2 cq = p + R * 0.05 * vec2(sin(p.y / (R * 0.17) + tm * 0.7), cos(p.x / (R * 0.15) - tm * 0.6)) + warp * R * 0.25;
+    // A finer warp at the cells' own scale rounds them, as light through ripples is.
+    cq += (vec2(vnoise(cq / (R * 0.15) + tm * 0.2), vnoise(cq / (R * 0.15) + 17.0 - tm * 0.2)) - 0.5) * R * 0.05;
+    vec2 c1 = causticGap(cq + vec2(tm * 3.0, -tm * 2.0), R * 0.26);
+    vec2 c2 = causticGap(rot(cq, 1.1) - vec2(tm * 2.0, tm * 2.6) + 50.0, R * 0.19);
+    float px = max(R / 100.0, 0.7);
+    float on1 = mix(0.25, 1.0, smoothstep(0.3, 0.7, vnoise(cq / (R * 0.22) + 3.0 + tm * 0.05)));
+    float on2 = smoothstep(0.4, 0.75, vnoise(cq / (R * 0.18) - 7.0 - tm * 0.04));
+    float shallows = 0.35 + 0.65 * smoothstep(R * 0.15, R * 0.9, r);
+    // Lines swell as they near a junction.
+    float near1 = 1.0 + 1.4 * smoothstep(12.0 * px, 0.0, c1.y);
+    float near2 = 1.0 + 1.2 * smoothstep(9.0 * px, 0.0, c2.y);
+    float glow = cover(2.4 * px * near1 - c1.x) * on1 * 0.1;
+    float line = max(cover(0.8 * px * near1 - c1.x) * on1 * 0.3, cover(0.6 * px * near2 - c2.x) * on2 * 0.17);
+    float knot = cover(1.6 * px - c1.y) * on1 * 0.42;
+    water = mix(water, u.cLight.rgb, max(max(glow, line), knot) * shallows);
     o = over(o, water, cover(R - r));
     // Light where the rim meets the water, and the rim.
     o = over(o, u.cLight.rgb, 0.35 * cover(R * 0.035 - abs(r - R + R * 0.035)));

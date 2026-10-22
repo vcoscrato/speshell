@@ -116,6 +116,9 @@ Item {
         if (!root.delegate || root.parts.length >= root.prewarm)
             return;
         var incubator = root.delegate.incubateObject(root, { visible: false });
+        // Null once the effect is being torn down, as on a theme change.
+        if (!incubator)
+            return;
         var keep = function() {
             if (incubator.status === Component.Ready && root.parts.length < root.capacity)
                 root.parts.push({ item: incubator.object, alive: false });

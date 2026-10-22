@@ -2,8 +2,8 @@
 #extension GL_GOOGLE_include_directive : enable
 // Relâmpago backdrop, drawn once over a surface's base color: asphalt with
 // a fine grain of aggregate, a checkered flag waving in from the top corner, a few
-// pinstripes, and a forked bolt falling across the lower part. It stays a few
-// percent off the base so text reads.
+// pinstripes, and a faint forked bolt low across the bottom, below where a panel's
+// controls sit. It stays a few percent off the base so text reads.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {
@@ -51,10 +51,10 @@ void main() {
         col = mix(col, i == 1 ? u.cGlow.rgb : u.cPaint.rgb, (i == 1 ? 0.18 : 0.2) * cover(w - abs(p.y - y)) * step(t, 1.0));
     }
 
-    // The bolt: falling from the upper right of the lower half to the bottom left,
+    // The bolt: falling from the right of the bottom quarter to the bottom left,
     // in sharp uneven zigzags with two forks, thickest at the top and coming to a
     // point where it strikes; faint red, edged in gold.
-    vec2 a = vec2(W * 0.98, H - m * 0.95);
+    vec2 a = vec2(W * 0.98, max(H * 0.72, H - m * 0.6));
     vec2 b = vec2(W * 0.12, H + 4.0);
     vec2 dir = normalize(b - a);
     vec2 nrm = vec2(-dir.y, dir.x);
@@ -62,10 +62,10 @@ void main() {
     vec2 rel = p - a;
     float s = dot(rel, dir) / L;
     float v = dot(rel, nrm);
-    float P = L / 6.0, A = m * 0.085;
+    float P = L / 6.0, A = m * 0.06;
     float d = 1e3;
     if (s > -0.05 && s < 1.05) {
-        float th = m * 0.024 * (1.0 - 0.85 * s) * smoothstep(0.0, 0.04, s);
+        float th = m * 0.016 * (1.0 - 0.85 * s) * smoothstep(0.0, 0.04, s);
         d = boltDist(vec2(s * L + P * 0.5, v), P, A, 3.0) - th;
     }
     for (int i = 0; i < 2; i++) {
@@ -86,8 +86,8 @@ void main() {
             d = min(d, boltDist(vec2(fs, fv) + c0, P * 0.45, A * 0.35, 9.0 + fi) - fth);
         }
     }
-    col = mix(col, u.cPaint.rgb, 0.12 * cover(-d));
-    col = mix(col, u.cGlow.rgb, 0.32 * cover(1.1 - abs(d)));
+    col = mix(col, u.cPaint.rgb, 0.08 * cover(-d));
+    col = mix(col, u.cGlow.rgb, 0.16 * cover(1.0 - abs(d)));
 
     fragColor = vec4(col, 1.0) * u.qt_Opacity;
 }

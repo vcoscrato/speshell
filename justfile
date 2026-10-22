@@ -93,10 +93,10 @@ preview effect="cosmos" scene="launcher": shaders
 check: shaders
     lab/check.sh $(cd effects && ls -d */ | tr -d /)
 
-# Estimate an effect scene's GPU time per frame at 1080p (needs a Wayland session).
+# Benchmark the effects' GPU time per frame at 1080p, phase by phase; see lab/bench.sh (needs Wayland).
 [working-directory: 'extras']
-perf effect="cosmos" scene="launcher": shaders
-    lab/perf.sh "{{ effect }}" "{{ scene }}"
+bench *args: shaders
+    lab/bench.sh {{ args }}
 
 # Render the real bar in a theme with each panel open (all, or those named, or `launcher`) into ~/.cache/speshell-lab/shots/ (needs Wayland).
 [working-directory: 'extras']

@@ -4,12 +4,12 @@ The themes and effects Speshell ships, the paintings behind their wallpapers, an
 
 | Theme | Effects | Wallpaper (painting) | Launcher | Wallpaper change | Controls | Clock face |
 |---|---|---|---|---|---|---|
-| Cosmos (default) | `cosmos` | `spiral-galaxy` | Opens out of a flaring star; planets orbit it while open | Supernova | Planet knobs with a moon; star dust trails, glints, constellations drawn out from what you pick | An orrery: the hour's planet and the minute's ringed giant circle the sun, held to it like hands, and a comet runs the seconds |
-| Fire | `fire` | `ember-dusk` | Burns in behind an ember's edge; flames simmer around it | Burns away from the middle | Ember knobs that flame when held; the track burns behind them, sparks, smoke; what you pick catches fire, with embers floating up | Charcoal cracked with embers inside a ring of flames; forged blades for hands and an ember running the seconds |
-| Air | `air` | `cloud-sea` | Unwinds out of a whirlwind; a breeze with leaves circles it | Whirlwind eye | Spinning wind-ball knobs; wind from behind blows a dragged knob along, wisps and leaves, curls of wind | Cloud banks and circling wind over a compass rose; a leaf and a feather for hands, and a leaf riding round with the seconds |
-| Water | `water` | `polar-night` | A water whip coils into it and clears through rippling caustics; two streams chase its border among orbs, currents, and mist held in the air | Ripple | Drop knobs that stretch as they move; water pours off as a slider goes down and rains onto it as it goes up, ripples; a drop splashes a crown up from what you pick, flinging drops that ripple where they land | A pool with drifting caustics; glassy currents for hands round a whirlpool, and a drop each second that ripples |
-| Earth | `earth` | `jade-valley` | Punches up out of cracked ground as a stone slab; tumbling boulders with circling pebbles hover in a ring of dust and stones | Cracks and crumbles | Rolling stone knobs; kicked-up rock chips and dust, jade shards | Layered, cracked stone with jade at the hours; obelisks for hands, and a pebble rolling in a groove |
-| Relâmpago | `relampago` | `thunder-road` | Races in from the left in a red streak with a bolt through it, brakes with sparks and skid marks, and stops in tire smoke as lightning strikes all around it; while open, speed lines stream past, electricity crackles on its border, and now and then a bolt strikes it; tears away on two trails of fire | Lightning splits it, and the halves race apart | Racing-wheel knobs carrying a zigzag bolt along the filled track, crackling live while held; sparks and arcs, discharges, lightning striking what you pick | A tachometer with a redline; needles on a checkered cap, and a bolt striking out to each second |
+| Cosmos (default) | `cosmos` | `spiral-galaxy` | Opens out of a flaring star; planets orbit it while open | Supernova: a filamented shock front flinging comets of ejecta, with sparks in its wake | Planet knobs with a moon; star dust trails, glints, constellations drawn out from what you pick | An orrery: the hour's planet and the minute's ringed giant circle the sun, held to it like hands, and a comet runs the seconds |
+| Fire | `fire` | `ember-dusk` | An ember flares and throws sparks, and the panel burns in behind its edge; flames simmer around it | Burns away from the middle in tongues of flame, embers drifting up off the burnt ground | Ember knobs that flame when held; the track burns behind them, sparks, smoke; what you pick catches fire, with embers floating up | Charcoal cracked with embers inside a ring of flames; forged blades for hands and an ember running the seconds |
+| Air | `air` | `cloud-sea` | Unwinds out of a whirlwind; a breeze with leaves circles it | Whirlwind eye with a torn, wind-blown edge | Spinning wind-ball knobs; a gust of breath from behind blows a dragged knob along, carrying specks and leaves; curls of wind | Cloud banks and circling wind over a compass rose; a leaf and a feather for hands, and a leaf riding round with the seconds |
+| Water | `water` | `polar-night` | A water whip coils into it and clears through rippling caustics; two streams chase its border among orbs, currents, and mist held in the air | A drop lands: a crown splashes and a jet leaps, and its ripple spreads | Drop knobs that stretch as they move; water pours off as a slider goes down and rains onto it as it goes up, ripples; a drop splashes a crown up from what you pick, flinging drops that ripple where they land | A pool with drifting caustics; glassy currents for hands round a whirlpool, and a drop each second that ripples |
+| Earth | `earth` | `jade-valley` | Punches up out of cracked ground as a carved stone slab that cracks on landing and crumbles away; faceted boulders, lit from one side, hover with pebbles and dust rings | Struck: cracks run out from the impact and branch, and the shards break loose one by one and fall away in dust | Rolling stone knobs; kicked-up rock chips and dust; what you pick is earthbent, with spikes of rock, a jade shard, and a ring of dust | Layered, cracked stone with jade at the hours; a pale stone hour hand and a jade minute hand, and a gold pebble rolling in a groove |
+| Relâmpago | `relampago` | `thunder-road` | Races in from the left, stretched by its speed, in a glossy red streak with a bolt decal through it, brakes with sparks and skid marks, and squashes to a stop in a comic starburst and cartoon tire smoke as lightning strikes all around it; while open, speed dashes trail behind it, electricity crackles on its border, and now and then a bolt strikes it; tears away on two trails of fire | A cartoon bolt, a new one each time, bursts where it lands and splits it; the inked, glowing halves race apart | Cartoon racing-wheel knobs that blur and trail speed dashes, carrying a stepped bolt decal along the filled track, charged while held; fat sparks, zigzag arcs, a starburst on release, bolts and glints on what you pick | A tachometer with a redline; needles on a checkered cap, and a bolt striking out to each second |
 
 ## Layout
 
@@ -30,7 +30,7 @@ Names are lowercase-kebab for directories and paintings; QML components are Pasc
 - **Original work only.** No fan art, photos, fonts, or code under another license. Wallpapers come from shaders in `paintings/`, so their whole source is in the repository.
 - **A wallpaper is committed with its painting.** After editing `paintings/<painting>.frag`, run `just paint <painting>` and commit the `.jpg` in the same change.
 - **`just check` passes** before effects changes are merged. It fails on any QML error or warning, or a transition that never finishes.
-- **Stay within the GPU budget:** under 0.5 ms per frame at 1080p in every phase (`just perf`). The current costs are in [effects/README.md](effects/README.md#cost).
+- **Stay within the GPU budget:** under 0.5 ms per frame at 1080p in every phase (`just bench`). The current costs are in [effects/README.md](effects/README.md#cost).
 - **Compiled shaders are build output.** `just shaders` writes them to git-ignored `qsb/` folders beside their sources, and the package build runs it.
 
 ## Workflows
@@ -60,7 +60,8 @@ just preview earth clock                 # the clock face, at the panel's size a
 just preview earth controls              # sliders, switches, and picks, at twice the size
 just preview earth picks                 # picks up close: a bar's clock clicked near its end, a row, a button
 just check                               # every effect in every scene but picks
-just perf fire launcher                  # GPU time per frame at 1080p
+just bench fire                          # GPU time per frame at 1080p, phase by phase
+just bench -a HEAD earth                 # the same, against the last commit
 just shot fire                           # the real bar with each panel open, and a contact sheet
 just shot earth network settings         # only those panels (or `launcher`)
 ```
@@ -72,7 +73,7 @@ Scenes drive `EffectClock` with virtual time, 1/60 s per frame, so captures matc
 - `THEME_INI`: another theme's `theme.ini`, to see the effect in its colors.
 - `KEEP_FRAMES=1` keeps the frames, about 700 MB per run; `EVERY_FRAME=1` captures at 60 fps instead of 30.
 - For shot, `SHOT_CONFIG`: another `config.ini` than yours, `SHOT_QUERY`: what to type into the launcher, and `SHOT_MEDIA=1` to show the playing track, hidden by default since its cover is someone else's art. Shots run from a copy of the tree with a fresh data directory, with a timer and a screen recording running, and land in `~/.cache/speshell-lab/shots/<theme>/`.
-- For perf, `PERF_FROM` and `DURATION`. For example, `CLOSE_AT=30 PERF_FROM=1.5 DURATION=4.5 just perf air` measures only the open launcher.
+- For bench, `-a REF` to compare against a commit, `-p` to pick phases (`open`, `motion`, `wallpaper`, `controls`, `clock`), `-r` for the runs per phase, and `-m` for the Markdown Cost table. It renders on the NVIDIA GPU of a hybrid laptop; `BENCH_GPU=default` leaves the choice to the system.
 
 `just clean` removes compiled shaders and all lab output.
 

@@ -16,6 +16,9 @@ Singleton {
     property var notificationHistory: []
     property var activePopups: []
     property int popupCounter: 0
+    // While the pointer rests on the toasts, none expires; the time held is added back.
+    property bool popupsHeld: false
+    property double heldSince: 0
     readonly property string statePath: ConfigService.dataDir !== ""
         ? ConfigService.dataDir + "/notifications.json"
         : ""
@@ -44,6 +47,23 @@ Singleton {
         root.schedulePopupExpiry();
     }
 
+    function setPopupsHeld(held) {
+        if (held === root.popupsHeld)
+            return;
+        if (held) {
+            root.heldSince = Date.now();
+            popupExpiryTimer.stop();
+        } else {
+            const paused = Date.now() - root.heldSince;
+            for (const popup of root.activePopups) {
+                if (popup.expiresAt >= 0)
+                    popup.expiresAt += paused;
+            }
+        }
+        root.popupsHeld = held;
+        root.schedulePopupExpiry();
+    }
+
     function popupById(popupId) {
         for (var i = 0; i < root.activePopups.length; i++) {
             if (root.activePopups[i].popupId === popupId)
@@ -61,6 +81,9 @@ Singleton {
             }
         }
         root.activePopups = current;
+        // The last toast gone, nothing is left under the pointer.
+        if (current.length === 0)
+            root.popupsHeld = false;
         root.schedulePopupExpiry();
     }
 
@@ -196,6 +219,8 @@ Singleton {
 
     function schedulePopupExpiry() {
         popupExpiryTimer.stop();
+        if (root.popupsHeld)
+            return;
         var now = Date.now();
         var earliest = -1;
         for (var i = 0; i < root.activePopups.length; i++) {

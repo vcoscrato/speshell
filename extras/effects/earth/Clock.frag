@@ -3,8 +3,10 @@
 // Earth's clock face: a disc cut from layered rock, its strata bending across it and a
 // few cracks through them, under a bevelled rim lit from the top left. Jade is set at
 // the hours, hexagonal and larger at the quarters, each stone faceted. The hands are
-// stone obelisks, a lit and a shaded face either side of their ridge, around a jade boss;
-// a pebble rolls round a carved groove with the seconds.
+// obelisks, a lit and a shaded face either side of their ridge, outlined and casting a
+// shadow, around a jade boss: a broad one of pale stone for the hour and a long, slim
+// one of jade for the minute. A pebble of gold rolls round a carved groove with the
+// seconds.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {
@@ -23,6 +25,7 @@ layout(std140, binding = 0) uniform buf {
     vec4 cWarm;
     vec4 cJade;
     vec4 cGlint;
+    vec4 cGold;
 } u;
 #include "../../lib/common.glsl"
 
@@ -112,7 +115,7 @@ void main() {
 
     // ── The groove and its pebble ──
     float rS = R * 0.72;
-    float gw = R * 0.022;
+    float gw = R * 0.03;
     float inGroove = cover(gw - abs(r - rS));
     // Carved in: shaded on the side toward the light, lit on the far side.
     float side = (r - rS) / gw * lit;
@@ -120,11 +123,14 @@ void main() {
     o = over(o, groove, inGroove * 0.85);
     if (u.seconds > 0.5) {
         vec2 c = at(u.secondTurn, rS);
-        float d = length(p - c) - gw * 0.95;
-        o = over(o, u.cShade.rgb, cover(1.0 - d));
+        float pr = max(gw * 1.7, 2.6);
+        float d = length(p - c) - pr;
+        o = over(o, u.cShade.rgb, 0.5 * cover(-(length(p - c - vec2(1.0, 1.5)) - pr)));
+        o = over(o, u.cShade.rgb, cover(1.2 - d));
         float shade = dot(normalize(p - c + 1e-4), LIGHT);
-        vec3 pebble = mix(u.cRock.rgb, u.cLight.rgb, band(shade, 0.45) * 0.7);
-        pebble = mix(pebble, mix(u.cRock.rgb, u.cShade.rgb, 0.5), band(-shade, 0.25));
+        vec3 pebble = u.cGold.rgb;
+        pebble = mix(pebble, mix(u.cGold.rgb, u.cGlint.rgb, 0.55), band(shade, 0.45));
+        pebble = mix(pebble, mix(u.cGold.rgb, u.cShade.rgb, 0.45), band(-shade, 0.2));
         o = over(o, pebble, cover(-d));
     }
 
@@ -141,20 +147,23 @@ void main() {
 
     // ── Hands: stone obelisks, their shadows first ──
     vec2 hq = handFrame(p, u.hourTurn);
-    vec2 h = obelisk(hq, R * 0.5, R * 0.08);
+    float hourLen = R * 0.5, hourW = R * 0.1;
+    float minuteLen = R * 0.8, minuteW = R * 0.058;
+    vec2 h = obelisk(hq, hourLen, hourW);
     vec2 mq = handFrame(p, u.minuteTurn);
-    vec2 m = obelisk(mq, R * 0.78, R * 0.055);
-    float shadow = min(obelisk(handFrame(p - vec2(2.0, 3.0), u.hourTurn), R * 0.5, R * 0.08).x,
-                       obelisk(handFrame(p - vec2(2.0, 3.0), u.minuteTurn), R * 0.78, R * 0.055).x);
-    o = over(o, u.cShade.rgb, 0.5 * cover(-shadow));
+    vec2 m = obelisk(mq, minuteLen, minuteW);
+    vec2 sh = p - vec2(1.0, 1.5) * max(1.5, R * 0.03);
+    float shadow = min(obelisk(handFrame(sh, u.hourTurn), hourLen, hourW).x,
+                       obelisk(handFrame(sh, u.minuteTurn), minuteLen, minuteW).x);
+    o = over(o, u.cShade.rgb, 0.65 * cover(-shadow + 1.0));
     // Which face is lit depends on where the hand points.
     float hLit = h.y * dot(at(u.hourTurn + 0.25, 1.0), LIGHT);
     float mLit = m.y * dot(at(u.minuteTurn + 0.25, 1.0), LIGHT);
-    vec3 hourCol = mix(mix(u.cRock.rgb, u.cShade.rgb, 0.35), mix(u.cRock.rgb, u.cLight.rgb, 0.45), step(0.0, hLit));
-    vec3 minuteCol = mix(mix(u.cRock.rgb, u.cShade.rgb, 0.35), mix(u.cRock.rgb, u.cLight.rgb, 0.45), step(0.0, mLit));
-    o = over(o, u.cShade.rgb, cover(1.2 - h.x));
+    vec3 hourCol = mix(mix(u.cLight.rgb, u.cRock.rgb, 0.45), mix(u.cLight.rgb, u.cGlint.rgb, 0.4), step(0.0, hLit));
+    vec3 minuteCol = mix(mix(u.cJade.rgb, u.cShade.rgb, 0.22), mix(u.cJade.rgb, u.cGlint.rgb, 0.4), step(0.0, mLit));
+    o = over(o, u.cShade.rgb, cover(1.5 - h.x));
     o = over(o, hourCol, cover(-h.x));
-    o = over(o, u.cShade.rgb, cover(1.2 - m.x));
+    o = over(o, u.cShade.rgb, cover(1.5 - m.x));
     o = over(o, minuteCol, cover(-m.x));
 
     // ── The jade boss ──

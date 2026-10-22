@@ -66,7 +66,8 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             visible: root.iconName !== ""
             name: root.iconName
-            size: root.text === "" ? Theme.iconSizeMedium : Theme.iconSizeSmall
+            // Smaller beside text, except on a panel button, which matches its neighbors.
+            size: root.text === "" || root.panel !== "" ? Theme.iconSizeMedium : Theme.iconSizeSmall
             iconColor: root.iconColor
         }
 

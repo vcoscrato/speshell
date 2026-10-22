@@ -1,9 +1,10 @@
 import QtQuick
 import "common"
 import "common/Colors.js" as Colors
+import "Water.js" as Water
 
-// Water wallpaper transition: a drop lands in the middle of the screen and its
-// ripple spreads out, carrying the new wallpaper in behind it.
+// Water wallpaper transition: a drop lands in the middle of the screen, splashing a
+// crown and a jet, and its ripple spreads out, carrying the new wallpaper in behind it.
 Item {
     id: root
 
@@ -59,10 +60,12 @@ Item {
         property point center: root.center
         // Ripples slow as they spread.
         property real ring: (1 - Math.pow(1 - root.sweep, 1.6)) * root.reach
-        property real strength: 16 * (1 - 0.5 * root.sweep)
+        property real strength: 21 * (1 - 0.5 * root.sweep)
         property real calm: Math.max(root.calm, root.sweep > 0.85 ? (root.sweep - 0.85) / 0.6 : 0)
+        property real age: root.sweep * root.spreadTime
         property color cLight: root.theme ? root.theme.text : "#e8f6fd"
         property color cDark: root.theme ? Colors.mix(root.theme.crust, root.theme.accent, 0.3) : "#123a55"
+        property color cWater: Water.mid(root.theme)
         fragmentShader: Qt.resolvedUrl("qsb/WallpaperTransition.qsb")
     }
 }

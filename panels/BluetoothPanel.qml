@@ -162,8 +162,9 @@ Card {
             visible: root.btOn && (root.deviceCount === 0 || (root.scanning && root.discoveredDevices.length === 0))
             iconName: "bluetooth"
             busy: root.scanning
-            title: root.scanning ? "Looking for devices…" : "No devices found"
-            detail: "Put the device in pairing mode to find it."
+            title: root.scanning ? "Looking for devices…" : "No devices yet"
+            detail: root.scanning ? "Put the device in pairing mode to find it."
+                : "Put a device in pairing mode, then scan for it."
             actionLabel: root.scanning ? "" : "Scan"
             actionIconName: "refresh"
             onActivated: BluetoothService.startDiscovery()

@@ -31,13 +31,14 @@ void main() {
     // Nebula: three flat steps of glow, with dark dust tearing through the core.
     float cloud = exp(-d * d * 1.6) * (0.55 + 0.9 * fbm(p / 70.0 + vec2(0.0, 4.0)));
     float steps = band(cloud, 0.35) * 0.35 + band(cloud, 0.6) * 0.35 + band(cloud, 0.9) * 0.3;
-    // Dust lanes stretch along the nebula, like torn filaments.
+    // Dust drifts along the nebula in soft dark wisps, faded at their ends; hard
+    // steps here read as slashes.
     vec2 along = vec2(dot(p, vec2(0.387, -0.922)), dot(p, vec2(0.922, 0.387)));
-    float dust = band(fbm(along / vec2(110.0, 22.0) + 9.0) * exp(-d * d * 4.0), 0.5);
+    float dust = smoothstep(0.42, 0.66, fbm(along / vec2(130.0, 46.0) + 9.0) * exp(-d * d * 4.0));
     vec3 warm = mix(u.cAccent.rgb, u.cText.rgb, 0.35);
     vec3 col = u.cBase.rgb;
     col = mix(col, warm, steps * 0.075);
-    col = mix(col, u.cDeep.rgb, dust * 0.35);
+    col = mix(col, u.cDeep.rgb, dust * 0.28);
 
     // Star dust: one candidate per cell, likelier along the lane.
     float density = 0.05 + 0.22 * exp(-d * d * 1.2);

@@ -44,6 +44,7 @@ Card {
             iconName: root.output
                 ? (root.muted ? "audio-output-muted" : "audio-output")
                 : (root.muted ? "audio-input-muted" : "audio-input")
+            iconColor: root.muted ? Theme.subtext : Theme.text
             anchors.verticalCenter: parent.verticalCenter
             tooltipText: (root.muted ? "Unmute " : "Mute ") + root.kind
             onClicked: {
@@ -59,6 +60,8 @@ Card {
             anchors.verticalCenter: parent.verticalCenter
             value: root.hasVolume ? root.volumePercent : 0
             enabled: root.device && root.hasVolume
+            // Muted, the level stays settable but reads as silent.
+            progressColor: root.muted ? Theme.overlay : Theme.accent
             stepSize: AudioService.scrollStep
             onMoved: root.setVolume(value)
             onWheelAdjusted: function(nextValue) { root.setVolume(nextValue); }
@@ -66,8 +69,9 @@ Card {
 
         Label {
             id: volumeText
-            text: !root.device ? "—" : (root.hasVolume ? root.volumePercent + "%" : "…")
+            text: !root.device ? "—" : root.muted ? "Muted" : (root.hasVolume ? root.volumePercent + "%" : "…")
             color: Theme.subtext
+            font.features: { "tnum": 1 }
             width: 40
             horizontalAlignment: Text.AlignRight
             anchors.verticalCenter: parent.verticalCenter
