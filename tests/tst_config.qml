@@ -84,7 +84,7 @@ TestCase {
         verify(messages(result).indexOf(data.message) >= 0, messages(result));
     }
 
-    // Settings writes single keys into the user's file; the rest must survive.
+    // Panels write single keys into the user's file; the rest must survive.
     function test_settingsEditKeepsTheRestOfTheFile() {
         var source = "# mine\n[Appearance]\ntextScale = 1.0\n\n[Weather]\nenabled = false\n";
 

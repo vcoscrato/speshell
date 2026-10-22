@@ -62,7 +62,7 @@ The Speshell mark at the left opens the launcher, followed by the screen's works
 
 ## Configuration
 
-Common options are in the **Settings** panel. Everything else is in `~/.config/speshell/config.ini`, documented by [`config.example.ini`](config.example.ini). Edits apply on save; an invalid file keeps the previous settings and shows the error.
+Options are in `~/.config/speshell/config.ini`, opened from the Power panel's header, and documented by [`config.example.ini`](config.example.ini). Edits apply on save; an invalid file keeps the previous settings and shows the error.
 
 The weather, on with `[Weather] enabled`, comes from [Open-Meteo](https://open-meteo.com/) for `[Weather] location`, or, left empty, for where [ipinfo.io](https://ipinfo.io/) places your IP address. Click the place in the weather panel's header to change it. Units follow your locale's measurement system.
 
@@ -109,7 +109,7 @@ hl.bind("SUPER + SHIFT + R", hl.dsp.exec_cmd("speshell tool record screen"))
 
 ## Power
 
-`[Power] mode` sets how much power the system and Speshell use: `maximum`, `balanced` (the default), or `saver` (see [Themes](#themes) for what each does to the effects). With `power-profiles-daemon`, the system's power profile follows: performance (balanced where there is none), balanced, or power-saver. `saverOnBattery` (on by default) switches to `saver` when the laptop is unplugged and back once it is plugged in; a mode picked in the Battery panel while unplugged lasts until then. A laptop sets both in the Battery panel; a desktop picks the mode in Settings › Appearance.
+`[Power] mode` sets how much power the system and Speshell use: `maximum`, `balanced` (the default), or `saver` (see [Themes](#themes) for what each does to the effects). With `power-profiles-daemon`, the system's power profile follows: performance (balanced where there is none), balanced, or power-saver. `saverOnBattery` (on by default) switches to `saver` when the laptop is unplugged and back once it is plugged in; a mode picked in the Battery panel while unplugged lasts until then. A laptop sets both in the Battery panel; a desktop picks the mode in the Power panel.
 
 ## Laptops
 
@@ -121,7 +121,7 @@ Short of room on the screen, the bar goes compact before it grows past the edge:
 
 **The Battery panel** shows the charge, the time to full or empty, the power draw, and the battery's health (its capacity against its design), and the charge of devices like a mouse or headphones. With a battery that has `charge_control_end_threshold`, the charge limit stops charging at 60, 80, or 90% and starts again 5 points below, which keeps a battery that's mostly plugged in healthy; Full charges it all the way, and leaves the firmware's own setting alone at startup. The packaged polkit rule lets you change it without a password; from a checkout, polkit asks.
 
-**Idle**, by `[Idle]` and in Settings › General, on battery only: after 2 minutes the screen dims and the keyboard backlight goes off, at 5 the session locks with `[Power] lockCommand`, at 6 the displays turn off (Hyprland), and at 15 the laptop sleeps. Input undoes each step. Apps can hold idling off, as video players do; playing media holds off sleep; and **Keep awake**, the cup in the bar on battery, or `speshell awake on`, holds it all off until turned off. Whatever puts the system to sleep, closing the lid included, locks first.
+**Idle**, by `[Idle]`, on battery only: after 2 minutes the screen dims and the keyboard backlight goes off, at 5 the session locks with `[Power] lockCommand`, at 6 the displays turn off (Hyprland), and at 15 the laptop sleeps. Input undoes each step. Apps can hold idling off, as video players do; playing media holds off sleep; and **Keep awake**, the cup in the bar on battery, or `speshell awake on`, holds it all off until turned off. Whatever puts the system to sleep, closing the lid included, locks first.
 
 **Hibernate** shows in the Power panel when logind can hibernate (a swap that fits memory, and resume set up), and locks first as Sleep does.
 
@@ -131,7 +131,7 @@ Short of room on the screen, the bar goes compact before it grows past the edge:
 
 **The lid**: with another display on, closing the lid turns the laptop's display off (Hyprland), and opening it, or unplugging the last other display, brings it back as it was.
 
-**Keys**: the OSD shows changes made outside Speshell's panels: volume, brightness, the keyboard backlight, the microphone's mute, the touchpad, and airplane mode. Brightness keys that run `brightnessctl` already show it. Airplane mode is also in the Network panel's header, the keyboard backlight beside the laptop display's brightness in the Displays panel, and the touchpad in Settings › General.
+**Keys**: the OSD shows changes made outside Speshell's panels: volume, brightness, the keyboard backlight, the microphone's mute, the touchpad, and airplane mode. Brightness keys that run `brightnessctl` already show it. Airplane mode is also in the Network panel's header, the keyboard backlight beside the laptop display's brightness in the Displays panel.
 
 ```lua
 hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd("speshell brightness up"), { locked = true, repeating = true })
@@ -146,9 +146,9 @@ On battery, Balanced also runs the theme's effects at 30 fps and looks for recor
 
 ## Themes
 
-Speshell ships Cosmos (the default), four elements (Fire, Air, Water, and Earth), and Relâmpago, a racing theme. Each has a palette, a wallpaper, launcher and wallpaper effects, a still painted backdrop behind the bar and its panels, themed slider and switch knobs with small effects as you use them, and a clock face (see [extras/](extras/README.md)). Pick one in Settings › Appearance or with `!theme`.
+Speshell ships Cosmos (the default), four elements (Fire, Air, Water, and Earth), and Relâmpago, a racing theme. Each has a palette, a wallpaper, launcher and wallpaper effects, a still painted backdrop behind the bar and its panels, themed slider and switch knobs with small effects as you use them, and a clock face (see [extras/](extras/README.md)). Pick one with `!theme` in the launcher, and a wallpaper with `!wall`.
 
-Set `drawWallpaper = true` under `[Appearance]` to let Speshell draw the desktop background. It is off by default so another wallpaper tool can stay in charge. `launcherTransitionSpeed`, `wallpaperTransitionSpeed`, and `controlEffectsSpeed` (0–3, default 1) speed up or slow down each kind of effect, and 0 turns it off. `[Power] mode` sets their frame rate: `maximum` animates at the display's refresh rate, `balanced` (the default) at 60 fps, and `saver` turns the effects off along with the interface's own motion. `shuffleAtLaunch` picks at random each time Speshell starts: `wallpaper` (another wallpaper of the theme), `theme` (another theme), or `both`; the default is `off`. Settings › Appearance sets all of these, and the power mode on a desktop (see [Power](#power)).
+Set `drawWallpaper = true` under `[Appearance]` to let Speshell draw the desktop background. It is off by default so another wallpaper tool can stay in charge. `launcherTransitionSpeed`, `wallpaperTransitionSpeed`, and `controlEffectsSpeed` (0–3, default 1) speed up or slow down each kind of effect, and 0 turns it off. `[Power] mode` sets their frame rate: `maximum` animates at the display's refresh rate, `balanced` (the default) at 60 fps, and `saver` turns the effects off along with the interface's own motion. `shuffleAtLaunch` picks at random each time Speshell starts: `wallpaper` (another wallpaper of the theme), `theme` (another theme), or `both`; the default is `off`.
 
 Each theme remembers the wallpaper last set for it, so switching back to a theme brings that wallpaper back; a theme you have not picked a wallpaper for starts with its first.
 

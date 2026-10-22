@@ -55,7 +55,6 @@ Item {
         notes: notesPanel,
         notifications: notificationsPanel,
         power: powerPanel,
-        settings: settingsPanel,
         timer: timerPanel,
         tools: toolsPanel,
         weather: weatherPanel
@@ -236,11 +235,6 @@ Item {
     Component {
         id: powerPanel
         PowerPanel {}
-    }
-
-    Component {
-        id: settingsPanel
-        SettingsPanel {}
     }
 
     // The timer of the chip it hangs from.

@@ -7,11 +7,13 @@ import qs.services
 import qs.theme
 import qs.components
 
-// Toasts in the focused screen's top right corner.
+// Toasts in the focused screen's right corner across from the bar, clear of the
+// dropdowns that hang from it.
 PanelWindow {
     id: root
 
     property var targetScreen: HyprlandService.focusedScreen()
+    readonly property bool atTop: ConfigService.settings.bar.position === "bottom"
 
     // Each new toast opens on the focused monitor.
     Connections {
@@ -30,20 +32,22 @@ PanelWindow {
     exclusionMode: ExclusionMode.Normal
 
     anchors {
-        top: true
+        top: root.atTop
+        bottom: !root.atTop
         right: true
     }
 
     // Quickshell's type info hides the fields of PanelWindow.margins.
     // qmllint disable missing-property
     margins {
-        top: Theme.spacingLarge
-        right: Theme.spacingLarge
+        top: Theme.spacingXL
+        bottom: Theme.spacingXL
+        right: Theme.spacingXL
     }
     // qmllint enable missing-property
 
     color: "transparent"
-    implicitWidth: 350
+    implicitWidth: 400
     implicitHeight: toastColumn.height
     visible: NotificationService.activePopups.length > 0
 
@@ -65,15 +69,48 @@ PanelWindow {
                     modelData.appIcon ? Quickshell.iconPath(modelData.appIcon, true) : ""
                 )
                 readonly property color toneColor: modelData.urgency === 2 ? Theme.error : Theme.accent
+                // What is left of its time on screen, from 1 to 0.
+                property real remaining: 1
+                // Whether it closes on its own, rather than when dismissed.
+                property bool timed: false
+
+                // Runs from the time left, as when a replaced notification restarts it.
+                function startCountdown() {
+                    const duration = Number(toastCard.modelData.duration);
+                    const left = Number(toastCard.modelData.expiresAt) - Date.now();
+                    countdown.stop();
+                    toastCard.timed = duration > 0 && toastCard.modelData.expiresAt >= 0;
+                    if (!toastCard.timed)
+                        return;
+                    toastCard.remaining = Math.max(0, Math.min(1, left / duration));
+                    countdown.duration = Math.max(0, left);
+                    countdown.start();
+                }
+
+                NumberAnimation {
+                    id: countdown
+                    target: toastCard
+                    property: "remaining"
+                    to: 0
+                }
+
+                // The service resets the expiry first, so read it after.
+                Connections {
+                    target: toastCard.live
+                    function onSummaryChanged() { Qt.callLater(toastCard.startCountdown); }
+                    function onBodyChanged() { Qt.callLater(toastCard.startCountdown); }
+                }
 
                 width: parent.width
-                height: toastContent.height + (Theme.spacingMedium * 2)
+                // Room below the content for the countdown.
+                height: toastContent.height + Theme.spacingLarge + Theme.spacingMedium + Theme.spacingSmall
 
-                // Top right of the screen: rounded toward its center, accent edge on the left.
+                // In a right corner: rounded toward the screen's center, accent edge on the left.
                 Surface {
                     anchors.fill: parent
                     backdrop: true
-                    roundBottomLeft: true
+                    roundBottomLeft: root.atTop
+                    roundTopLeft: !root.atTop
                     edge: "left"
                     edgeColor: toastCard.toneColor
                     tint: toastMouse.containsMouse ? Theme.controlFill : "transparent"
@@ -86,7 +123,10 @@ PanelWindow {
                 // Pops in as the OSD does.
                 scale: 0.96
                 opacity: 0
-                Component.onCompleted: entranceAnim.start()
+                Component.onCompleted: {
+                    entranceAnim.start();
+                    toastCard.startCountdown();
+                }
 
                 ParallelAnimation {
                     id: entranceAnim
@@ -110,6 +150,7 @@ PanelWindow {
                         right: dismissBtn.left
                         top: parent.top
                         margins: Theme.spacingMedium
+                        topMargin: Theme.spacingLarge
                         leftMargin: Theme.spacingLarge
                     }
                     spacing: Theme.spacingSmall
@@ -118,8 +159,8 @@ PanelWindow {
                         spacing: Theme.spacingSmall
 
                         Image {
-                            width: 16
-                            height: 16
+                            width: Theme.iconSizeMedium
+                            height: Theme.iconSizeMedium
                             anchors.verticalCenter: parent.verticalCenter
                             visible: toastCard.notificationIcon !== ""
                             source: toastCard.notificationIcon
@@ -128,7 +169,7 @@ PanelWindow {
                         }
 
                         SpeshellMark {
-                            size: 16
+                            size: Theme.iconSizeMedium
                             anchors.verticalCenter: parent.verticalCenter
                             visible: toastCard.internal && toastCard.notificationIcon === ""
                         }
@@ -179,12 +220,34 @@ PanelWindow {
                     }
                 }
 
+                // Drains toward the left until the toast closes on its own.
+                Rectangle {
+                    visible: toastCard.timed
+                    anchors {
+                        left: toastContent.left
+                        right: parent.right
+                        bottom: parent.bottom
+                        rightMargin: Theme.spacingMedium
+                        bottomMargin: Theme.spacingSmall
+                    }
+                    height: 2
+                    radius: 1
+                    color: Theme.controlFill
+
+                    Rectangle {
+                        width: parent.width * toastCard.remaining
+                        height: parent.height
+                        radius: parent.radius
+                        color: Theme.alpha(toastCard.toneColor, Theme.tintOutline)
+                    }
+                }
+
                 IconButton {
                     id: dismissBtn
                     anchors.right: parent.right
                     anchors.rightMargin: Theme.spacingSmall
                     anchors.top: parent.top
-                    anchors.topMargin: Theme.spacingSmall
+                    anchors.topMargin: Theme.spacingMedium
                     iconName: "close"
                     size: Theme.controlHeightSmall
                     iconSize: Theme.iconSizeTiny

@@ -7,8 +7,8 @@ import "../core/Config.js" as Config
 import "Shell.js" as Shell
 
 // config.ini: loads and validates it (Config.js), seeding it from config.example.ini
-// on the first run, follows edits made outside Speshell, and writes the Settings
-// panel's changes. Read the settings in force from `settings`.
+// on the first run, follows edits made outside Speshell, and writes the panels'
+// changes. Read the settings in force from `settings`.
 Singleton {
     id: root
 

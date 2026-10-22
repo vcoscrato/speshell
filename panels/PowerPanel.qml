@@ -6,7 +6,8 @@ import qs.services
 import qs.theme
 
 // Lock, which runs at once, and the session's power actions, each asking for a second
-// click.
+// click; Speshell's config and relaunch in the header; and, without a battery, the
+// power mode.
 Card {
     id: root
 
@@ -30,6 +31,29 @@ Card {
             { id: "poweroff", label: "Power off", iconName: "power", tone: "error" }
         ]
     ]
+    readonly property var modeOptions: [
+        { value: "saver", label: "Saver" },
+        { value: "balanced", label: "Balanced" },
+        { value: "maximum", label: "Maximum" }
+    ]
+
+    headerActions: Row {
+        spacing: Theme.spacingTiny
+
+        HeaderButton {
+            iconName: "config"
+            tooltipText: "Edit config.ini"
+            onClicked: ConfigService.openConfig()
+        }
+
+        HeaderButton {
+            iconName: "refresh"
+            busy: SystemState.relaunching
+            enabled: SystemState.canRelaunch
+            tooltipText: "Relaunch Speshell " + SystemState.appVersion
+            onClicked: SystemState.relaunch()
+        }
+    }
 
     onPresentedChanged: if (!root.presented) root.cancelConfirmation()
 
@@ -135,5 +159,20 @@ Card {
         text: PowerService.errorMessage
         color: Theme.error
         wrapMode: Text.WordWrap
+    }
+
+    // A laptop picks it in the Battery panel.
+    SettingRow {
+        visible: !FeatureSupport.supportsBattery
+        label: "Power mode"
+        info: PowerService.profilesAvailable
+            ? "Sets the system's power profile and Speshell's animations together."
+            : "Sets how much Speshell animates."
+
+        SegmentedControl {
+            options: root.modeOptions
+            currentValue: PowerService.mode
+            onValueSelected: value => PowerService.setMode(value)
+        }
     }
 }

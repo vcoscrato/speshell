@@ -22,7 +22,6 @@ Singleton {
         notes: "Notes",
         notifications: "Notifications",
         power: "Power",
-        settings: "Settings",
         timer: "Timer",
         tools: "Tools",
         weather: "Weather"
@@ -85,7 +84,7 @@ Singleton {
             return NotificationService.dndEnabled ? "bell-off" : "bell";
         if (panel === "weather")
             return WeatherService.ready ? WeatherService.current.icon : "weather-cloudy";
-        return ({ tools: "tools", clipboard: "clipboard", notes: "notes", settings: "config", power: "power" })[panel] || "missing";
+        return ({ tools: "tools", clipboard: "clipboard", notes: "notes", power: "power" })[panel] || "missing";
     }
 
     // A panel's state in a few words, for its bar button's label.

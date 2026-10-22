@@ -39,7 +39,7 @@ PanelWindow {
     readonly property var panelGroups: [
         ["tools", "clipboard", "notes"],
         ["audio", "microphone", "display", "network", "bluetooth", "awake", "battery", "notifications"],
-        ["settings", "power"]
+        ["power"]
     ]
 
     // The panel open in the dropdown, or "", and the button it hangs from.

@@ -37,7 +37,7 @@ Names are lowercase-kebab for directories and paintings; QML components are Pasc
 
 Run every recipe from the repository root. The lab renders through an invisible 1×1 overlay, so it needs a Wayland session, plus `qt6-shadertools`, ffmpeg, and ImageMagick.
 
-**Retune a theme's palette.** Edit `themes/<theme>/theme.ini`. Its keys are listed in `themes/cosmos/theme.ini`; missing ones fall back to Cosmos. Pick the theme in Speshell's Settings › Appearance to see it.
+**Retune a theme's palette.** Edit `themes/<theme>/theme.ini`. Its keys are listed in `themes/cosmos/theme.ini`; missing ones fall back to Cosmos. Pick the theme with `!theme` in the launcher to see it.
 
 **Paint a wallpaper.**
 

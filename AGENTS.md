@@ -6,14 +6,14 @@ git diff --check
 timeout 5s quickshell --no-color -p .
 ```
 
-`quickshell --reload` is not available in QuickShell v0.3. Use Reload (config) or Relaunch in Settings › About, or restart the process.
+`quickshell --reload` is not available in QuickShell v0.3. Use Relaunch in the Power panel's header, or restart the process.
 
 ## Architecture
 
 - `shell.qml` starts strict config loading, binds the theme to the active palette and text scale, creates the services that act on their own (idle, battery, lid), and gates either `Runtime` or `ConfigErrorWindow`.
 - `core/` composes the runtime (IPC, notification server) and holds the launcher, wallpaper, OSD, toast, and config-error windows.
 - `bar/` is the bar on each screen: its buttons, the workspaces, the media controls, the tray, and the dropdown that hosts one panel at a time.
-- `panels/` holds the panels the bar opens, one `<Name>Panel.qml` each and the parts they share; `panels/settings/` holds the Settings pages.
+- `panels/` holds the panels the bar opens, one `<Name>Panel.qml` each and the parts they share. There is no Settings panel: options live in config.ini, and a panel writes one only where it changes state there (weather location, night light, charge limit, power mode).
 - `services/` holds singleton system integrations and shared state. `PanelService` knows the panels and opens them. Hyprland-only services (`HyprlandService`, `WorkspaceService`, `DisplayService`) gate on `HyprlandService.running`, so everything Hyprland-only degrades on other compositors.
 - `components/` holds reusable QML UI primitives; `theme/` the default palette and geometry/typography tokens.
 - `assets/icons/` holds the pinned Tabler SVG subset (`tabler/`, with its license) and Speshell's own icons in its style (`speshell/`); `components/Icons.js` names them.

@@ -14,7 +14,7 @@ default:
     @just --list
 
 # QML module directories, imported as `qs.<dir>`.
-modules := "bar components core panels panels/settings services theme"
+modules := "bar components core panels services theme"
 
 # Lint every QML module; any warning fails.
 lint:

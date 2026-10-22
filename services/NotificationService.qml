@@ -148,6 +148,7 @@ Singleton {
             defaultAction: null,
             actions: [],
             resident: false,
+            duration: critical ? -1 : 8000,
             expiresAt: critical ? -1 : Date.now() + 8000
         }));
     }
@@ -252,6 +253,7 @@ Singleton {
             var popup = root.activePopups[j];
             if (popup.notification === notification) {
                 var timeout = root.timeoutForNotification(notification);
+                popup.duration = timeout;
                 popup.expiresAt = timeout < 0 ? -1 : Date.now() + timeout;
                 root.schedulePopupExpiry();
                 break;
@@ -295,6 +297,8 @@ Singleton {
             defaultAction: actions.defaultAction,
             actions: actions.actions,
             resident: notification.resident,
+            // Milliseconds on screen, or -1 until dismissed; the toast draws what is left.
+            duration: timeout,
             expiresAt: timeout < 0 ? -1 : Date.now() + timeout
         });
     }

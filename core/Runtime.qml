@@ -37,6 +37,15 @@ Scope {
 
     Component.onCompleted: root.reportStartupIssues()
 
+    // Panels save to config.ini as they change; a save that fails says so.
+    Connections {
+        target: ConfigService
+        function onOperationMessageChanged() {
+            if (ConfigService.operationFailed && ConfigService.operationMessage !== "")
+                NotificationService.addInternalNotification("config", "Speshell config", ConfigService.operationMessage);
+        }
+    }
+
     NotificationServer {
         actionsSupported: true
         imageSupported: true
