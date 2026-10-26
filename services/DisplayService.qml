@@ -312,8 +312,10 @@ Singleton {
             + ", position = " + quote(position)
             + ", scale = " + scale
             // Always sent: Hyprland merges the rule into the last one, so a mirror left
-            // out stays mirrored.
+            // out stays mirrored, and a display disabled before (as the lid does) stays
+            // disabled.
             + ", mirror = " + quote(mirrored ? mirrorTarget : "")
+            + ", disabled = false"
             + " })"];
     }
 
