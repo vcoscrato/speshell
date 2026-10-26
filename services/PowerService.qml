@@ -39,6 +39,12 @@ Singleton {
     readonly property bool lockerAvailable: FeatureSupport.hasCommand(root.lockerExecutable)
     // Whether the locker Speshell started still runs.
     readonly property bool locked: lockerProcess.running
+    // Whether the compositor confirmed the lock, so the locker has drawn on every screen.
+    // Only hyprlock says so; sleep waits for it, up to lockSecureTimeout, since sleeping
+    // with the locker's first frames still on the GPU can leave the screen frozen on
+    // resume (NVIDIA).
+    property bool lockSecured: false
+    readonly property int lockSecureTimeout: 4000
     property bool busy: false
     property string activeAction: ""
     property string errorMessage: ""
@@ -95,6 +101,7 @@ Singleton {
         }
 
         root.lockerPurpose = purpose;
+        root.lockSecured = false;
         lockerProcess.command = root.lockCommand.slice();
         lockerProcess.running = true;
         lockerReadyTimer.restart();
@@ -180,16 +187,41 @@ Singleton {
             }
 
             if (root.sleeps(purpose)) {
-                sleepProcess.running = true;
+                if (root.lockSecured)
+                    sleepProcess.running = true;
+                else
+                    lockSecureTimer.restart();
             }
+        }
+    }
+
+    Timer {
+        id: lockSecureTimer
+        interval: root.lockSecureTimeout
+        onTriggered: sleepProcess.running = true
+    }
+
+    onLockSecuredChanged: {
+        if (root.lockSecured && lockSecureTimer.running) {
+            lockSecureTimer.stop();
+            sleepProcess.running = true;
         }
     }
 
     Process {
         id: lockerProcess
         running: false
+        stdout: SplitParser {
+            // hyprlock's log line once the compositor sends ext-session-lock's locked.
+            onRead: function(line) {
+                if (line.indexOf("onLockLocked called") >= 0)
+                    root.lockSecured = true;
+            }
+        }
         stderr: StdioCollector { id: lockerError }
         onExited: function(exitCode) {
+            root.lockSecured = false;
+            lockSecureTimer.stop();
             if (lockerReadyTimer.running && root.lockerPurpose !== "") {
                 root.fail(root.commandError(
                     lockerError,

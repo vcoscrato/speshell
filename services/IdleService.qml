@@ -63,8 +63,8 @@ Singleton {
         onIsIdleChanged: if (isIdle && !PowerService.busy) PowerService.runAction("sleep")
     }
 
-    // Locks, then lets the system sleep once the locker has had time to cover the
-    // screen, as PowerService's own Sleep does.
+    // Locks, then lets the system sleep once the locker has covered the screen, as
+    // PowerService's own Sleep does.
     Connections {
         target: SessionService
 
@@ -78,9 +78,21 @@ Singleton {
         }
     }
 
+    Connections {
+        target: PowerService
+
+        function onLockSecuredChanged() {
+            if (PowerService.lockSecured && sleepRelease.running) {
+                sleepRelease.stop();
+                SessionService.releaseSleep();
+            }
+        }
+    }
+
+    // Within logind's InhibitDelayMaxSec (5 s), for lockers that never confirm.
     Timer {
         id: sleepRelease
-        interval: 1000
+        interval: PowerService.lockSecureTimeout
         onTriggered: SessionService.releaseSleep()
     }
 }
