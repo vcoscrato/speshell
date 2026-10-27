@@ -4,9 +4,9 @@ Each theme brings its own palette, wallpaper, clock face, and effects. Rendered 
 
 ## Cosmos
 
-The launcher picking a theme with `!theme`.
+The theme gallery previewing Cosmos: its wallpaper, palette, and orrery clock face, over the other themes.
 
-![The launcher listing the themes over the Cosmos wallpaper](cosmos.jpg)
+![The theme gallery previewing the Cosmos theme](cosmos.jpg)
 
 ## Fire
 
@@ -37,3 +37,9 @@ A timer counting down in the bar, opened from its chip.
 Settings.
 
 ![The Settings panel in the Relâmpago theme](relampago.jpg)
+
+## Sugar
+
+The sound panel: frosting piped along each slider's track, ending at the knob in a kiss.
+
+![The sound panel in the Sugar theme](sugar.jpg)

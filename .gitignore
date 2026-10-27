@@ -4,9 +4,10 @@ config.ini
 *.qmlc
 *.jsc
 .codex
-*.pkg.tar.*
-pkg/
-src/
-/speshell/
+# makepkg's output, beside the PKGBUILD.
+/packaging/*.pkg.tar.*
+/packaging/pkg/
+/packaging/src/
+/packaging/speshell/
 qsb/
 .claude

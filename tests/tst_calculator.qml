@@ -1,6 +1,6 @@
 import QtQuick
 import QtTest
-import "../services/CalculatorProvider.js" as Calculator
+import "../shell/services/CalculatorProvider.js" as Calculator
 
 TestCase {
     name: "Calculator"

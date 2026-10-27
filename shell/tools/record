@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Usage: record [region|screen]
+# Records an area the user drags out (region, the default) or the focused
+# monitor (screen), with audio, to Videos/Recordings. While a recording runs,
+# any call stops it.
+set -euo pipefail
+# shellcheck source=lib.sh
+source "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")/lib.sh"
+
+# SIGINT lets wf-recorder finish the file.
+if pkill -SIGINT -x wf-recorder 2>/dev/null; then
+  refresh_activity
+  exit 0
+fi
+
+case "${1:-region}" in
+  region)
+    region="$(select_region)"
+    [[ -n "$region" ]] || exit 0
+    target=(-g "$region")
+    ;;
+  screen)
+    target=(-o "$(focused_output)")
+    ;;
+  *)
+    printf 'usage: record [region|screen]\n' >&2
+    exit 2
+    ;;
+esac
+
+file="$(timestamped_file VIDEOS Recordings Recording).mp4"
+log="$runtime_dir/record.log"
+refresh_activity
+status=0
+wf-recorder "${target[@]}" --audio -f "$file" >"$log" 2>&1 </dev/null || status=$?
+refresh_activity
+
+if [[ ! -s "$file" ]]; then
+  notify "Recording failed" "$(preview "$(tail -n1 "$log")")"
+  exit "$((status > 0 ? status : 1))"
+fi
+notify_open "Recording saved" "$(basename -- "$file")" "$file"

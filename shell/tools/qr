@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Copies what the QR code or barcode in an area the user drags out says, and
+# offers to open it when it is a link.
+set -euo pipefail
+# shellcheck source=lib.sh
+source "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")/lib.sh"
+
+region="$(select_region)"
+[[ -n "$region" ]] || exit 0
+
+text="$(grim -g "$region" -t png - | zbarimg -q --raw -1 - 2>/dev/null || true)"
+text="${text%$'\n'}"
+if [[ -z "$text" ]]; then
+  notify "No code found" "Drag around the whole QR code or barcode."
+  exit 0
+fi
+printf '%s' "$text" | wl-copy
+
+if [[ "$text" =~ ^https?:// ]]; then
+  notify_open "Link copied" "$(preview "$text")" "$text"
+else
+  notify "Code copied" "$(preview "$text")"
+fi

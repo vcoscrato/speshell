@@ -1,0 +1,200 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Runs the shell this script sits in, which /usr/bin/speshell links to, or a
+# checkout's; SPESHELL_QML_DIR runs another copy.
+script_dir="$(cd -- "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")" && pwd)"
+readonly app_dir="${SPESHELL_QML_DIR:-$script_dir}"
+readonly config_root="${XDG_CONFIG_HOME:-$HOME/.config}"
+readonly data_root="${XDG_DATA_HOME:-$HOME/.local/share}"
+readonly config_dir="$config_root/speshell"
+readonly data_dir="$data_root/speshell"
+readonly config_file="$config_dir/config.ini"
+
+if [[ ! -r "$app_dir/shell.qml" ]]; then
+  printf 'speshell: shell.qml not found in %s\n' "$app_dir" >&2
+  exit 1
+fi
+
+install -d -m755 "$config_root" "$data_root" "$config_dir" "$data_dir"
+
+if [[ ! -e "$config_file" && ! -L "$config_file" ]]; then
+  install -m644 "$app_dir/config.example.ini" "$config_file"
+fi
+
+# Prints the call's output. A frozen instance still accepts IPC connections but never
+# answers, so give up after a few seconds; that exits with status 124.
+ipc_try() {
+  local output
+  output="$(timeout 3 /usr/bin/quickshell ipc --any-display -p "$app_dir" call -- "$@" 2>/dev/null)" || return
+  if [[ -n "$output" ]]; then
+    printf '%s\n' "$output"
+  fi
+}
+
+stop_frozen_instances() {
+  local pid
+  for pid in $(/usr/bin/quickshell list -j -p "$app_dir" 2>/dev/null | sed -n 's/^ *"pid": \([0-9]*\).*/\1/p'); do
+    printf 'speshell: instance %s stopped responding; restarting it\n' "$pid" >&2
+    kill -TERM "$pid" 2>/dev/null || continue
+    for _ in $(seq 1 20); do
+      kill -0 "$pid" 2>/dev/null || continue 2
+      sleep 0.05
+    done
+    kill -KILL "$pid" 2>/dev/null || true
+  done
+}
+
+ipc_call() {
+  local status=0
+  ipc_try "$@" || status=$?
+  if (( status == 0 )); then
+    return 0
+  fi
+  if (( status == 124 )); then
+    stop_frozen_instances
+  fi
+
+  /usr/bin/quickshell -p "$app_dir" --no-duplicate --daemonize
+
+  for _ in $(seq 1 30); do
+    if ipc_try "$@"; then
+      return 0
+    fi
+    sleep 0.05
+  done
+
+  printf 'speshell: failed to contact IPC target %s\n' "${1:-unknown}" >&2
+  return 1
+}
+
+readonly usage_text='usage: speshell [QUICKSHELL OPTIONS]
+       speshell launcher [open | close | toggle]
+       speshell lock
+       speshell panel [list | open NAME | toggle NAME | close]
+       speshell timer [get | start LENGTH [NAME] | add LENGTH [NAME] | pause|resume|toggle|stop [NAME]]
+       speshell activity [list | set ID STATE LABEL [DETAIL] [ICON] [TONE] | clear ID | refresh]
+       speshell tool [list | NAME [MODE]]
+       speshell brightness [get | up | down | set PERCENT | keyboard]
+       speshell awake|touchpad|airplane|nightlight [get | on | off | toggle]
+       speshell theme [get | list | set ID | shuffle [ID] | rescan | open | close | toggle]
+       speshell wallpaper [get | set PATH]'
+
+# The usage of the command given, and exit 2.
+usage() {
+  printf '%s\n' "$usage_text" | grep -E "speshell ([a-z]+\|)*$command( |\$)" | sed -E 's/^ *(usage: )?/usage: /' >&2
+  exit 2
+}
+
+# Calls an IPC target of core/Runtime.qml and prints its reply. The targets check
+# what the arguments name; a reply of "error: WHY" fails with WHY.
+call() {
+  local reply
+  reply="$(ipc_call "$@")" || exit 1
+  if [[ "$reply" == "error: "* ]]; then
+    printf 'speshell: %s\n' "${reply#error: }" >&2
+    exit 1
+  fi
+  if [[ -n "$reply" ]]; then
+    printf '%s\n' "$reply"
+  fi
+}
+
+# Anything but a command runs the shell itself.
+case "${1:-}" in
+  launcher|lock|panel|timer|activity|tool|brightness|awake|touchpad|airplane|nightlight|theme|wallpaper) ;;
+  *) exec /usr/bin/quickshell -p "$app_dir" "$@" ;;
+esac
+
+command="$1"
+action="${2:-}"
+shift
+shift || true
+nargs=$#
+
+# Fails with the usage unless the action got $1 to ${2:-$1} arguments.
+takes() {
+  (( nargs >= $1 && nargs <= ${2:-$1} )) || usage
+}
+
+case "$command" in
+  launcher)
+    takes 0
+    case "${action:=open}" in
+      open|close|toggle) call launcher "$action" >/dev/null ;;
+      *) usage ;;
+    esac
+    ;;
+  lock)
+    [[ -z "$action" ]] || usage
+    call lock lock
+    ;;
+  panel)
+    case "${action:=list}" in
+      list|close) takes 0 ;;
+      open|toggle) takes 1 ;;
+      *) usage ;;
+    esac
+    call panel "$action" "$@"
+    ;;
+  timer)
+    case "${action:=get}" in
+      get) takes 0 ;;
+      start|add) (( nargs > 0 )) || usage ;;
+      pause|resume|toggle|stop) ;;
+      *) usage ;;
+    esac
+    if [[ "$action" == get ]]; then
+      call timer get
+    else
+      call timer "$action" "$*"
+    fi
+    ;;
+  activity)
+    case "${action:=list}" in
+      list) takes 0; call activity list ;;
+      set) takes 3 6; call activity publish "$1" "$2" "$3" "${4:-}" "${5:-info}" "${6:-neutral}" ;;
+      clear) takes 1; call activity clear "$1" ;;
+      # Hotkey scripts call this on every state change: never start Speshell for it.
+      refresh) takes 0; ipc_try activity refresh >/dev/null || true ;;
+      *) usage ;;
+    esac
+    ;;
+  tool)
+    case "${action:=list}" in
+      list) takes 0; call tool list ;;
+      *) takes 0 1; call tool run "$action" "${1:-}" ;;
+    esac
+    ;;
+  brightness)
+    case "${action:=get}" in
+      get|up|down|keyboard) takes 0; call brightness "$action" ;;
+      set) takes 1; [[ "$1" =~ ^[0-9]+$ ]] || usage; call brightness set "$1" ;;
+      *) usage ;;
+    esac
+    ;;
+  awake|touchpad|airplane|nightlight)
+    takes 0
+    case "${action:=get}" in
+      get) call "$command" get ;;
+      on|off|toggle) call "$command" set "$action" ;;
+      *) usage ;;
+    esac
+    ;;
+  theme)
+    case "${action:=get}" in
+      get|list|rescan|open|close|toggle) takes 0 ;;
+      set) takes 1 ;;
+      shuffle) takes 0 1; set -- "${1:-}" ;;
+      *) usage ;;
+    esac
+    call theme "$action" "$@"
+    ;;
+  wallpaper)
+    case "${action:=get}" in
+      get) takes 0; call wallpaper get ;;
+      set) takes 1; call wallpaper set "$(realpath -s -- "$1")" ;;
+      *) usage ;;
+    esac
+    ;;
+esac

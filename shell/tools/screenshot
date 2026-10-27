@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Usage: screenshot [region|screen]
+# Saves a screenshot of an area the user drags out (region, the default) or of
+# the focused monitor (screen) to Pictures/Screenshots and copies it. The toast
+# offers to annotate it in Swappy, when installed, or to open it.
+set -euo pipefail
+# shellcheck source=lib.sh
+source "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")/lib.sh"
+
+case "${1:-region}" in
+  region)
+    region="$(select_region)"
+    [[ -n "$region" ]] || exit 0
+    capture=(grim -g "$region")
+    ;;
+  screen)
+    capture=(grim -o "$(focused_output)")
+    ;;
+  *)
+    printf 'usage: screenshot [region|screen]\n' >&2
+    exit 2
+    ;;
+esac
+
+file="$(timestamped_file PICTURES Screenshots Screenshot).png"
+if ! "${capture[@]}" "$file" 2>/dev/null; then
+  notify "Screenshot failed" "Couldn't capture the screen."
+  exit 1
+fi
+wl-copy --type image/png <"$file"
+
+saved="Saved as $(basename -- "$file")"
+if command -v swappy >/dev/null 2>&1; then
+  [[ "$(notify "Screenshot copied" "$saved" "edit=Annotate")" == edit ]] && exec swappy -f "$file" -o "$file"
+else
+  notify_open "Screenshot copied" "$saved" "$file"
+fi

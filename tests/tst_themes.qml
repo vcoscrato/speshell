@@ -1,17 +1,18 @@
 import QtQuick
 import QtTest
-import "../services/ThemeProvider.js" as ThemeProvider
+import "../shell/services/ThemeProvider.js" as ThemeProvider
 
 TestCase {
     name: "Themes"
 
-    readonly property string shippedDir: "/usr/share/speshell/extras/themes"
+    readonly property string shippedDir: "/usr/share/speshell/themes"
     readonly property string themesDir: "/home/me/.config/speshell/themes"
     readonly property var themesDirs: [shippedDir, themesDir]
     readonly property string scan: [
         "theme\t" + shippedDir + "/fire",
         "ini\t[Theme]",
         "ini\tname = Fire",
+        "ini\tdescription = Embers and ash.",
         "ini\teffects = fire",
         "ini\t[Colors]",
         "ini\taccent = #e5482e",
@@ -35,8 +36,8 @@ TestCase {
         "wall\t" + themesDir + "/cosmos/galaxy.jpg",
         "wall\t" + themesDir + "/nord/fjord.webp",
         "wall\t" + themesDir + "/loose.jpg",
-        "effects\t/usr/share/speshell/extras/effects/fire",
-        "effects\t/usr/share/speshell/extras/effects/cosmos",
+        "effects\t/usr/share/speshell/effects/fire",
+        "effects\t/usr/share/speshell/effects/cosmos",
         "effects\t/home/me/.local/share/speshell/effects/fire",
         ""
     ].join("\n")
@@ -47,6 +48,7 @@ TestCase {
         compare(parsed.wallpapers.map(function(w) { return w.theme; }), ["cosmos", "fire", "fire", "nord"]);
         var fire = ThemeProvider.findTheme(parsed.themes, "fire");
         compare(fire.name, "Fire");
+        compare(fire.description, "Embers and ash.");
         compare(fire.colors.accent, "#e5482e");
     }
 

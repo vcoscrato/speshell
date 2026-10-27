@@ -1,0 +1,6 @@
+[Unit]
+Description=Copy %i's Speshell theme to the login screen
+
+[Service]
+Type=oneshot
+ExecStart=/usr/share/speshell/greeter/speshell-greeter-theme %i

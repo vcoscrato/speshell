@@ -1,7 +1,7 @@
 import QtQuick
 import QtTest
-import "../services/TimerProvider.js" as TimerProvider
-import "../components/Format.js" as Format
+import "../shell/services/TimerProvider.js" as TimerProvider
+import "../shell/components/Format.js" as Format
 
 TestCase {
     name: "Timer"

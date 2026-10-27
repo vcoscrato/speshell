@@ -1,0 +1,10 @@
+#!/bin/sh
+# Speshell's login screen, as greetd's greeter (`command = "speshell-greeter"`): a bare
+# Hyprland running greeter.qml. The greeter account has no home, so its caches and
+# state live under /var/lib/speshell/greeter. It runs the shell it sits in, which
+# /usr/bin/speshell-greeter links to; SPESHELL_QML_DIR runs another copy.
+state=/var/lib/speshell/greeter
+export XDG_CACHE_HOME="$state/cache" XDG_STATE_HOME="$state/state" \
+    XDG_DATA_HOME="$state/data" XDG_CONFIG_HOME="$state/config"
+export SPESHELL_QML_DIR="${SPESHELL_QML_DIR:-$(dirname -- "$(dirname -- "$(readlink -f -- "$0")")")}"
+exec start-hyprland -- --config "$SPESHELL_QML_DIR/greeter/hyprland.lua"

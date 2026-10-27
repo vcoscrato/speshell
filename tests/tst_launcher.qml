@@ -1,7 +1,7 @@
 import QtQuick
 import QtTest
-import "../services/AppProvider.js" as AppProvider
-import "../services/BangProvider.js" as BangProvider
+import "../shell/services/AppProvider.js" as AppProvider
+import "../shell/services/BangProvider.js" as BangProvider
 
 TestCase {
     name: "Launcher"

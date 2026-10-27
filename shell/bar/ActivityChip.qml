@@ -1,0 +1,49 @@
+import QtQuick
+import qs.services
+import "../components/Format.js" as Format
+
+// Something running, in the bar: its icon in its tone, its name, and how long it has
+// run, the icon spinning while it's busy. A click takes its first action (Finish,
+// Stop), a right-click its second (Discard).
+BarButton {
+    id: root
+
+    required property var activity
+
+    readonly property var actions: root.activity.actions
+    // In a crowded bar: the running time alone.
+    property bool compact: false
+    property double nowMs: Date.now()
+
+    function act(index) {
+        if (index < root.actions.length)
+            ActivityService.requestAction(root.activity.provider, root.activity.id, root.actions[index].id);
+    }
+
+    iconName: root.activity.iconName
+    iconColor: root.activity.tone !== "neutral" ? Theme.toneColor(root.activity.tone)
+        : (root.pointerInside ? Theme.text : Theme.subtextBright)
+    text: (root.compact ? "" : root.activity.label + "  ")
+        + Format.clock((root.nowMs - root.activity.startedAt) / 1000)
+    tabularDigits: true
+    label: [root.activity.label, root.activity.detail,
+        root.actions.length === 0 ? ""
+            : "Click to " + root.actions[0].label.toLowerCase()
+                + (root.actions.length > 1 ? ", right-click to " + root.actions[1].label.toLowerCase() : "")]
+        .filter(part => part !== "").join(" · ")
+    onClicked: root.act(0)
+    onRightClicked: root.act(1)
+
+    Timer {
+        interval: 1000
+        repeat: true
+        running: root.visible
+        onTriggered: root.nowMs = Date.now()
+    }
+
+    Binding {
+        target: root.icon
+        property: "spinning"
+        value: root.activity.state === "busy"
+    }
+}

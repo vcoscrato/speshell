@@ -1,0 +1,8 @@
+[Unit]
+Description=Show %i's Speshell theme on the login screen
+
+[Path]
+PathChanged=/home/%i/.local/share/speshell/theme.json
+
+[Install]
+WantedBy=multi-user.target

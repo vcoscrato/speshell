@@ -1,0 +1,38 @@
+#!/bin/bash
+# speshell-greeter-theme USER: copies USER's Speshell theme, its colors and wallpaper,
+# to /var/lib/speshell/theme/USER, where the login screen, which can't read the home,
+# wears it. speshell-greeter-theme@USER.path runs it as root on each theme change; it
+# reads the user's files as the user.
+set -euo pipefail
+user=${1:?usage: speshell-greeter-theme USER}
+home=$(getent passwd "$user" | cut -d: -f6)
+cd /
+as_user() { setpriv --reuid="$user" --regid="$(id -g "$user")" --init-groups -- "$@"; }
+
+state=$(as_user cat -- "$home/.local/share/speshell/theme.json")
+out=/var/lib/speshell/theme/$user
+install -d -m 0755 "$out"
+tmp=$(mktemp -d "$out/.next.XXXXXX")
+trap 'rm -rf "$tmp"' EXIT
+
+wallpaper=$(jq -r '.wallpaper // ""' <<<"$state")
+ext=${wallpaper##*.}
+ext=${ext,,}
+shown=""
+case "$ext" in
+    jpg|jpeg|png|webp)
+        if [ "$(as_user stat -L -c %s -- "$wallpaper")" -le $((64 * 1024 * 1024)) ]; then
+            as_user cat -- "$wallpaper" > "$tmp/wallpaper.$ext"
+            shown=$out/wallpaper.$ext
+        else
+            echo "speshell-greeter-theme: wallpaper over 64 MiB, left out" >&2
+        fi
+        ;;
+esac
+jq --arg wallpaper "$shown" '{ theme: .theme, colors: (.snapshot.colors // null), wallpaper: $wallpaper }' \
+    <<<"$state" > "$tmp/theme.json"
+chmod 0644 "$tmp"/*
+
+find "$out" -maxdepth 1 -name 'wallpaper.*' ! -name "wallpaper.$ext" -delete
+[ -z "$shown" ] || mv -f "$tmp/wallpaper.$ext" "$shown"
+mv -f "$tmp/theme.json" "$out/theme.json"

@@ -1,0 +1,11 @@
+# Qt portals identify the process through its desktop ID. Hidden from launchers:
+# Speshell starts with the session.
+[Desktop Entry]
+Type=Application
+Name=Speshell
+Comment=Desktop shell: a bar, its panels, and a launcher
+Exec=speshell --no-duplicate
+TryExec=speshell
+Terminal=false
+NoDisplay=true
+Categories=Utility;
