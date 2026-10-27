@@ -3,8 +3,8 @@
 // One particle of Sugar's small effects, by `kind`, the bigger ones edged softly in
 // chocolate: 0 a sugar sparkle, a four-pointed twinkle; 1 powdered sugar sifted down
 // from the item's top, grains spreading as they fall; 2 a puff of powdered sugar, lumps that
-// bloom and shrink, dusted with grains; 3 a grain of sugar, glinting as it turns; 4 a
-// crumb of cake, a lumpy chunk of sponge with a frosted side.
+// bloom and shrink, dusted with grains; 3 a crumb of cake, a lumpy chunk of sponge with
+// a frosted side.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {
@@ -82,15 +82,6 @@ vec4 sift(vec2 p, float R) {
     return c;
 }
 
-// A grain of sugar, a tiny glinting square, falling and turning.
-vec4 grain(vec2 p, float R) {
-    float fade = 1.0 - smoothstep(0.5, 1.0, u.age);
-    vec2 q = abs(rot(p, u.age * 6.0 + u.seed * 6.0));
-    float d = max(q.x, q.y) - R * 0.45;
-    vec4 c = over(vec4(0.0), u.cCream.rgb, cover(-d) * fade);
-    return over(c, u.cSparkle.rgb, cover(-d - R * 0.2) * step(0.5, fract(u.age * 5.0 + u.seed)) * fade);
-}
-
 vec4 puff(vec2 p, float R) {
     float grow = mix(0.3, 1.0, pop(0.3)) * (1.0 - 0.8 * smoothstep(0.4, 1.0, u.age));
     vec2 q = p + vec2(0.0, R * 0.2 * u.age);
@@ -145,7 +136,6 @@ vec4 crumb(vec2 p, float R) {
 void main() {
     vec2 p = (qt_TexCoord0 - 0.5) * u.size;
     float R = u.size * 0.5 - 1.0;
-    vec4 c = u.kind < 0.5 ? sparkle(p, R) : u.kind < 1.5 ? sift(p, R) : u.kind < 2.5 ? puff(p, R)
-           : u.kind < 3.5 ? grain(p, R) : crumb(p, R);
+    vec4 c = u.kind < 0.5 ? sparkle(p, R) : u.kind < 1.5 ? sift(p, R) : u.kind < 2.5 ? puff(p, R) : crumb(p, R);
     fragColor = c * u.qt_Opacity;
 }

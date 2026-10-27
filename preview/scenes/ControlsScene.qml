@@ -299,6 +299,8 @@ Item {
                     id: thumbLoader
                     anchors.fill: parent
                     sourceComponent: root.knobComponent
+                    onLoaded: if ("switchArea" in item)
+                        item.switchArea = Qt.binding(() => Qt.rect(-thumb.x, -thumb.y, toggle.width, toggle.height))
                 }
 
                 Binding { target: thumbLoader.item; property: "theme"; value: swatch }

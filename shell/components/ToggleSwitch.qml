@@ -97,6 +97,7 @@ Rectangle {
             width: parent.height
             height: parent.height
             sourceComponent: EffectsService.knob
+            onLoaded: EffectsService.placeKnobOnSwitch(item, () => Qt.rect(-thumb.x - knob.x, -thumb.y - knob.y, root.width, root.height))
         }
 
         Binding { target: knob.item; property: "theme"; value: Theme }

@@ -1,10 +1,11 @@
 import QtQuick
 import "Sugar.js" as Sugar
 
-// Sugar's knob for Speshell's sliders and switches: frosting piped along the track
-// back to its start, ending at the knob in a kiss. As the pointer nears, a piping bag
-// comes down onto the kiss, and going back, a spatula scrapes the frosting off.
-// Switched off, the track is bare and the kiss is plain meringue.
+// Sugar's knob for Speshell's sliders and switches. On a slider, frosting piped along
+// the track back to its start, ending at the knob in a kiss. As the pointer nears, a
+// piping bag comes down onto the kiss, and going back, a spatula scrapes the frosting
+// off. A switch is an éclair with a disc of chocolate for its thumb, glazed in fondant
+// behind the disc: the whole length when on, bare when off.
 Item {
     id: root
 
@@ -15,6 +16,9 @@ Item {
     property bool checked: true
     property real travel: 0
     property point pointer: Qt.point(0, 0)
+    property rect switchArea: Qt.rect(0, 0, 0, 0)
+
+    readonly property bool isSwitch: root.switchArea.width > 0
 
     readonly property real size: Math.min(width, height)
     // The pointer along the track, so it stays put as the knob moves under the wheel.
@@ -66,6 +70,7 @@ Item {
     // Reaches back along the track to its start for the piped frosting, and up over
     // the knob for the bag and the spatula.
     ShaderEffect {
+        visible: !root.isSwitch
         readonly property real reach: root.travel + root.size / 2
         readonly property real margin: root.size * 0.3
         x: root.width / 2 - reach - margin
@@ -90,5 +95,35 @@ Item {
         property color cMeringue: Sugar.cream(root.theme)
         property color cHandle: Sugar.wood(root.theme)
         fragmentShader: Qt.resolvedUrl("qsb/Knob.qsb")
+    }
+
+    // The éclair, over the whole switch and a little past it for the disc's shadow.
+    property real lift: root.pressed ? 0 : root.hovered ? 1 : 0.5
+    Behavior on lift { NumberAnimation { duration: 140 } }
+
+    ShaderEffect {
+        visible: root.isSwitch
+        readonly property real margin: 3
+        x: root.switchArea.x - margin
+        y: root.switchArea.y - margin
+        width: root.switchArea.width + 2 * margin
+        height: root.switchArea.height + 2 * margin
+        property size area: Qt.size(width, height)
+        property size body: Qt.size(root.switchArea.width, root.switchArea.height)
+        property point origin: Qt.point(margin, margin)
+        property point thumb: Qt.point(root.width / 2 - root.switchArea.x, root.height / 2 - root.switchArea.y)
+        property real radius: root.size / 2
+        property real lift: root.lift
+        property color cChoux: Sugar.choux(root.theme)
+        property color cChouxDeep: Sugar.chouxDeep(root.theme)
+        property color cChouxLight: Sugar.sponge(root.theme)
+        property color cGlaze: Sugar.frosting(root.theme)
+        property color cGlazeLight: Sugar.frostingLight(root.theme)
+        property color cGlazeShade: Sugar.frostingShade(root.theme)
+        property color cSheen: Sugar.sparkle(root.theme)
+        property color cChocolate: Sugar.chocolate(root.theme)
+        property color cGold: Sugar.gold(root.theme)
+        property color cGoldShade: Sugar.goldShade(root.theme)
+        fragmentShader: Qt.resolvedUrl("qsb/Knob.switch.qsb")
     }
 }

@@ -1,7 +1,8 @@
 import QtQuick
 
 // Sugar effects: a launcher piped round with frosting and eaten away in bites,
-// wallpapers glazed over, and sliders piped with a bag and scraped with a spatula.
+// wallpapers glazed over, sliders piped with a bag and scraped with a spatula, and
+// switches that glaze an éclair.
 // A theme picks them with `effects = sugar` in its theme.ini.
 QtObject {
     readonly property int apiVersion: 1

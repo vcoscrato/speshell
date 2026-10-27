@@ -62,6 +62,13 @@ Singleton {
             knobItem.pointer = area.mapToItem(knobItem, mouse.x, mouse.y);
     }
 
+    // Tells a knob on a switch that asks (it declares `switchArea`) the whole switch, as
+    // `area` returns it in the knob's own coordinates, kept up to date as it moves.
+    function placeKnobOnSwitch(knobItem, area) {
+        if (knobItem && "switchArea" in knobItem)
+            knobItem.switchArea = Qt.binding(area);
+    }
+
     // The wallpaper transition of the effects in `dir`, as wallpaperTransition is the
     // active ones'.
     function wallpaperTransitionIn(dir) {

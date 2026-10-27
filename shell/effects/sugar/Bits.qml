@@ -2,9 +2,8 @@ import QtQuick
 import "common"
 import "Sugar.js" as Sugar
 
-// Sugar's particles: sugar sparkles, powdered sugar sifted down, puffs of it, sugar
-// grains, and cake crumbs, each a small shader drawn by its age. See
-// Bits.frag.
+// Sugar's particles: sugar sparkles, powdered sugar sifted down, puffs of it, and cake
+// crumbs, each a small shader drawn by its age. See Bits.frag.
 Particles {
     id: root
 
@@ -13,8 +12,7 @@ Particles {
     readonly property int sparkle: 0
     readonly property int sift: 1        // falls from the item's top over its height
     readonly property int puff: 2
-    readonly property int grain: 3
-    readonly property int crumb: 4
+    readonly property int crumb: 3
 
     function rnd(a, b) {
         return a + Math.random() * (b - a);

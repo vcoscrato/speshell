@@ -3,8 +3,7 @@ import QtQuick
 // Sugar's effects on Speshell's controls, kept small and light, since the knob's bag
 // and spatula do the work on a slider. A glint now and then on frosting freshly piped,
 // and one where it is let go. Picking something sifts a little powdered sugar down
-// over where you clicked; a switch turned on gets a sifting too, and turned off, a few
-// grains of sugar fall from it.
+// over where you clicked; a switch turned on glints on its fresh fondant.
 Item {
     id: root
 
@@ -32,16 +31,13 @@ Item {
         bits.emit(bits.sift, { x: at.x, y: at.y + 4, life: 0.95, size: 48 });
     }
 
+    // A switch turned on glints along its fresh fondant.
     function toggle(area, on) {
-        var x = on ? area.x + area.width - area.height / 2 : area.x + area.height / 2;
-        var cy = area.y + area.height / 2;
-        if (on) {
-            bits.emit(bits.sift, { x: x, y: cy + 2, life: 0.9, size: 36 });
-        } else {
-            for (var i = 0; i < 4; i++)
-                bits.emit(bits.grain, { x: x + bits.rnd(-5, 5), y: cy + bits.rnd(-2, 3), vx: bits.rnd(-20, 20), vy: bits.rnd(-30, 10),
-                                        gravity: 300, life: bits.rnd(0.4, 0.6), size: Math.round(bits.rnd(4, 6)), delay: i * 0.03 });
-        }
+        if (!on)
+            return;
+        var cy = area.y + area.height * 0.35;
+        for (var i = 0; i < 2; i++)
+            bits.emit(bits.sparkle, { x: area.x + area.width * (0.22 + i * 0.25), y: cy + i * 2, life: 0.4, size: 8 + i, delay: 0.12 + i * 0.1 });
     }
 
     Bits {
