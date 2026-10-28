@@ -7,7 +7,7 @@ import qs.services
 
 // Renders Speshell's real bar offscreen over the theme's wallpaper, once with nothing
 // open (`bar`) and once with each panel in SHOTS open, the launcher (`launcher`), or the
-// theme gallery (`themes`).
+// theme gallery at its themes (`themes`) or the theme's wallpapers (`wallpapers`).
 // shot.sh copies this file to the root of a copy of the tree, so `qs.*` and the shipped
 // themes resolve. For each shot it saves OUT/<name>.png and logs the area to keep as
 // "crop <name> x y w h".
@@ -93,9 +93,9 @@ ShellRoot {
         if (name === "launcher") {
             shell.launcher = shell.create("core/LauncherOverlay.qml", { opened: true, presenting: true });
             LauncherService.setQuery(Quickshell.env("SHOT_QUERY") || "");
-        } else if (name === "themes") {
+        } else if (name === "themes" || name === "wallpapers") {
             shell.gallery = shell.create("core/ThemeGallery.qml", {});
-            ThemeService.openGallery();
+            ThemeService.openGallery(name);
             typing.restart();
         } else if (name !== "bar") {
             const button = shell.bar.buttonFor(name);

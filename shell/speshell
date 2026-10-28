@@ -78,7 +78,7 @@ readonly usage_text='usage: speshell [QUICKSHELL OPTIONS]
        speshell brightness [get | up | down | set PERCENT | keyboard]
        speshell awake|touchpad|airplane|nightlight [get | on | off | toggle]
        speshell theme [get | list | set ID | shuffle [ID] | rescan | open | close | toggle]
-       speshell wallpaper [get | set PATH]'
+       speshell wallpaper [get | set PATH | open | toggle]'
 
 # The usage of the command given, and exit 2.
 usage() {
@@ -194,6 +194,7 @@ case "$command" in
     case "${action:=get}" in
       get) takes 0; call wallpaper get ;;
       set) takes 1; call wallpaper set "$(realpath -s -- "$1")" ;;
+      open|toggle) takes 0; call wallpaper "$action" ;;
       *) usage ;;
     esac
     ;;

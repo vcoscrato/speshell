@@ -43,6 +43,16 @@ Scope {
         return ok ? "" : "error: " + why;
     }
 
+    function openWallpapers(toggle) {
+        if (!ThemeService.wallpaperEnabled)
+            return "error: Speshell doesn't draw the wallpaper: [Appearance] drawWallpaper is false";
+        if (toggle)
+            ThemeService.toggleGallery("wallpapers");
+        else
+            ThemeService.openGallery("wallpapers");
+        return "";
+    }
+
     // A switch's IPC `set`, to on, off, or toggle: `apply` takes whether it's on.
     function setSwitch(name, available, current, state, apply) {
         if (state !== "on" && state !== "off" && state !== "toggle")
@@ -256,6 +266,9 @@ Scope {
                 path + " is not in a theme folder in " + ThemeService.themesDirs.join(" or "));
         }
         function get(): string { return ThemeService.wallpaper; }
+        // The theme gallery, at the current theme's wallpapers.
+        function open(): string { return root.openWallpapers(false); }
+        function toggle(): string { return root.openWallpapers(true); }
     }
 
     ActivityProcessAdapter {

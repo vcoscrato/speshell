@@ -133,8 +133,13 @@ Singleton {
 
     // The launcher's own actions that apply right now.
     function commandResults() {
-        var commands = [BangProvider.commandResult("theme", "Themes", "Browse themes and wallpapers", "palette",
+        var commands = [BangProvider.commandResult("theme", "Themes", "Pick a theme, then its wallpaper", "palette",
             "wallpaper background color scheme palette appearance speshell")];
+        // Only when there is another wallpaper to pick.
+        if (ThemeService.wallpaperEnabled
+                && ThemeService.wallpapers.filter(wallpaper => wallpaper.theme === ThemeService.themeId).length > 1)
+            commands.push(BangProvider.commandResult("wallpaper", "Wallpapers", "Pick another wallpaper of " + ThemeService.theme.name,
+                "photo", "background picture image appearance"));
         if (!FeatureSupport.supportsDisplayControl || !DisplayService.canMirror)
             return commands;
         return commands.concat([DisplayService.mirrored
@@ -237,6 +242,10 @@ Singleton {
             ThemeService.openGallery();
             return true;
         }
+        if (result.kind === "command" && payload.command === "wallpaper") {
+            ThemeService.openGallery("wallpapers");
+            return true;
+        }
         if (result.kind === "web" && payload.url) {
             Qt.openUrlExternally(payload.url);
             return true;
@@ -332,6 +341,12 @@ Singleton {
         target: WindowService
         function onWindowsChanged() { if (root.shown) root.rebuild(); }
         function onHiddenAppsChanged() { if (root.shown) root.rebuild(); }
+    }
+
+    Connections {
+        target: ThemeService
+        function onWallpapersChanged() { root.rebuild(); }
+        function onThemeIdChanged() { root.rebuild(); }
     }
 
     Connections {

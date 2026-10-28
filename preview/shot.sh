@@ -1,5 +1,5 @@
 #!/bin/sh
-# usage: preview/shot.sh THEME [SHOT...]  (SHOT: a panel id, `launcher`, `themes`, or `bar`;
+# usage: preview/shot.sh THEME [SHOT...]  (SHOT: a panel id, `launcher`, `themes`, `wallpapers`, or `bar`;
 # none: every panel this machine has, and the launcher)
 # Renders the real bar offscreen in THEME, with each panel open in turn, into
 # ~/.cache/speshell-preview/shots/THEME/<shot>.png, cropped to the panel, and a contact

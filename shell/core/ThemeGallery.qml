@@ -10,12 +10,15 @@ import qs.components
 import qs.services
 import "../services/ThemeProvider.js" as ThemeProvider
 
-// The theme gallery. The theme it previews fills the screen: its wallpaper behind, its
-// colors on the whole shell, its name, palette, and clock face, and its wallpapers to
-// pick from; the themes line up along the bottom. A move plays the theme's own
-// wallpaper transition behind; quick moves wait for the keys to rest. Applying lets
-// the gallery's interface go, sets the theme under its wallpaper, already the one on
-// screen, and then lets that go too, so nothing goes back to the old theme.
+// The theme gallery, in two steps: a theme, then its wallpaper. The theme it previews
+// fills the screen: its wallpaper behind, its colors on the whole shell, its name,
+// palette, and clock face; along the bottom line up the themes, then the picked
+// theme's wallpapers. A move between themes plays the theme's own wallpaper transition
+// behind, and one between wallpapers a plain fade, so a quick run through them stays
+// smooth; quick moves wait for the keys to rest. It may open at the second step, for
+// another wallpaper of the current theme. Applying lets the gallery's interface go,
+// sets the theme under its wallpaper, already the one on screen, and then lets that go
+// too, so nothing goes back to the old theme.
 PanelWindow {
     id: root
 
@@ -33,8 +36,10 @@ PanelWindow {
     property string selectedId: ""
     // The wallpaper previewed, one of the selected theme's, or "" for none.
     property string wallpaperPath: ""
-    // Where the arrow keys move: "themes" or "wallpapers".
-    property string row: "themes"
+    // The step on screen: "themes", or "wallpapers" of the selected theme.
+    property string stage: "themes"
+    // The wallpapers step came from the themes step, so leaving it goes back there.
+    property bool fromThemes: false
     // What shows behind: the selection once it settles, and its theme's effects, whose
     // wallpaper transition brings it in and whose clock face shows.
     property string shownPath: ""
@@ -48,15 +53,19 @@ PanelWindow {
     property real wheelDelta: 0
 
     readonly property string query: filterInput.text.trim().toLowerCase()
-    readonly property var themes: ThemeService.themes.filter(theme => root.query === ""
+    readonly property bool atWallpapers: root.stage === "wallpapers"
+    // Typing filters the step on screen.
+    readonly property var themes: ThemeService.themes.filter(theme => root.atWallpapers || root.query === ""
         || theme.name.toLowerCase().indexOf(root.query) >= 0 || theme.id.indexOf(root.query) >= 0
         || theme.effects.indexOf(root.query) >= 0)
     readonly property int selectedIndex: root.themes.findIndex(theme => theme.id === root.selectedId)
     readonly property var selected: root.selectedIndex >= 0 ? root.themes[root.selectedIndex] : null
-    readonly property var wallpapers: ThemeService.wallpapers.filter(wallpaper => wallpaper.theme === root.selectedId)
+    readonly property var themeWallpapers: ThemeService.wallpapers.filter(wallpaper => wallpaper.theme === root.selectedId)
+    readonly property var wallpapers: root.themeWallpapers.filter(wallpaper => !root.atWallpapers
+        || wallpaper.title.toLowerCase().indexOf(root.query) >= 0)
     readonly property int wallpaperIndex: root.wallpapers.findIndex(wallpaper => wallpaper.path === root.wallpaperPath)
     // Wallpapers are picked only when Speshell draws them and the theme has a choice.
-    readonly property bool pickingWallpapers: ThemeService.wallpaperEnabled && root.wallpapers.length > 1
+    readonly property bool pickingWallpapers: ThemeService.wallpaperEnabled && root.themeWallpapers.length > 1
     readonly property bool selectedActive: root.selectedId === ThemeService.themeId
     readonly property bool applied: root.selectedActive
         && (!ThemeService.wallpaperEnabled || root.wallpaperPath === ThemeService.wallpaper)
@@ -64,7 +73,6 @@ PanelWindow {
     readonly property int margin: Math.round(Math.max(Theme.spacingXL, Math.min(root.width, root.height) * 0.05))
     readonly property int cardWidth: Math.round(Math.max(168, Math.min(272, (root.width - root.margin * 2) / 7.5)))
     readonly property int cardHeight: Math.round(root.cardWidth * 9 / 16)
-    readonly property int thumbWidth: Math.round(root.cardWidth * 0.5)
 
     visible: root.presenting && root.targetScreen !== null
     screen: root.targetScreen
@@ -91,11 +99,13 @@ PanelWindow {
         settleTimer.stop();
         root.leaving = "";
         root.pending = null;
+        root.fromThemes = false;
         filterInput.text = "";
-        root.row = "themes";
         root.select(ThemeService.themeId);
         if (ThemeService.wallpaper !== "")
             root.wallpaperPath = ThemeService.wallpaper;
+        // Once the selection is the current one, which the step's filter then keeps.
+        root.stage = ThemeService.galleryStart;
         root.shownDir = ThemeService.activeEffectsDir;
         root.shownPath = root.wallpaperPath;
         // What the desktop shows already, so it arrives as is.
@@ -153,8 +163,38 @@ PanelWindow {
     function select(id) {
         root.selectedId = id;
         root.wallpaperPath = ThemeService.wallpaperFor(id);
-        if (!root.pickingWallpapers)
-            root.row = "themes";
+    }
+
+    // On to the selected theme's wallpapers, from the one previewed.
+    function chooseWallpaper() {
+        if (root.selected === null)
+            return;
+        filterInput.text = "";
+        root.fromThemes = true;
+        root.stage = "wallpapers";
+    }
+
+    function backToThemes() {
+        filterInput.text = "";
+        root.stage = "themes";
+    }
+
+    // Enter: on from a theme with wallpapers to pick, otherwise apply.
+    function advance() {
+        if (!root.atWallpapers && root.pickingWallpapers)
+            root.chooseWallpaper();
+        else
+            root.apply();
+    }
+
+    // Esc: clears the filter, then steps back, then closes.
+    function retreat() {
+        if (filterInput.text !== "")
+            filterInput.text = "";
+        else if (root.atWallpapers && root.fromThemes)
+            root.backToThemes();
+        else
+            ThemeService.closeGallery();
     }
 
     // The selection moved: it shows behind at once, or, for one of a quick run of
@@ -188,10 +228,12 @@ PanelWindow {
         }
     }
 
-    // Steps through the row the keys are on, wrapping around.
-    function move(delta, row, repeated) {
-        if ((row || root.row) === "wallpapers" && root.pickingWallpapers) {
+    // Steps through the step's row, wrapping around.
+    function move(delta, repeated) {
+        if (root.atWallpapers) {
             const count = root.wallpapers.length;
+            if (count === 0)
+                return;
             root.wallpaperPath = root.wallpapers[(Math.max(0, root.wallpaperIndex) + delta + count) % count].path;
         } else if (root.themes.length > 0) {
             const count = root.themes.length;
@@ -203,16 +245,25 @@ PanelWindow {
     }
 
     // A wheel or touchpad steps once per notch's worth of scrolling.
-    function scroll(event, row) {
+    function scroll(event) {
         root.wheelDelta += event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x;
         while (Math.abs(root.wheelDelta) >= 120) {
-            root.move(root.wheelDelta > 0 ? -1 : 1, row);
+            root.move(root.wheelDelta > 0 ? -1 : 1);
             root.wheelDelta -= root.wheelDelta > 0 ? 120 : -120;
         }
     }
 
-    // Another theme at random, and one of its wallpapers.
+    // Another theme at random, and one of its wallpapers; at the wallpapers, another of
+    // those.
     function surprise() {
+        if (root.atWallpapers) {
+            const path = ThemeProvider.pickRandom(root.wallpapers, root.selectedId, root.wallpaperPath);
+            if (path === "")
+                return;
+            root.wallpaperPath = path;
+            root.moved();
+            return;
+        }
         const id = ThemeProvider.pickRandomTheme(root.themes, root.selectedId);
         if (id === "")
             return;
@@ -245,8 +296,16 @@ PanelWindow {
             root.moved();
         }
     }
+    // Likewise for the wallpapers.
+    onWallpapersChanged: {
+        if (root.opened && root.atWallpapers && root.wallpapers.length > 0
+                && !root.wallpapers.some(wallpaper => wallpaper.path === root.wallpaperPath)) {
+            root.wallpaperPath = root.wallpapers[0].path;
+            root.moved();
+        }
+    }
     onSelectedIndexChanged: if (root.selectedIndex >= 0) dock.positionViewAtIndex(root.selectedIndex, ListView.Contain)
-    onWallpaperIndexChanged: if (root.wallpaperIndex >= 0) strip.positionViewAtIndex(root.wallpaperIndex, ListView.Contain)
+    onWallpaperIndexChanged: if (root.wallpaperIndex >= 0) wallpaperDock.positionViewAtIndex(root.wallpaperIndex, ListView.Contain)
     onVisibleChanged: {
         if (root.visible) {
             focusTimer.restart();
@@ -264,6 +323,12 @@ PanelWindow {
                 root.open();
             else
                 root.close();
+        }
+
+        // Asked for the other step while open: starts over there.
+        function onGalleryStartChanged() {
+            if (root.opened)
+                root.open();
         }
     }
 
@@ -363,8 +428,9 @@ PanelWindow {
         opacity: root.backdropShown ? 1 : 0
         path: root.shownPath
         theme: Theme
-        // Only while it shows, so a theme applied meanwhile loads nothing here.
-        transition: root.presenting ? EffectsService.wallpaperTransitionIn(root.shownDir) : null
+        // The theme's own between themes, a plain fade between its wallpapers; only
+        // while it shows, so a theme applied meanwhile loads nothing here.
+        transition: root.presenting && !root.atWallpapers ? EffectsService.wallpaperTransitionIn(root.shownDir) : null
         fadeDuration: Theme.animDurationSlow
         timeScale: EffectsService.wallpaperSpeed
         frameRate: EffectsService.frameRate
@@ -391,7 +457,7 @@ PanelWindow {
 
         WheelHandler {
             target: null
-            onWheel: event => root.scroll(event, "themes")
+            onWheel: event => root.scroll(event)
         }
 
         // Scrims, so the text reads over any wallpaper.
@@ -428,7 +494,7 @@ PanelWindow {
             }
         }
 
-        // Header: the gallery's name, the filter typed so far, and closing.
+        // Header: the step's name, the filter typed so far, and closing.
         Item {
             id: header
             anchors.left: parent.left
@@ -443,9 +509,19 @@ PanelWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: Theme.spacingSmall
 
+                HeaderButton {
+                    anchors.verticalCenter: parent.verticalCenter
+                    size: Theme.controlHeight
+                    iconSize: Theme.iconSizeMedium
+                    iconName: "chevron-left"
+                    tooltipText: "Themes"
+                    visible: root.atWallpapers && root.fromThemes
+                    onClicked: root.backToThemes()
+                }
+
                 AppIcon {
                     anchors.verticalCenter: parent.verticalCenter
-                    name: "palette"
+                    name: root.atWallpapers ? "photo" : "palette"
                     size: Theme.iconSizeMedium
                     iconColor: Theme.accent
                 }
@@ -453,15 +529,19 @@ PanelWindow {
                 Label {
                     anchors.verticalCenter: parent.verticalCenter
                     role: "heading"
-                    text: "Themes"
+                    text: root.atWallpapers ? "Wallpapers" : "Themes"
                 }
 
                 Label {
                     anchors.verticalCenter: parent.verticalCenter
                     role: "caption"
-                    text: root.query === ""
-                        ? ThemeService.themes.length + " installed"
-                        : root.themes.length + " of " + ThemeService.themes.length
+                    text: root.atWallpapers
+                        ? (root.query === ""
+                            ? root.themeWallpapers.length + " in " + (root.selected ? root.selected.name : "")
+                            : root.wallpapers.length + " of " + root.themeWallpapers.length)
+                        : (root.query === ""
+                            ? ThemeService.themes.length + " installed"
+                            : root.themes.length + " of " + ThemeService.themes.length)
                 }
             }
 
@@ -504,25 +584,17 @@ PanelWindow {
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeSmall
                         clip: true
-                        Accessible.name: "Filter themes"
+                        Accessible.name: root.atWallpapers ? "Filter wallpapers" : "Filter themes"
 
                         Keys.onPressed: event => {
                             if (event.key === Qt.Key_Escape) {
-                                if (filterInput.text !== "")
-                                    filterInput.text = "";
-                                else
-                                    ThemeService.closeGallery();
+                                root.retreat();
                             } else if (event.key === Qt.Key_Left) {
-                                root.move(-1, "", event.isAutoRepeat);
+                                root.move(-1, event.isAutoRepeat);
                             } else if (event.key === Qt.Key_Right) {
-                                root.move(1, "", event.isAutoRepeat);
-                            } else if (event.key === Qt.Key_Up || event.key === Qt.Key_Tab && root.row === "themes") {
-                                if (root.pickingWallpapers)
-                                    root.row = "wallpapers";
-                            } else if (event.key === Qt.Key_Down || event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
-                                root.row = "themes";
+                                root.move(1, event.isAutoRepeat);
                             } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                                root.apply();
+                                root.advance();
                             } else {
                                 return;
                             }
@@ -566,10 +638,14 @@ PanelWindow {
                     spacing: Theme.spacingSmall
 
                     Label {
+                        readonly property bool inUse: root.atWallpapers ? root.applied : root.selectedActive
+
                         role: "section"
-                        color: root.selectedActive ? Theme.accent : Theme.subtext
-                        text: "Theme " + (root.selectedIndex + 1) + " of " + root.themes.length
-                            + (root.selectedActive ? "  ·  In use" : "")
+                        color: inUse ? Theme.accent : Theme.subtext
+                        text: (root.atWallpapers
+                                ? "Wallpaper " + (root.wallpaperIndex + 1) + " of " + root.wallpapers.length
+                                : "Theme " + (root.selectedIndex + 1) + " of " + root.themes.length)
+                            + (inUse ? "  ·  In use" : "")
                     }
 
                     Label {
@@ -577,7 +653,12 @@ PanelWindow {
                         role: "display"
                         font.pixelSize: Math.round(Theme.fontSizeHuge * 1.5)
                         font.weight: Font.DemiBold
-                        text: root.selected ? root.selected.name : ""
+                        text: {
+                            const wallpaper = root.wallpapers[root.wallpaperIndex];
+                            if (root.atWallpapers)
+                                return wallpaper ? root.sentenceCase(wallpaper.title) : "";
+                            return root.selected ? root.selected.name : "";
+                        }
                         elide: Text.ElideRight
                     }
 
@@ -589,7 +670,8 @@ PanelWindow {
                         wrapMode: Text.WordWrap
                         maximumLineCount: 3
                         elide: Text.ElideRight
-                        text: root.selected ? root.selected.description : ""
+                        // At the wallpapers, the theme they belong to.
+                        text: !root.selected ? "" : root.atWallpapers ? root.selected.name : root.selected.description
                         visible: text !== ""
                     }
                 }
@@ -663,7 +745,7 @@ PanelWindow {
                     font.pixelSize: Theme.fontSizeSmall
                     text: {
                         const theme = root.selected;
-                        if (!theme)
+                        if (!theme || root.atWallpapers)
                             return "";
                         const parts = [];
                         if (theme.effects === "")
@@ -673,117 +755,34 @@ PanelWindow {
                         const wallpaper = root.wallpapers[root.wallpaperIndex];
                         if (wallpaper)
                             parts.push(root.sentenceCase(wallpaper.title));
-                        if (root.wallpapers.length > 1)
-                            parts.push((root.wallpaperIndex + 1) + " of " + root.wallpapers.length + " wallpapers");
+                        if (root.themeWallpapers.length > 1)
+                            parts.push(root.themeWallpapers.length + " wallpapers");
                         return parts.join("  ·  ");
                     }
                     visible: text !== ""
                 }
 
-                Column {
-                    width: parent.width
-                    spacing: Theme.spacingSmall
-                    visible: root.pickingWallpapers
-
-                    Label {
-                        role: "section"
-                        color: root.row === "wallpapers" ? Theme.accent : Theme.subtext
-                        text: "Wallpapers"
-                    }
-
-                    ListView {
-                        id: strip
-                        // Room for the selection ring.
-                        readonly property int ring: 3
-
-                        width: Math.min(contentWidth, parent.width)
-                        height: Math.round((root.thumbWidth - strip.ring * 2) * 9 / 16) + strip.ring * 2
-                        orientation: ListView.Horizontal
-                        interactive: false
-                        spacing: Theme.spacingTiny
-                        clip: true
-                        model: root.wallpapers
-
-                        WheelHandler {
-                            target: null
-                            onWheel: event => root.scroll(event, "wallpapers")
-                        }
-
-                        // As tall as the strip, the thumbnail inset by the ring, which
-                        // ListView would not leave room for above and below.
-                        delegate: Item {
-                            id: thumb
-                            required property var modelData
-                            readonly property bool chosen: thumb.modelData.path === root.wallpaperPath
-
-                            width: root.thumbWidth
-                            height: strip.height
-
-                            Rectangle {
-                                anchors.fill: parent
-                                radius: Theme.borderRadius + strip.ring
-                                color: "transparent"
-                                border.width: root.row === "wallpapers" ? 2 : 1
-                                border.color: Theme.accent
-                                visible: thumb.chosen
-                            }
-
-                            ClippingRectangle {
-                                anchors.fill: parent
-                                anchors.margins: strip.ring
-                                radius: Theme.borderRadius
-                                color: Theme.crust
-                                opacity: thumb.chosen || thumbMouse.containsMouse ? 1 : 0.7
-
-                                Image {
-                                    anchors.fill: parent
-                                    source: ThemeProvider.fileUrl(thumb.modelData.path)
-                                    sourceSize: Qt.size(parent.width * root.devicePixelRatio, parent.height * root.devicePixelRatio)
-                                    fillMode: Image.PreserveAspectCrop
-                                    asynchronous: true
-                                }
-                            }
-
-                            MouseArea {
-                                id: thumbMouse
-                                anchors.fill: parent
-                                anchors.margins: strip.ring
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    root.row = "wallpapers";
-                                    root.wallpaperPath = thumb.modelData.path;
-                                    root.moved();
-                                }
-                                onDoubleClicked: root.apply()
-                            }
-
-                            Tooltip {
-                                visible: thumbMouse.containsMouse
-                                text: root.sentenceCase(thumb.modelData.title)
-                            }
-                        }
-                    }
-                }
-
                 Row {
                     spacing: Theme.spacingSmall
 
-                    // In use, it only closes.
+                    // Between steps, on to the wallpapers; in use, it only closes.
                     ActionButton {
-                        kind: root.applied ? "secondary" : "primary"
-                        checked: root.applied
-                        iconName: root.applied ? "check" : ""
-                        text: root.applied ? "In use"
+                        readonly property bool onward: !root.atWallpapers && root.pickingWallpapers
+
+                        kind: root.applied && !onward ? "secondary" : "primary"
+                        checked: root.applied && !onward
+                        iconName: onward ? "chevron-right" : root.applied ? "check" : ""
+                        text: onward ? "Choose wallpaper"
+                            : root.applied ? "In use"
                             : root.selectedActive ? "Apply wallpaper"
                             : "Apply theme"
-                        onClicked: root.apply()
+                        onClicked: root.advance()
                     }
 
                     ActionButton {
                         iconName: "shuffle"
                         text: "Surprise me"
-                        enabled: root.themes.length > 1
+                        enabled: root.atWallpapers ? root.wallpapers.length > 1 : root.themes.length > 1
                         onClicked: root.surprise()
                     }
                 }
@@ -813,6 +812,9 @@ PanelWindow {
             // Room for the selection ring.
             readonly property int ring: 5
 
+            opacity: root.atWallpapers ? 0 : 1
+            visible: opacity > 0
+            enabled: !root.atWallpapers
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: hints.top
             anchors.bottomMargin: Theme.spacingXL
@@ -823,6 +825,10 @@ PanelWindow {
             spacing: Theme.spacingSmall
             clip: true
             model: root.themes
+
+            Behavior on opacity {
+                NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasing }
+            }
 
             // The card inset by the ring, as for the wallpapers.
             delegate: Item {
@@ -953,9 +959,136 @@ PanelWindow {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        root.row = "themes";
                         if (card.modelData.id !== root.selectedId) {
                             root.select(card.modelData.id);
+                            root.moved();
+                        }
+                    }
+                    onDoubleClicked: root.advance()
+                }
+            }
+        }
+
+        // The selected theme's wallpapers, at the same size and place as the themes.
+        ListView {
+            id: wallpaperDock
+
+            opacity: root.atWallpapers ? 1 : 0
+            visible: opacity > 0
+            enabled: root.atWallpapers
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: hints.top
+            anchors.bottomMargin: Theme.spacingXL
+            width: Math.min(contentWidth, parent.width - root.margin * 2)
+            height: dock.height
+            orientation: ListView.Horizontal
+            interactive: false
+            spacing: Theme.spacingSmall
+            clip: true
+            // Loads its images only while it shows.
+            model: wallpaperDock.visible ? root.wallpapers : []
+
+            onCountChanged: if (root.wallpaperIndex >= 0) wallpaperDock.positionViewAtIndex(root.wallpaperIndex, ListView.Contain)
+
+            Behavior on opacity {
+                NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasing }
+            }
+
+            delegate: Item {
+                id: wallpaperCard
+                required property var modelData
+                readonly property bool chosen: wallpaperCard.modelData.path === root.wallpaperPath
+
+                width: root.cardWidth + dock.ring * 2
+                height: wallpaperDock.height
+                scale: wallpaperCard.chosen ? 1 : wallpaperMouse.containsMouse ? 0.97 : 0.93
+
+                Behavior on scale {
+                    NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasing }
+                }
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: Theme.borderRadius + dock.ring
+                    color: "transparent"
+                    border.width: 2
+                    border.color: Theme.accent
+                    opacity: wallpaperCard.chosen ? 1 : 0
+
+                    Behavior on opacity {
+                        NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasing }
+                    }
+                }
+
+                ClippingRectangle {
+                    id: wallpaperTile
+                    anchors.fill: parent
+                    anchors.margins: dock.ring
+                    radius: Theme.borderRadius
+                    color: Theme.crust
+                    opacity: wallpaperCard.chosen || wallpaperMouse.containsMouse ? 1 : 0.8
+
+                    Behavior on opacity {
+                        NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasing }
+                    }
+
+                    Image {
+                        anchors.fill: parent
+                        source: ThemeProvider.fileUrl(wallpaperCard.modelData.path)
+                        sourceSize: Qt.size(wallpaperTile.width * root.devicePixelRatio, wallpaperTile.height * root.devicePixelRatio)
+                        fillMode: Image.PreserveAspectCrop
+                        asynchronous: true
+                    }
+
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        height: parent.height * 0.6
+                        gradient: Gradient {
+                            GradientStop { position: 0; color: Theme.alpha(Theme.crust, 0) }
+                            GradientStop { position: 1; color: Theme.alpha(Theme.crust, 0.9) }
+                        }
+                    }
+
+                    Label {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        anchors.margins: Theme.spacingSmall
+                        role: "title"
+                        text: root.sentenceCase(wallpaperCard.modelData.title)
+                        elide: Text.ElideRight
+                    }
+
+                    // The wallpaper in use.
+                    Rectangle {
+                        anchors.top: parent.top
+                        anchors.right: parent.right
+                        anchors.margins: Theme.spacingSmall
+                        width: 20
+                        height: 20
+                        radius: 10
+                        color: Theme.accent
+                        visible: root.selectedActive && wallpaperCard.modelData.path === ThemeService.wallpaper
+
+                        AppIcon {
+                            anchors.centerIn: parent
+                            name: "check"
+                            size: Theme.iconSizeTiny
+                            iconColor: Theme.onAccent
+                        }
+                    }
+                }
+
+                MouseArea {
+                    id: wallpaperMouse
+                    anchors.fill: wallpaperTile
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        if (!wallpaperCard.chosen) {
+                            root.wallpaperPath = wallpaperCard.modelData.path;
                             root.moved();
                         }
                     }
@@ -968,8 +1101,8 @@ PanelWindow {
             anchors.centerIn: dock
             role: "title"
             color: Theme.subtext
-            text: "No theme matches “" + filterInput.text.trim() + "”"
-            visible: root.themes.length === 0
+            text: (root.atWallpapers ? "No wallpaper" : "No theme") + " matches “" + filterInput.text.trim() + "”"
+            visible: root.atWallpapers ? root.wallpapers.length === 0 : root.themes.length === 0
         }
 
         Row {
@@ -979,11 +1112,10 @@ PanelWindow {
             anchors.bottomMargin: Math.round(root.margin * 0.6)
             spacing: Theme.spacingXL
 
-            Hint { keys: "← →"; label: "Themes" }
-            Hint { keys: "↑ ↓"; label: "Wallpapers"; visible: root.pickingWallpapers }
-            Hint { keys: "Enter"; label: "Apply" }
+            Hint { keys: "← →"; label: root.atWallpapers ? "Wallpapers" : "Themes" }
+            Hint { keys: "Enter"; label: !root.atWallpapers && root.pickingWallpapers ? "Choose wallpaper" : "Apply" }
             Hint { keys: "Type"; label: "Filter" }
-            Hint { keys: "Esc"; label: "Close" }
+            Hint { keys: "Esc"; label: root.atWallpapers && root.fromThemes ? "Back" : "Close" }
         }
     }
 

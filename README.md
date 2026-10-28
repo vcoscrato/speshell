@@ -17,7 +17,7 @@ This is Speshell, pronounced *special*. My [Quickshell](https://quickshell.outfo
 - Panels for audio output and input, displays and brightness, network (Wi-Fi, and NetworkManager's VPN and WireGuard profiles), Bluetooth, battery, notifications with Do Not Disturb, media, power, Markdown notes, clipboard history, and tools
 - On a laptop: the battery's charge in the bar, low-battery warnings, dimming, locking, and sleeping on idle, hibernating, a lower brightness on battery, locking before the lid sleeps it, the laptop's display off while docked with the lid closed, and an OSD for brightness, the keyboard backlight, the microphone, the touchpad, and airplane mode (see [Laptops](#laptops))
 - Launcher: apps, open windows and apps hidden in the tray, a calculator, web searches and your own bangs
-- Theme gallery: every theme over its wallpaper, previewed full screen in its own colors with its clock face, and its wallpapers to pick from
+- Theme gallery: every theme over its wallpaper, previewed full screen in its own colors with its clock face, then its wallpapers to pick from
 - Lock screen, login screen (greetd), and password prompts (polkit) in the theme: its wallpaper, its clock face, and its colors (see [Lock, login, and passwords](#lock-login-and-passwords))
 - Tools: timers, dictation, copy text from the screen (OCR), screenshots, screen recording, QR codes, color picker
 - What's running, as chips in the bar: screen recording, dictation, and anything that publishes over IPC
@@ -79,6 +79,7 @@ The weather, on with `[Weather] enabled`, comes from [Open-Meteo](https://open-m
 | `!yt query` | A bang from `[Launcher.Bangs]` |
 | `? query` | Search with `[Launcher] searchUrl` |
 | `!theme`, or "themes" | Open the theme gallery |
+| `!wallpaper`, or "wallpapers" | Pick another wallpaper of the current theme |
 | `!mirror` | Mirror the displays, or extend them again |
 
 Unknown bangs go to the search engine, so its own bangs work too.
@@ -173,11 +174,11 @@ On battery, Balanced also runs the theme's effects at 30 fps and looks for recor
 
 ## Themes
 
-Speshell ships Cosmos (the default), four elements (Fire, Air, Water, and Earth), Relâmpago, a racing theme, and Sugar, a confectionery theme. Each has a palette, a wallpaper, launcher and wallpaper effects, a still painted backdrop behind the bar and its panels, themed slider and switch knobs with small effects as you use them, and a clock face (see [shell/themes](shell/themes/README.md)). Pick one in the theme gallery: open Themes from the launcher (`!theme`), or run `speshell theme open`.
+Speshell ships Cosmos (the default), four elements (Fire, Air, Water, and Earth), Relâmpago, a racing theme, and Sugar, a confectionery theme. Each has a palette, a wallpaper, launcher and wallpaper effects, a still painted backdrop behind the bar and its panels, themed slider and switch knobs with small effects as you use them, and a clock face (see [shell/themes](shell/themes/README.md)). Pick one in the theme gallery: open Themes from the launcher (`!theme`), or run `speshell theme open`. For another wallpaper of the theme you have, open Wallpapers (`!wallpaper`, or `speshell wallpaper open`), which goes straight to its wallpapers.
 
-The gallery fills the screen with the theme it previews: its wallpaper, its colors on the whole shell, its palette, and its clock face, ticking. The themes line up along the bottom, each over its wallpaper in its own colors. ←/→ (or the scroll wheel) moves between themes, ↑/↓ between a theme's wallpapers when Speshell draws them and the theme has more than one, Enter applies, typing filters, and Esc closes without changing anything. Surprise me previews a theme at random.
+The gallery fills the screen with the theme it previews: its wallpaper, its colors on the whole shell, its palette, and its clock face, ticking. It goes in two steps. First the themes line up along the bottom, each over its wallpaper in its own colors; ←/→ (or the scroll wheel) moves between them. Enter goes on to the theme's wallpapers, when Speshell draws them and the theme has more than one, or applies the theme otherwise. There the wallpapers line up in its place, each at full card size, ←/→ moves between them, and Enter applies the theme with the one shown. Typing filters either step, Esc goes back a step and then closes without changing anything, and Surprise me previews a theme, or a wallpaper, at random.
 
-Each theme comes in behind with its own wallpaper transition, as it would on the desktop, and so does each wallpaper. A quick run of moves, or a held key, waits for you to stop before playing one, and a move during a transition carries off whatever is on screen, so nothing jumps. Applying keeps what you are already looking at: the gallery's interface fades, any transition still playing finishes, and the desktop takes the theme underneath without playing it again, so only the bar comes back. Other screens play the transition as usual.
+Each theme comes in behind with its own wallpaper transition, as it would on the desktop; a wallpaper of the same theme fades in, so running through them stays smooth. A quick run of moves, or a held key, waits for you to stop before playing one, and a move during a transition carries off whatever is on screen, so nothing jumps. Applying keeps what you are already looking at: the gallery's interface fades, any transition still playing finishes, and the desktop takes the theme underneath without playing it again, so only the bar comes back. Other screens play the transition as usual.
 
 Set `drawWallpaper = true` under `[Appearance]` to let Speshell draw the desktop background. It is off by default so another wallpaper tool can stay in charge. `launcherTransitionSpeed`, `wallpaperTransitionSpeed`, and `controlEffectsSpeed` (0–3, default 1) speed up or slow down each kind of effect, and 0 turns it off. `[Power] mode` sets their frame rate: `maximum` animates at the display's refresh rate, `balanced` (the default) at 60 fps, and `saver` turns the effects off along with the interface's own motion. `shuffleAtLaunch` picks at random each time Speshell starts: `wallpaper` (another wallpaper of the theme), `theme` (another theme), or `both`; the default is `off`.
 
@@ -215,7 +216,7 @@ speshell launcher [open|close|toggle]
 speshell lock
 speshell panel list | open NAME | toggle NAME | close
 speshell theme list | get | set ID | shuffle [ID] | rescan | open | close | toggle
-speshell wallpaper get | set PATH
+speshell wallpaper get | set PATH | open | toggle
 speshell tool list | dictate [cancel] | ocr | screenshot [region|screen] | record [region|screen] | qr | color
 speshell timer get | start LENGTH [NAME] | add LENGTH [NAME] | pause|resume|toggle|stop [NAME]
 speshell activity set ID STATE LABEL [DETAIL] [ICON] [TONE]

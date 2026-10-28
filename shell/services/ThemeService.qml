@@ -54,9 +54,11 @@ Singleton {
             || ThemeProvider.findTheme(root.themes, ThemeProvider.defaultTheme);
     }
     readonly property var colors: root.theme.colors
-    // Whether the theme gallery shows, and the theme it previews ("" for none), whose
-    // colors the shell wears meanwhile. Its effects stay the active theme's.
+    // Whether the theme gallery shows, the step it opens on ("themes", or "wallpapers"
+    // to pick another of the current theme's), and the theme it previews ("" for none),
+    // whose colors the shell wears meanwhile. Its effects stay the active theme's.
     property bool galleryShown: false
+    property string galleryStart: "themes"
     property string previewId: ""
     readonly property var previewTheme: root.previewId !== "" ? ThemeProvider.findTheme(root.themes, root.previewId) : null
     readonly property var shownColors: root.previewTheme ? root.previewTheme.colors : root.colors
@@ -88,10 +90,12 @@ Singleton {
         ? ThemeProvider.appPalette(Theme.mergePalette(root.colors))
         : null
 
-    // Rescans on opening, so new themes and wallpapers show up.
-    function openGallery() {
+    // Rescans on opening, so new themes and wallpapers show up. `start`: the step
+    // it opens on, "themes" by default.
+    function openGallery(start) {
         if (!root.galleryShown)
             root.scan();
+        root.galleryStart = start || "themes";
         root.galleryShown = true;
     }
 
@@ -99,11 +103,11 @@ Singleton {
         root.galleryShown = false;
     }
 
-    function toggleGallery() {
+    function toggleGallery(start) {
         if (root.galleryShown)
             root.closeGallery();
         else
-            root.openGallery();
+            root.openGallery(start);
     }
 
     // The wallpaper theme `id` comes with: its last one, otherwise its first.
