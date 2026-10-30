@@ -96,11 +96,15 @@ float boltDist(vec2 q, float P, float A, float seed) {
     return d;
 }
 
+// Derivatives exist only in fragment shaders; a vertex shader that includes this
+// file defines VERTEX_SHADER first, and goes without the helpers that need them.
+#ifndef VERTEX_SHADER
 // Anti-aliased hard step: the cel-shading primitive.
 float band(float v, float t) {
     float w = fwidth(v) * 0.75;
     return smoothstep(t - w, t + w, v);
 }
+#endif
 
 // Premultiplied color: `col` at coverage `a` laid over `under`.
 vec4 over(vec4 under, vec3 col, float a) {
@@ -131,12 +135,14 @@ vec4 spiralCoord(vec2 p, vec2 c, float r0, float k, float th0, float spin, float
     return vec4(abs(sd), u, R, sd);
 }
 
+#ifndef VERTEX_SHADER // (see band)
 // Antialiased coverage of a signed "inside" distance, robust to the jumps where
 // spiralCoord switches windings.
 float cover(float s) {
     float aa = clamp(fwidth(s), 1e-3, 1.5);
     return smoothstep(-aa, aa, s);
 }
+#endif
 
 vec2 hash2(vec2 p) {
     return vec2(hash(p), hash(p + 17.31));

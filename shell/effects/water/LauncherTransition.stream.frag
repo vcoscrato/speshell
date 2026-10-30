@@ -25,26 +25,14 @@ layout(std140, binding = 0) uniform buf {
     vec4 cLight;
     vec4 cFoam;
 } u;
+layout(binding = 1) uniform sampler2D dropTable;  // LauncherTransition.drops.frag
 #include "../common/common.glsl"
-
-const int STREAMS = 2;
-const float GRAVITY = 240.0;   // px/s², pulling droplets down the screen
+#include "Streams.glsl"
 
 // Smooth union of two "inside" fields (> 0 inside): water merging under surface tension.
 float smax(float a, float b, float k) {
     float h = clamp(0.5 + 0.5 * (a - b) / k, 0.0, 1.0);
     return mix(b, a, h) + k * h * (1.0 - h);
-}
-
-// Head position along the border (px of arc) and its speed, for stream i. Each
-// surges on its own rhythm, so the streams close in on each other and fall apart.
-vec2 streamHead(float fi, float t, float P) {
-    float w1 = 0.55 + 0.21 * fi, w2 = 1.31 - 0.17 * fi;
-    float a1 = 0.48 * u.speed / w1, a2 = 0.22 * u.speed / w2;
-    float ph = fi * 2.4;
-    float head = t * u.speed + fi * P / float(STREAMS) + a1 * sin(w1 * t + ph) + a2 * sin(w2 * t + ph * 1.7);
-    float vel = u.speed + a1 * w1 * cos(w1 * t + ph) + a2 * w2 * cos(w2 * t + ph * 1.7);
-    return vec2(head, vel);
 }
 
 // A droplet at q of radius `size`, stretched along its velocity `v` (px/s).
@@ -71,7 +59,8 @@ void main() {
 
     // ── The streams ──
     float field = -1e3, rimField = -1e3, n = 0.0, along = 0.0, own = 0.0, wOwn = 0.0, thickOwn = 1.0;
-    for (int i = 0; i < STREAMS; i++) {
+    // Swinging inward, the water stops against the panel, so none reaches far inside it.
+    for (int i = 0; i < STREAMS && d0 > -u.gap - 6.0; i++) {
         float fi = float(i);
         vec2 hv = streamHead(fi, t, P);
         float vRel = hv.y / u.speed;                     // 1 at mean speed
@@ -128,85 +117,16 @@ void main() {
 
     // ── Droplets ──
     float drops = -1e3;
-    float a = h.x - r, b = h.y - r, q = 1.5707963 * r;
-    for (int i = 0; i < STREAMS; i++) {
-        float fi = float(i);
-        vec2 hv = streamHead(fi, t, P);
-        float vel = clamp(hv.y, 30.0, 1.3 * u.speed);
-        float len = P * 0.27 * u.flow * mix(0.65, 1.0, clamp(hv.y / u.speed, 0.0, 1.6));
-
-        // Where a stream rounds a corner, droplets keep going straight and fly off.
-        for (int j = 0; j < 4; j++) {
-            float fj = float(j);
-            vec2 sg = vec2(j == 0 || j == 1 ? 1.0 : -1.0, j == 0 || j == 3 ? -1.0 : 1.0);
-            vec2 nrm = sg * 0.7071068;
-            vec2 tan_ = vec2(-nrm.y, nrm.x);              // clockwise on screen, like s
-            vec2 cp = c + vec2(a, b) * sg + nrm * r;
-            float sc = j == 0 ? 2.0 * a + 0.5 * q
-               : j == 1 ? 2.0 * a + 1.5 * q + 2.0 * b
-               : j == 2 ? 4.0 * a + 2.5 * q + 2.0 * b
-                        : 4.0 * a + 3.5 * q + 4.0 * b;
-            float past = hv.x - sc;
-            float lap = floor(past / P);
-            float sinceHead = (past - lap * P) / vel;    // s since this stream's head rounded it
-            for (int k = 0; k < 3; k++) {
-                vec3 rnd = vec3(hash(vec2(lap * 4.0 + fj, fi * 7.0 + float(k))),
-                                hash(vec2(lap * 4.0 + fj + 0.5, fi * 7.0 + float(k) + 3.1)),
-                                hash(vec2(lap * 4.0 + fj + 0.25, fi * 7.0 + float(k) + 5.7)));
-                // Most fly off as the head goes round; some later, from the body.
-                float tau = sinceHead - rnd.x * rnd.x * len / vel * 0.7;
-                float life = 0.55 + 0.3 * rnd.y;
-                if (tau < 0.0 || tau > life)
-                    continue;
-                float ang = mix(0.08, 0.55, rnd.z);
-                vec2 v0 = (tan_ * cos(ang) + nrm * sin(ang)) * vel * mix(0.7, 1.15, rnd.y);
-                float drag = 3.2;
-                float e = exp(-drag * tau);
-                vec2 dp = cp + v0 * (1.0 - e) / drag + vec2(0.0, 0.5 * GRAVITY * tau * tau);
-                vec2 v = v0 * e + vec2(0.0, GRAVITY * tau);
-                float size = mix(2.2, 4.6, rnd.z) * sqrt(1.0 - tau / life) * u.flow;
-                drops = max(drops, droplet(p, dp, v, size));
-            }
-        }
-
-        // Beads breaking off the tail lag behind, drift outward, and fall.
-        for (int k = 0; k < 3; k++) {
-            float fk = float(k);
-            float life = 0.9;
-            float age = fract(t / 0.75 + fk / 3.0 + fi * 0.37);
-            float tau = age * life;
-            float drag = 2.4;
-            float lag = vel * (tau - (1.0 - exp(-drag * tau)) / drag);
-            float sd = hv.x - len - 6.0 - lag;
-            vec2 bp = rrPoint(sd, h, r);
-            vec2 dir = normalize(rrPoint(sd + 2.0, h, r) - rrPoint(sd - 2.0, h, r));
-            vec2 out_ = vec2(dir.y, -dir.x);
-            float seed = floor(t / 0.75 + fk / 3.0 + fi * 0.37);
-            vec2 dp = c + bp + out_ * (u.gap * 0.3 + 30.0 * tau * hash(vec2(seed, fi + fk)))
-                    + vec2(0.0, 0.5 * GRAVITY * tau * tau);
-            vec2 v = dir * vel * exp(-drag * tau) + vec2(0.0, GRAVITY * tau);
-            float size = mix(2.0, 3.6, hash(vec2(seed + 0.5, fi + fk))) * smoothstep(0.0, 0.12, age) * (1.0 - age * age) * u.flow;
-            drops = max(drops, droplet(p, dp, v, size));
-        }
-
-        // Spray flung off the head, mostly outward, falling behind it.
-        vec2 hp = rrPoint(hv.x, h, r);
-        vec2 hdir = normalize(rrPoint(hv.x + 2.0, h, r) - rrPoint(hv.x - 2.0, h, r));
-        vec2 hout = vec2(hdir.y, -hdir.x);
-        for (int k = 0; k < 3; k++) {
-            float fk = float(k);
-            float cyc = t * (2.2 + 0.7 * hash(vec2(fk, fi + 8.0))) + hash(vec2(fk, fi + 5.0));
-            float age = fract(cyc);
-            float seed = floor(cyc);
-            vec3 rnd = vec3(hash(vec2(seed, fi * 3.0 + fk + 9.1)), hash(vec2(seed + 3.3, fi * 3.0 + fk)),
-                            hash(vec2(fi * 3.0 + fk, seed + 6.2)));
-            float side = rnd.y < 0.8 ? 1.0 : -0.6;
-            vec2 dp = c + hp - hdir * (0.3 * w0 + age * (10.0 + 30.0 * rnd.x))
-                    + hout * side * (0.8 * w0 + age * (8.0 + 22.0 * rnd.y))
-                    + vec2(0.0, 0.5 * GRAVITY * age * age * 0.1);
-            float size = mix(1.4, 3.0, rnd.z) * smoothstep(0.0, 0.12, age) * (1.0 - age) * u.flow;
-            drops = max(drops, droplet(p, dp, hdir * vel * 0.6, size));
-        }
+    for (int i = 0; i < STREAMS * DROPS; i++) {
+        float x = (float(i) + 0.5) / float(STREAMS * DROPS);
+        vec4 d = texture(dropTable, vec2(x, 0.25));
+        // A droplet stretches at most 2.2 times along its path, and its rim reaches
+        // 1.5 px past it, softened over at most 1.5 more.
+        vec2 rel = p - d.xy;
+        float reach = 2.2 * (d.z + 3.0);
+        if (d.z <= 0.0 || dot(rel, rel) > reach * reach)
+            continue;
+        drops = max(drops, droplet(p, d.xy, texture(dropTable, vec2(x, 0.75)).xy, d.z));
     }
     float dropIn = cover(drops), dropRim = cover(drops + 1.5);
 

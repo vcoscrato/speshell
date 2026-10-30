@@ -14,12 +14,21 @@ Every effect here has these files; a part that draws with a shader another part 
 ├── Knob.qml/.frag                the thumb of Speshell's sliders and switches
 ├── Clock.qml/.frag               the clock panel's face
 ├── <Part>.qml/.frag              pieces the transitions use (Flames, Wind, Whip, ...)
+├── <Name>.glsl                   GLSL the shaders of one part share: uniforms, placement, constants
 ├── <Name>.js                     color recipes several parts share (Flame, Water, Stone, Bolt)
 ├── common -> ../common           symlink that gives QML `import "common"` (EffectClock, ClockTime, Particles) and `common/Colors.js`
-└── qsb/                          git-ignored: `just shaders` compiles each `<Name>.frag` to `qsb/<Name>.qsb`
+└── qsb/                          git-ignored: `just shaders` compiles each `<Name>.frag` to `qsb/<Name>.qsb`, and each `<Name>.vert` to `qsb/<Name>.vert.qsb`
 ```
 
-A QML file that draws more than one shader names the others `<Qml>.<piece>.frag` (`LauncherTransition.ground.frag`); a shader several parts share is named for what it draws (`Portal.frag`, `Burn.frag`). Shaders include the shared library by relative path: `#include "../common/common.glsl"`. A part loads its shader as `Qt.resolvedUrl("qsb/<Name>.qsb")`.
+A QML file that draws more than one shader names the others `<Qml>.<piece>.frag` (`LauncherTransition.ground.frag`); a shader several parts share is named for what it draws (`Portal.frag`, `Burn.frag`). Shaders include the shared library by relative path: `#include "../common/common.glsl"`. A part loads its shader as `Qt.resolvedUrl("qsb/<Name>.qsb")`. A vertex shader defines `VERTEX_SHADER` before its includes, which leaves out the helpers that need derivatives (`band`, `cover`).
+
+Speshell must run smoothly on an integrated GPU, so a shader that fills the screen must not loop over every piece of the effect for every pixel. Work that does not depend on the pixel goes where it runs once:
+
+- **Pieces on their own quads.** Many small things (debris, shards, boulders) each get a quad, or a diamond in one strip of a `GridMesh`, that a vertex shader fits to where the piece is, so a pixel pays only for the pieces over it: `air/Debris.vert`, `earth/Boulders.vert`, `earth/WallpaperTransition.vert`.
+- **Tables.** What is the same for every pixel this frame (where droplets are), or for the whole transition (a layout, a path), is drawn once by a small `ShaderEffect` into a float `ShaderEffectSource` (`format: ShaderEffectSource.RGBA32F`, `smooth: false`, `hideSource: true`, an explicit `textureSize`) that the main shader reads: `water/LauncherTransition.drops.frag`, `relampago/WallpaperTransition.tear.frag`.
+- **Low resolution.** A smooth field is drawn small and read back filtered: `air/Wind.drift.frag`.
+
+`hash()` is chaotic enough that two shaders compiled apart can round it differently, so make each random choice in one shader and read it from there.
 
 ## API
 
@@ -104,6 +113,18 @@ The clock faces are each one shader: an orrery whose planets, lit from the sun a
 On the controls, each effect spawns particles from `common/Particles.qml`, each a small `ShaderEffect` that draws one kind of bit by its age: star dust, glints, and constellations that draw themselves star by star; flames standing on a burning streak, sparks, embers, flashes of ignition, and smoke; a plume of breath that blows a dragged knob along (one shader per direction, not particles), wisps, leaves, and curls of wind; drops that drip off, leap in, or fly off to land in ripples, and crown splashes with the jet that follows; rock chips, pebbles that bounce where they land, grit, and dust; sparks, arcs, starbursts, lightning strikes, glints, and tire smoke; sugar sparkles, powdered sugar sifted down in a spreading fall, puffs of it, and cake crumbs. Each knob is one small shader turned by its travel, clockwise as it moves right, as a ball rolls: a planet whose moon orbits, an ember, a ball of wind, a drop that stretches by how far a spring-damped copy of its travel lags behind, a faceted stone that rolls, and a racing wheel that blurs by how far a spring-damped copy of its travel lags, and reaches back to the track's start to draw a stepped bolt decal along the fill. Sugar's knob is the frosting piped along the whole fill, with a piping bag or a spatula over it while the pointer is near, and on a switch an éclair glazed in fondant behind a disc of chocolate.
 
 ## Cost
+
+The worst GPU time per frame at 1080p on an Intel UHD 630 (a laptop's integrated GPU) at full clock, read from i915's `drm-engine-render`. Keep every effect under 8 ms there, since the compositor draws on the same GPU:
+
+| Effects | Launcher | Wallpaper |
+|---|---|---|
+| Cosmos | 4.3 ms | 4.6 ms |
+| Fire | 3.3 ms | 7.3 ms |
+| Air | 4.8 ms | 7.2 ms |
+| Water | 6.1 ms | 5.5 ms |
+| Earth | 7.7 ms | 4.2 ms |
+| Relâmpago | 4.1 ms | 6.3 ms |
+| Sugar | 1.8 ms | 5.9 ms |
 
 GPU time per frame at 1080p on an RTX 3070, measured before `just bench` with a method that read low; `just bench -m` prints a fresh one, best on a GPU that isn't slowing down for heat:
 

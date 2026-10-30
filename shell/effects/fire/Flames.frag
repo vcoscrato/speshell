@@ -20,7 +20,10 @@ void main() {
     vec2 p = qt_TexCoord0 * u.resolution;
     vec4 s = texture(state, qt_TexCoord0);
     // Fine erosion adds edge detail the low-res sim cannot hold, mostly where flames are thin.
-    float detail = fbm(vec2(p.x / 22.0, p.y / 30.0 + u.time * 3.0)) - 0.5;
+    // It adds at most 0.06, so where there is too little fuel to show it is skipped.
+    float detail = 0.0;
+    if (s.r > 0.1)
+        detail = fbm(vec2(p.x / 22.0, p.y / 30.0 + u.time * 3.0)) - 0.5;
     float thin = 1.0 - smoothstep(0.15, 0.55, s.r);
     float f = s.r + detail * mix(0.04, 0.16, thin);
     // Inner bands by how far through its life the fuel is, so weak flames still have

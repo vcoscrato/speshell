@@ -40,6 +40,7 @@ layout(std140, binding = 0) uniform buf {
     vec4 cBody;
     vec4 cRim;
 } u;
+layout(binding = 1) uniform sampler2D drift;   // Wind.drift.frag
 #include "../common/common.glsl"
 
 vec2 cmul(vec2 a, vec2 b) { return vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x); }
@@ -66,7 +67,7 @@ void main() {
 
     vec2 rel = p - u.center;
     if (u.turbulence > 0.0)
-        rel += swirl(rel / (1.6 * min(u.axes.x, u.axes.y)), u.time * 0.3) * u.turbulence;
+        rel += texture(drift, qt_TexCoord0).xy;
     vec2 z = rel / u.axes;
     float r = max(length(z), 1e-3);
     float fade = smoothstep(u.inner, u.inner + 0.2, r) * (1.0 - smoothstep(u.outer * 0.7, u.outer, r));

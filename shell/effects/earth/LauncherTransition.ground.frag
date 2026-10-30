@@ -36,15 +36,19 @@ void main() {
             float grow = 1.0 - pow(1.0 - u.dust, 2.5);
             float r = mix(8.0, 20.0 + 26.0 * hash(vec2(fi, 5.0)), grow);
             vec2 cp = vec2(x + (x - u.origin.x) * 0.35 * grow, u.origin.y - r * 0.4 - 46.0 * grow * hash(vec2(fi, 6.0)));
-            // Lumpy cauliflower outline from two noise octaves.
+            // Lumpy cauliflower outline from two noise octaves, which reach at most
+            // 0.32 r past the circle: a pixel well clear of that skips the puff.
             vec2 rel = p - cp;
+            if (dot(rel, rel) > pow(r * 1.32 + 4.0, 2.0))
+                continue;
             float ang = atan(rel.y, rel.x);
             float lumps = (vnoise(vec2(ang * 2.2 + fi * 7.0, grow)) - 0.5) * 0.45 * r
                         + (vnoise(vec2(ang * 6.0 + fi * 3.0, 0.0)) - 0.5) * 0.18 * r;
             float d = length(rel) - r - lumps;
-            cover_ = max(cover_, cover(-d));
+            float k = cover(-d);
+            cover_ = max(cover_, k);
             // Lit from above: the lower part of each puff is in shade.
-            shade = max(shade, cover(-d) * cover(rel.y - r * 0.2));
+            shade = max(shade, k * cover(rel.y - r * 0.2));
         }
         float thin = 1.0 - smoothstep(0.3, 0.75, u.dust);
         float dustA = cover_ * thin * 0.55;
@@ -53,19 +57,22 @@ void main() {
         col *= a;
     }
 
-    // Crack: a jagged dark seam with a pale lip.
+    // Crack: a jagged dark seam with a pale lip, which strays at most 16 px from the
+    // ground line.
     float dx = abs(p.x - u.origin.x);
-    float along = clamp(1.0 - dx / max(u.crackLen, 1.0), 0.0, 1.0);
-    float seamY = u.origin.y + (vnoise(vec2(p.x / 26.0, 1.0)) - 0.5) * 9.0 + (vnoise(vec2(p.x / 8.0, 2.0)) - 0.5) * 4.0;
-    float w = u.crackOpen * 5.0 * pow(along, 0.4);
-    // Both fade out as it shuts, so no hairline is left where it was.
-    float shut = smoothstep(0.0, 0.15, u.crackOpen);
-    float seam = cover(w - abs(p.y - seamY)) * step(0.001, along) * shut;
-    float lip = cover(w + 2.0 * u.crackOpen - abs(p.y - seamY - 2.0)) * step(0.001, along) * (1.0 - seam) * shut;
-    col = mix(col, u.cDust.rgb, lip * 0.8);
-    a = max(a, lip * 0.8);
-    col = mix(col, u.cDark.rgb, seam);
-    a = max(a, seam);
+    if (abs(p.y - u.origin.y) < 24.0 && dx < u.crackLen) {
+        float along = clamp(1.0 - dx / max(u.crackLen, 1.0), 0.0, 1.0);
+        float seamY = u.origin.y + (vnoise(vec2(p.x / 26.0, 1.0)) - 0.5) * 9.0 + (vnoise(vec2(p.x / 8.0, 2.0)) - 0.5) * 4.0;
+        float w = u.crackOpen * 5.0 * pow(along, 0.4);
+        // Both fade out as it shuts, so no hairline is left where it was.
+        float shut = smoothstep(0.0, 0.15, u.crackOpen);
+        float seam = cover(w - abs(p.y - seamY)) * step(0.001, along) * shut;
+        float lip = cover(w + 2.0 * u.crackOpen - abs(p.y - seamY - 2.0)) * step(0.001, along) * (1.0 - seam) * shut;
+        col = mix(col, u.cDust.rgb, lip * 0.8);
+        a = max(a, lip * 0.8);
+        col = mix(col, u.cDark.rgb, seam);
+        a = max(a, seam);
+    }
 
     // Rock chips: flung up from the crack, tumbling under gravity.
     if (u.burst > 0.0 && u.burst < 1.2) {
@@ -75,6 +82,9 @@ void main() {
             vec2 start = vec2(u.origin.x + (h.x - 0.5) * 1.6 * u.crackLen, u.origin.y);
             vec2 vel = vec2((h.x - 0.5) * 420.0, -380.0 - 260.0 * h.y);
             vec2 pos = start + vel * u.burst + vec2(0.0, 1400.0) * u.burst * u.burst * 0.5;
+            // A chip reaches at most 1.3 times its size (at most 12 px) from its middle.
+            if (dot(p - pos, p - pos) > 400.0)
+                continue;
             float ang = u.burst * (h.y - 0.5) * 16.0;
             vec2 lp = mat2(cos(ang), -sin(ang), sin(ang), cos(ang)) * (p - pos);
             float size = 4.0 + 8.0 * hash(vec2(fi, 11.0));

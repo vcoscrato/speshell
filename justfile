@@ -57,13 +57,15 @@ test:
 shaders:
     #!/bin/sh
     set -e
-    for frag in shell/effects/*/*.frag; do
-        out="$(dirname "$frag")/qsb/$(basename "$frag" .frag).qsb"
+    # <Name>.frag compiles to qsb/<Name>.qsb, and <Name>.vert to qsb/<Name>.vert.qsb.
+    for src in shell/effects/*/*.frag shell/effects/*/*.vert; do
+        [ -f "$src" ] || continue
+        out="$(dirname "$src")/qsb/$(basename "$src" .frag).qsb"
         mkdir -p "$(dirname "$out")"
-        if [ ! -f "$out" ] || [ "$frag" -nt "$out" ] || [ shell/effects/common/common.glsl -nt "$out" ] \
-                || [ -n "$(find "$(dirname "$frag")" -maxdepth 1 -name "*.glsl" -newer "$out")" ]; then
-            echo "qsb $frag"
-            {{ qsb }} --glsl "100 es,120,150" --hlsl 50 --msl 12 -o "$out" "$frag"
+        if [ ! -f "$out" ] || [ "$src" -nt "$out" ] || [ shell/effects/common/common.glsl -nt "$out" ] \
+                || [ -n "$(find "$(dirname "$src")" -maxdepth 1 -name "*.glsl" -newer "$out")" ]; then
+            echo "qsb $src"
+            {{ qsb }} --glsl "100 es,120,150" --hlsl 50 --msl 12 -o "$out" "$src"
         fi
     done
 

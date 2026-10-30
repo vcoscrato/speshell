@@ -36,8 +36,9 @@ void main() {
     // Band widths wander so the bands do not read as concentric rings.
     float w = 0.6 + 0.8 * vnoise(p / 45.0);
 
-    float r = u.revealR - burnField(p, u.revealOrigin, 1.0);           // > 0 revealed
-    float ar = fwidth(r);
+    // A reveal front past any screen is no front at all (the wallpaper transition's).
+    float r = u.revealR < 1e4 ? u.revealR - burnField(p, u.revealOrigin, 1.0) : 1e5;  // > 0 revealed
+    float ar = max(fwidth(r), 1e-3);
     float c = burnField(p, u.burnOrigin, u.fieldScale) - u.burnR;      // > 0 not yet consumed
     float ac = fwidth(c);
     float revealed = smoothstep(-ar, ar, r);

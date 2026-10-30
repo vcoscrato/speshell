@@ -21,7 +21,13 @@ Singleton {
     // between.
     property string keyboard: ""
     property string keyboardLayout: ""
-    property int keyboardLayouts: 0
+    readonly property int keyboardLayouts: root.keyboardLayoutList.length
+    // The layouts it switches between, as { code: "BR", name: "Portuguese (Brazil)" },
+    // and the active one's index.
+    property var keyboardLayoutList: []
+    property int keyboardLayoutIndex: -1
+    // xkb's names for layouts ("br") and their variants ("br:nodeadkeys").
+    property var xkbNames: ({})
 
     // Hyprland's socket events, as `name>>data` lines split at the `>>`.
     signal event(string name, string data)
@@ -51,6 +57,12 @@ Singleton {
             Hyprland.refreshMonitors();
     }
 
+    // Switches every keyboard to the layout at `index` of keyboardLayoutList.
+    function switchKeyboardLayout(index) {
+        if (root.running)
+            Quickshell.execDetached(["hyprctl", "switchxkblayout", "all", String(index)]);
+    }
+
     // A Lua string literal, for Lua dispatchers and `hyprctl eval`.
     function luaQuote(value) {
         return "\"" + String(value || "")
@@ -72,7 +84,16 @@ Singleton {
         }
     }
 
+    // Read again on each layout switch, as the main keyboard may change with it, and
+    // on a config reload; a switch on every keyboard reads once.
+    Timer {
+        id: devicesRefresh
+        interval: 50
+        onTriggered: devices.running = true
+    }
+
     Process {
+        id: devices
         running: root.running
         command: ["hyprctl", "devices", "-j"]
         stdout: StdioCollector {
@@ -81,11 +102,51 @@ Singleton {
                     const main = JSON.parse(text).keyboards.find(keyboard => keyboard.main);
                     if (!main)
                         return;
+                    const layouts = String(main.layout || "").split(",");
+                    const variants = String(main.variant || "").split(",");
                     root.keyboard = main.name;
                     root.keyboardLayout = main.active_keymap;
-                    root.keyboardLayouts = String(main.layout || "").split(",").length;
+                    root.keyboardLayoutIndex = main.active_layout_index;
+                    root.keyboardLayoutList = layouts.map((layout, i) => {
+                        const variant = variants[i] || "";
+                        return {
+                            code: layout.toUpperCase(),
+                            name: i === main.active_layout_index ? main.active_keymap
+                                : root.xkbNames[variant !== "" ? layout + ":" + variant : layout]
+                                    || root.xkbNames[layout] || layout.toUpperCase()
+                        };
+                    });
                 } catch (error) {}
             }
+        }
+    }
+
+    // `! layout` lines read "  br  Portuguese (Brazil)", and `! variant` lines
+    // "  nodeadkeys  br: Portuguese (Brazil, no dead keys)".
+    FileView {
+        path: root.running ? "/usr/share/X11/xkb/rules/evdev.lst" : ""
+        printErrors: false
+        onLoaded: {
+            const names = {};
+            let section = "";
+            for (const line of text().split("\n")) {
+                if (line.startsWith("! ")) {
+                    section = line.substring(2).trim();
+                    continue;
+                }
+                const match = line.match(/^\s+(\S+)\s+(.+)$/);
+                if (!match)
+                    continue;
+                if (section === "layout")
+                    names[match[1]] = match[2];
+                else if (section === "variant") {
+                    const colon = match[2].indexOf(": ");
+                    if (colon > 0)
+                        names[match[2].substring(0, colon) + ":" + match[1]] = match[2].substring(colon + 2);
+                }
+            }
+            root.xkbNames = names;
+            devicesRefresh.restart();
         }
     }
 
@@ -93,12 +154,8 @@ Singleton {
         target: root.running ? Hyprland : null
 
         function onRawEvent(event) {
-            // "keyboard,Layout name": layout names may hold commas.
-            if (event.name === "activelayout") {
-                const comma = event.data.indexOf(",");
-                if (event.data.substring(0, comma) === root.keyboard)
-                    root.keyboardLayout = event.data.substring(comma + 1);
-            }
+            if (event.name === "activelayout" || event.name === "configreloaded")
+                devicesRefresh.restart();
             root.event(event.name, event.data);
         }
     }

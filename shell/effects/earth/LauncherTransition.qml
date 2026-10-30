@@ -142,23 +142,21 @@ Item {
         fragmentShader: Qt.resolvedUrl("qsb/LauncherTransition.ground.qsb")
     }
 
-    ShaderEffect {
+    Boulders {
         readonly property real margin: 240
         visible: root.lift > 0 && root.fall < 1
         x: root.panelRect.x - margin
         y: root.panelRect.y - margin
         width: root.panelRect.width + 2 * margin
         height: root.panelRect.height + 2 * margin
-        property real time: clock.simTime
-        property rect rect: Qt.rect(x, y, width, height)
-        property rect panel: root.panelRect
-        property real ground: root.ground
-        property real lift: root.lift
-        property real fall: root.fall
-        property color cLight: root.slabLight
-        property color cMid: root.slabMid
-        property color cDark: root.slabDark
-        property color cEdge: Stone.tone(root.theme, "crust", 0.1, "#15130e")
-        fragmentShader: Qt.resolvedUrl("qsb/LauncherTransition.boulders.qsb")
+        time: clock.simTime
+        panel: root.panelRect
+        ground: root.ground
+        lift: root.lift
+        fall: root.fall
+        cLight: root.slabLight
+        cMid: root.slabMid
+        cDark: root.slabDark
+        cEdge: Stone.tone(root.theme, "crust", 0.1, "#15130e")
     }
 }

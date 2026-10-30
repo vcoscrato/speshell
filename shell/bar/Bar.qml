@@ -8,8 +8,9 @@ import qs.services
 
 // Speshell's bar, one per screen, along its top or bottom: the Speshell mark, which
 // opens the launcher, and the screen's workspaces; the clock between the playing track
-// and the weather, the timers, and what's running (dictation, a recording); the tray
-// and the panel buttons. Buttons open their panel in a dropdown, and each timer its own.
+// and the weather, the timers, and what's running (dictation, a recording); the tray,
+// the keyboard layout where there are several, and the panel buttons. Buttons open
+// their panel in a dropdown, and each timer its own.
 //
 // The window covers the screen so dropdowns, menus, and labels can draw beside the
 // bar, and takes input only on the bar until one of them opens.
@@ -424,6 +425,13 @@ PanelWindow {
                             }
                         }
                     }
+                }
+
+                KeyboardLayoutButton {
+                    size: root.itemSize
+                    labelAbove: !root.atTop
+                    onMenuOpenChanged: root.openMenus = Math.max(0, root.openMenus + (menuOpen ? 1 : -1))
+                    Component.onDestruction: if (menuOpen) root.openMenus = Math.max(0, root.openMenus - 1)
                 }
 
                 Repeater {

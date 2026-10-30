@@ -19,32 +19,28 @@ layout(std140, binding = 0) uniform buf {
     vec4 cEdge;
     vec4 cPaint;
     vec4 cRubber;
+    float columns;      // the bolt table's width
+    float bands;        // the embers table's width
 } u;
 layout(binding = 1) uniform sampler2D source;
+layout(binding = 2) uniform sampler2D tear;     // WallpaperTransition.tear.frag
+layout(binding = 3) uniform sampler2D embers;   // WallpaperTransition.embers.frag
 #include "../common/common.glsl"
+#include "Tear.glsl"
 
 const float TAU = 6.2831853;
 const float STRIKE = 0.1;       // the bolt reaching the bottom
 const float SPLIT = 0.16;       // the halves starting to move
 
-// The bolt's path, a new one each time: big zigzags between corners at uneven
-// heights, kicked out mostly left and right by turns but now and then twice the same
-// way, leaning a little as it falls, with small torn teeth along it.
+// Where the bolt crosses height y (px), from its table: exact at each row's middle,
+// and straight between them.
 float tearX(float y) {
-    float H = u.resolution.y, W = u.resolution.x;
-    float P = H / 4.5;
-    float k = floor(y / P);
-    float s = u.seed * 97.0;
-    #define KINK(i) vec2(((i) + 0.5 * (hash(vec2((i), 2.0 + s)) - 0.5)) * P, \
-        (mod((i), 2.0) * 2.0 - 1.0) * (hash(vec2((i), 5.0 + s)) < 0.2 ? -0.45 : 1.0) \
-        * mix(0.04, 0.15, hash(vec2((i), 1.0 + s))) * W)
-    vec2 a = KINK(k), b = KINK(k + 1.0);
-    if (y < a.x) { b = a; a = KINK(k - 1.0); }
-    else if (y > b.x) { a = b; b = KINK(k + 2.0); }
-    #undef KINK
-    float x = mix(a.y, b.y, clamp((y - a.x) / (b.x - a.x), 0.0, 1.0));
-    float lean = (u.seed - 0.5) * 0.16 * W * (y / H - 0.5);
-    return W * 0.5 + x + lean + 7.0 * zig(y / 23.0, 3.0);
+    return texture(tear, vec2(y / u.columns, 0.25)).x;
+}
+
+// Texel i of the table's second row.
+vec4 traits(float i) {
+    return texture(tear, vec2((i + 0.5) / u.columns, 0.75));
 }
 
 float span(float x, float a, float b) { return clamp((x - a) / (b - a), 0.0, 1.0); }
@@ -128,20 +124,19 @@ void main() {
     // Embers spilling into the gap, carried apart and falling.
     // Embers stay within the gap's reach of the tear, so most pixels skip them.
     if (s > 0.0 && s < 0.95 && abs(p.x - tx) < gap + 0.3 * W) {
-        for (int i = 0; i < 32; i++) {
-            float fi = float(i);
-            vec4 h = vec4(hash(vec2(fi, 1.0)), hash(vec2(fi, 2.0)), hash(vec2(fi, 3.0)), hash(vec2(fi, 4.0)));
-            float y0 = h.x * H;
-            float dir = h.y < 0.5 ? -1.0 : 1.0;
-            float age = s * mix(0.8, 1.6, h.z);
-            float ey = y0 + 260.0 * age * age - 60.0 * age;
-            if (abs(p.y - ey) > 6.0)
+        float bx = (floor(p.y / BAND) + 0.5) / u.bands;
+        for (int i = 0; i < SLOTS; i++) {
+            vec4 e = texture(embers, vec2(bx, (float(2 * i) + 0.5) / float(2 * SLOTS)));
+            if (e.z < 0.0)
+                break;
+            if (abs(p.y - e.y) > 6.0)
                 continue;
-            vec2 ep = vec2(tearX(y0) + dir * gap * mix(0.2, 0.9, h.w), ey);
-            float life = 1.0 - smoothstep(0.5, 1.0, age);
-            float r = mix(2.0, 4.0, h.z) * life;
+            vec2 ep = e.xy;
+            vec2 lt = texture(embers, vec2(bx, (float(2 * i) + 1.5) / float(2 * SLOTS))).xy;
+            float life = lt.x;
+            float r = e.z;
             float d = length(p - ep);
-            vec3 ec = mix(u.cEdge.rgb, u.cGlow.rgb, h.w);
+            vec3 ec = mix(u.cEdge.rgb, u.cGlow.rgb, lt.y);
             col = mix(col, vec4(u.cRubber.rgb, 1.0), cover(r + 1.2 - d) * life);
             col = mix(col, vec4(ec, 1.0), cover(r - d) * life);
         }
@@ -178,12 +173,11 @@ void main() {
         float w = mix(13.0, 6.0, p.y / H) * (1.0 - 0.6 * s);
         float d = abs(p.x - tx) * norm - w;
         // Forks running off its corners, straight and pointed.
-        for (int i = 0; i < 4; i++) {
-            float fi = float(i);
-            float y0 = H * (0.15 + 0.2 * fi + 0.05 * hash(vec2(fi, 5.0)));
-            float len = H * (0.06 + 0.05 * hash(vec2(fi, 6.0)));
-            float side = mod(fi, 2.0) * 2.0 - 1.0;
-            vec2 a = vec2(tearX(y0), y0);
+        for (int i = 0; i < FORKS; i++) {
+            vec4 fork = traits(float(i));
+            float len = fork.z;
+            float side = fork.w;
+            vec2 a = fork.xy;
             vec2 m = a + vec2(side * len * 0.55, len * 0.5);
             vec2 b = m + vec2(-side * len * 0.15, len * 0.5);
             float f = clamp((p.y - a.y) / len, 0.0, 1.0);

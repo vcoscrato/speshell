@@ -30,5 +30,30 @@ ShaderEffect {
     property var theme: null
     property color cBody: theme ? Qt.lighter(Colors.mix(theme.rosewater, theme.text, 0.15), 1.05) : "#f6f9fc"
     property color cRim: theme ? Colors.mix(theme.blue, theme.accent, 0.15) : "#7fa6c8"
+    // The turbulence, worked out at an eighth of the resolution (Wind.drift.frag).
+    property var drift: driftTex
     fragmentShader: Qt.resolvedUrl("qsb/Wind.qsb")
+
+    ShaderEffect {
+        id: driftPass
+        visible: parent.turbulence > 0
+        width: Math.max(1, Math.ceil(parent.width / 8))
+        height: Math.max(1, Math.ceil(parent.height / 8))
+        blending: false
+        property real time: parent.time
+        property size area: Qt.size(parent.width, parent.height)
+        property point origin: parent.origin
+        property point center: parent.center
+        property size axes: parent.axes
+        property real turbulence: parent.turbulence
+        fragmentShader: Qt.resolvedUrl("qsb/Wind.drift.qsb")
+    }
+
+    ShaderEffectSource {
+        id: driftTex
+        sourceItem: driftPass
+        hideSource: true
+        format: ShaderEffectSource.RGBA16F
+        textureSize: Qt.size(driftPass.width, driftPass.height)
+    }
 }

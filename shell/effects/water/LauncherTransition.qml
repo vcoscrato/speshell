@@ -131,6 +131,29 @@ Item {
         fragmentShader: Qt.resolvedUrl("qsb/LauncherTransition.qsb")
     }
 
+    // Where the glints and orbs held round the launcher are this frame.
+    ShaderEffect {
+        id: motesPass
+        visible: root.flow > 0
+        width: 31
+        height: 2
+        blending: false
+        property real time: clock.simTime
+        property rect panel: root.panelRect
+        property real radius: 10
+        property real flow: root.flow
+        fragmentShader: Qt.resolvedUrl("qsb/LauncherTransition.motes.qsb")
+    }
+
+    ShaderEffectSource {
+        id: motesTex
+        sourceItem: motesPass
+        hideSource: true
+        smooth: false
+        format: ShaderEffectSource.RGBA32F
+        textureSize: Qt.size(31, 2)
+    }
+
     // Water held in the air around the open launcher, behind the streams.
     ShaderEffect {
         readonly property real margin: 240
@@ -144,11 +167,38 @@ Item {
         property rect panel: root.panelRect
         property real radius: 10
         property real flow: root.flow
+        property var motes: motesTex
         property color cDeep: Water.deep(root.theme)
         property color cMid: Water.mid(root.theme)
         property color cLight: Water.light(root.theme)
         property color cFoam: Water.foam(root.theme)
         fragmentShader: Qt.resolvedUrl("qsb/LauncherTransition.held.qsb")
+    }
+
+    // Where the streams' droplets are this frame, worked out once for every pixel.
+    ShaderEffect {
+        id: dropsPass
+        visible: root.flow > 0
+        width: 36
+        height: 2
+        blending: false
+        property real time: clock.simTime
+        property rect panel: root.panelRect
+        property real radius: 10
+        property real gap: 15
+        property real flow: root.flow
+        property real speed: 170
+        property real tubeWidth: 10
+        fragmentShader: Qt.resolvedUrl("qsb/LauncherTransition.drops.qsb")
+    }
+
+    ShaderEffectSource {
+        id: dropsTex
+        sourceItem: dropsPass
+        hideSource: true
+        smooth: false
+        format: ShaderEffectSource.RGBA32F
+        textureSize: Qt.size(36, 2)
     }
 
     ShaderEffect {
@@ -166,6 +216,7 @@ Item {
         property real flow: root.flow
         property real speed: 170
         property real tubeWidth: 10
+        property var dropTable: dropsTex
         property color cDeep: Water.deep(root.theme)
         property color cMid: Water.mid(root.theme)
         property color cLight: Water.light(root.theme)

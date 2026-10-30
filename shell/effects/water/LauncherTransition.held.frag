@@ -19,21 +19,16 @@ layout(std140, binding = 0) uniform buf {
     vec4 cLight;
     vec4 cFoam;
 } u;
+layout(binding = 1) uniform sampler2D motes;  // LauncherTransition.motes.frag
 #include "../common/common.glsl"
+#include "Held.glsl"
 
 const int CURRENTS = 3;
-const int ORBS = 9;
-const int MIST = 22;
 
 // Premultiplied "over" of a flat color with coverage k.
 void over(inout vec3 col, inout float a, vec3 c, float k) {
     col = mix(col, c, k);
     a = mix(a, 1.0, k);
-}
-
-// A point travelling clockwise along the panel's border pushed out by `dist` px.
-vec2 orbit(vec2 h, float dist, float s) {
-    return rrPoint(s, h + dist, u.radius + dist);
 }
 
 void main() {
@@ -44,6 +39,12 @@ void main() {
     float t = u.time;
     vec3 col = vec3(0.0);
     float a = 0.0;
+    // Nothing over the panel itself.
+    float off = cover(sdRoundRect(rel, h, u.radius) - 3.0);
+    if (sdRoundRect(rel, h, u.radius) < 1.0) {
+        fragColor = vec4(0.0);
+        return;
+    }
 
     // ── Currents: broad translucent ribbons, fainter further out ──
     for (int j = 0; j < CURRENTS; j++) {
@@ -78,33 +79,25 @@ void main() {
 
     // ── Mist: tiny glints drifting round ──
     for (int i = 0; i < MIST; i++) {
-        float fi = float(i);
-        vec3 r = vec3(hash(vec2(fi, 1.3)), hash(vec2(fi, 4.1)), hash(vec2(fi, 9.7)));
-        float dist = mix(18.0, 210.0, r.x);
-        float P = rrPerimeter(h + dist, u.radius + dist);
-        vec2 q = c + orbit(h, dist, r.y * P + t * mix(40.0, 95.0, r.z));
-        q.y += 10.0 * sin(t * (0.7 + r.z) + fi);
-        float twinkle = pow(0.5 + 0.5 * sin(t * (1.3 + 1.7 * r.y) + fi * 2.3), 3.0);
-        float size = mix(1.0, 2.3, r.z) * u.flow;
-        float k = cover(size - length(p - q)) * twinkle * mix(0.45, 0.9, r.z);
-        over(col, a, u.cFoam.rgb, k);
+        vec4 m = texture(motes, vec2((float(i) + 0.5) / float(MIST + ORBS), 0.25));
+        float dm = length(p - m.xy);
+        if (dm > m.z + 2.0)
+            continue;
+        over(col, a, u.cFoam.rgb, cover(m.z - dm) * m.w);
     }
 
     // ── Orbs: held water, wobbling as it drifts; nearer ones bigger and quicker ──
     for (int i = 0; i < ORBS; i++) {
-        float fi = float(i);
-        float z = hash(vec2(fi, 21.7));
-        float seed = hash(vec2(fi, 3.9)) * 6.2831853;
-        float dist = mix(36.0, 175.0, hash(vec2(fi, 11.3)));
-        float P = rrPerimeter(h + dist, u.radius + dist);
-        vec2 q = c + orbit(h, dist, fi / float(ORBS) * P + t * mix(16.0, 48.0, z));
-        float size = mix(4.5, 20.0, z * z);
-        q.y += 6.0 * sin(t * 1.25 + seed) * (0.5 + z);
+        float x = (float(i + MIST) + 0.5) / float(MIST + ORBS);
+        vec4 m = texture(motes, vec2(x, 0.25));
+        vec2 q = m.xy;
+        float size = m.z;
+        float appear = m.w;
         vec2 o = p - q;
         if (dot(o, o) > size * size * 2.0)
             continue;
-        // Gathers in turn as the streams form and drains first when they go.
-        float appear = smoothstep(0.0, 1.0, clamp(u.flow * 1.7 - 0.07 * fi, 0.0, 1.0));
+        vec2 zs = texture(motes, vec2(x, 0.75)).xy;
+        float z = zs.x, seed = zs.y;
         float ang = atan(o.y, o.x);
         float R = size * appear * (1.0 + 0.1 * sin(2.0 * ang + t * 3.1 + seed)
                                        + 0.06 * sin(3.0 * ang - t * 2.3 + seed * 2.0));
@@ -127,7 +120,5 @@ void main() {
         over(col, a, orb, cover(body) * mix(0.55, 1.0, z));
     }
 
-    // Nothing over the panel itself.
-    float off = cover(sdRoundRect(rel, h, u.radius) - 3.0);
     fragColor = vec4(col, a) * off * u.qt_Opacity;
 }

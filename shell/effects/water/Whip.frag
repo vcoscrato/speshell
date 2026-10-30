@@ -49,10 +49,11 @@ vec2 tangentAt(float v) {
 // (> 0 outward), for a whip L px long. Sets n (-1..1 across) and how far behind the
 // head it is (px).
 float strand(float v, float sd, float L, inout float n, inout float behind, inout float wide) {
-    float b = arcTo(v);
-    if (b < 0.0 || b > L)
-        return -1e3;
     float W = u.tubeWidth;
+    float b = arcTo(v);
+    // Its half-width reaches at most 1.7 W, and its ripples move its spine 0.7 W.
+    if (b < 0.0 || b > L || abs(sd) > 2.5 * W + 4.0)
+        return -1e3;
     float t = u.time;
     float tt = b / max(L, 1.0);                          // 0 at the head .. 1 at the tail
     // A round head that swells and wobbles, then a body that thins steadily to the
@@ -119,7 +120,8 @@ void main() {
     float tailV = u.head - u.len;
     float tailR = u.r0 * exp(-u.k * tailV);
     vec2 tailDir = tangentAt(tailV);
-    for (int i = 0; i < 6; i++) {
+    // The beads lag at most 116 px behind the tail along the spiral and drift 46 px.
+    for (int i = 0; i < 6 && distance(p, spiralAt(tailV)) < 190.0; i++) {
         // Beads pinched off the tail lag behind it and drift outward, shrinking.
         float fi = float(i);
         float cyc = t * (1.5 + 0.5 * hash(vec2(fi, 4.0))) + hash(vec2(fi, 1.0));
@@ -136,7 +138,8 @@ void main() {
     vec2 headPos = spiralAt(u.head);
     vec2 headDir = tangentAt(u.head);
     vec2 out_ = normalize(headPos - u.center + 1e-3);
-    for (int i = 0; i < 5; i++) {
+    // The spray flies at most about 80 px from the head.
+    for (int i = 0; i < 5 && distance(p, headPos) < 100.0; i++) {
         // Spray flung off the head, mostly outward, falling behind it.
         float fi = float(i);
         float cyc = t * (2.6 + 0.8 * hash(vec2(fi, 8.0))) + hash(vec2(fi, 5.0));
