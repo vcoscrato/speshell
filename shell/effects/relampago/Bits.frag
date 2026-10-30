@@ -174,25 +174,35 @@ float flicker(float fadeFrom, float fadeTo) {
 }
 
 vec4 strike(vec2 p, float R) {
-    // Strikes down from the top to the middle in an instant, holds, and blinks out;
-    // where it lands, a little starburst.
-    float tip = -R + R * smoothstep(0.0, 0.07, u.age);
-    if (p.y > tip + R * 0.3)
+    // Strikes down from the top in an instant, holds, and blinks out; where it lands,
+    // spikes flare up round the middle. The bolt stops short of the middle, which the
+    // spikes leave hollow, and they shrink away to the sides and below, so what was
+    // picked and the line it is on stay readable under them.
+    float hole = min(R * 0.3, 20.0) * 0.55;
+    float tip = -R + (R - hole) * smoothstep(0.0, 0.07, u.age);
+    if (p.y > tip + R * 0.3 && length(p) > hole * 2.0)
         return vec4(0.0);
-    float on = flicker(0.42, 0.8);
-    float w0 = clamp(R * 0.06, 1.8, 9.0);
+    float on = flicker(0.3, 0.62);
+    float w0 = clamp(R * 0.05, 1.5, 6.0);
     float ow = ink(R);
+    float halo = min(R * 0.04, 6.0);
     float d = bolt(p, -R, 0.0, R * 0.22, w0, 0.6, u.seed * 10.0, 4.0);
-    // A fork off its second corner, thin, slanting off.
+    // Out of nothing at the top, rather than cut off by the item's edge.
+    d += 1.3 * (w0 + ow + halo) * (1.0 - smoothstep(-R * 0.97, -R * 0.75, p.y));
+    // A fork off its second corner, thin, slanting off away from the next run.
     vec2 f0 = boltKink(2.0, -R, 0.0, R * 0.22, u.seed * 10.0, 4.0);
-    float side = f0.x < 0.0 ? 1.0 : -1.0;
+    float side = f0.x < 0.0 ? -1.0 : 1.0;
     vec2 f = mat2(0.8, side * 0.6, -side * 0.6, 0.8) * (p - f0);
     d = min(d, bolt(f, 0.0, R * 0.4, R * 0.08, w0 * 0.5, 0.4, u.seed * 10.0 + 7.0, 2.0));
     d = max(d, p.y - tip);
-    vec4 c = boltOver(vec4(0.0), d, ow, w0, min(R * 0.04, 6.0), on);
+    vec4 c = boltOver(vec4(0.0), d, ow, w0, halo, on);
     if (u.age > 0.06) {
-        float k = clamp((u.age - 0.06) / 0.6, 0.0, 1.0);
-        vec4 s = starburst(p, min(R * 0.22, 26.0), k, u.seed + 3.0);
+        float k = clamp((u.age - 0.06) / 0.5, 0.0, 1.0);
+        float up = mix(0.45, 1.0, smoothstep(1.7, 0.6, abs(atan(p.x, -p.y))));
+        vec4 s = starburst(p / up, min(R * 0.3, 20.0), k, u.seed + 3.0);
+        // Hollow, inked round its hole.
+        float l = length(p);
+        s = over(s * cover(l - hole), u.cRubber.rgb, cover(ink(R) * 0.5 - abs(l - hole)) * step(0.01, s.a));
         c = s + c * (1.0 - s.a);
     }
     return c;

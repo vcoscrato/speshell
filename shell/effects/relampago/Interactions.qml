@@ -44,11 +44,12 @@ Item {
 
     function pick(area, at) {
         var cx = at.x, cy = at.y;
-        var size = Math.max(80, Math.min(150, Math.max(area.width, area.height) * 3));
+        var size = Math.max(70, Math.min(100, Math.max(area.width, area.height) * 3));
         bits.emit(bits.strike, { x: cx, y: cy, life: 0.45, size: Math.round(size), angle: bits.rnd(-20, 20) });
+        // Sparks fly up and out of the line picked, not along it.
         for (var i = 0; i < 4; i++) {
-            var a = bits.rnd(0, 2 * Math.PI);
-            bits.emit(bits.spark, { x: cx, y: cy, vx: Math.cos(a) * bits.rnd(90, 190), vy: Math.sin(a) * bits.rnd(90, 190) - 50,
+            var a = -Math.PI / 2 + bits.rnd(-1.0, 1.0);
+            bits.emit(bits.spark, { x: cx, y: cy, vx: Math.cos(a) * bits.rnd(90, 190), vy: Math.sin(a) * bits.rnd(120, 220),
                                     gravity: 500, life: bits.rnd(0.28, 0.42), size: 20, orient: true, delay: 0.05 });
         }
         bits.emit(bits.glint, { x: area.x + area.width - 2, y: area.y + 2, life: 0.4, size: 18, delay: 0.12 });

@@ -88,14 +88,14 @@ vec4 raspberry(vec4 o, vec2 p, vec2 c, float rr, float seed) {
     return over(o, gap, cover(rr * 0.13 - l));
 }
 
-// A lancet hand: a long leaf, widest a third of the way out, its point sharp, a
-// short stem behind the pivot ending in a round tail. Signed distance.
+// A lancet hand: a long leaf, widest a third of the way out, its point sharp, and a
+// short tail behind the pivot tapering to a point. Signed distance.
 float lancet(vec2 q, float len, float w, float tail) {
     float t = q.y / len;
     float hw = w * (t < 0.33 ? mix(0.45, 1.0, sin(t / 0.33 * PI * 0.5)) : (1.0 - t) / 0.67);
     float blade = max(abs(q.x) - max(hw, 0.0), max(-q.y, q.y - len));
-    float stem = max(abs(q.x) - w * 0.45, max(-q.y - tail, q.y));
-    return min(min(blade, stem), length(q + vec2(0.0, tail)) - w * 0.9);
+    float stem = max(abs(q.x) - w * 0.45 * (1.0 + q.y / tail), max(-q.y - tail, q.y));
+    return min(blade, stem);
 }
 
 void main() {
@@ -143,10 +143,10 @@ void main() {
     // ── The lancet hands in dark chocolate, their shadows first, each lit along its
     // left edge ──
     vec2 sh = vec2(R * 0.022, R * 0.032);
-    float hd = lancet(handFrame(p, u.hourTurn), R * 0.48, R * 0.06, R * 0.08);
-    float md = lancet(handFrame(p, u.minuteTurn), R * 0.74, R * 0.045, R * 0.1);
-    float shd = min(lancet(handFrame(p - sh, u.hourTurn), R * 0.48, R * 0.06, R * 0.08),
-                    lancet(handFrame(p - sh, u.minuteTurn), R * 0.74, R * 0.045, R * 0.1));
+    float hd = lancet(handFrame(p, u.hourTurn), R * 0.48, R * 0.06, R * 0.13);
+    float md = lancet(handFrame(p, u.minuteTurn), R * 0.74, R * 0.045, R * 0.15);
+    float shd = min(lancet(handFrame(p - sh, u.hourTurn), R * 0.48, R * 0.06, R * 0.13),
+                    lancet(handFrame(p - sh, u.minuteTurn), R * 0.74, R * 0.045, R * 0.15));
     o = over(o, u.cCreamShade.rgb * 0.6, 0.45 * cover(-shd + 0.5));
     o = over(o, mix(u.cChocolateDark.rgb, u.cChocolate.rgb, 0.8 * step(handFrame(p, u.minuteTurn).x, 0.0)), cover(-md));
     o = over(o, mix(u.cChocolateDark.rgb, u.cChocolate.rgb, 0.8 * step(handFrame(p, u.hourTurn).x, 0.0)), cover(-hd));

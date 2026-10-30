@@ -1,9 +1,10 @@
 #version 440
 #extension GL_GOOGLE_include_directive : enable
 // A curtain of glaze pouring down over the old wallpaper. Its lower edge runs ahead in
-// drips of uneven width and length, each a round-tipped tongue that keeps stretching,
-// and drops break off the longest and fall; it is cel-shaded, deeper toward its lower
-// edge with a gloss along it. Where its wavy upper edge has passed, the new wallpaper
+// drips of uneven width and length, from stubs to a few long ones, each a round-tipped
+// tongue that keeps stretching, some swelling into a bead at the tip, and drops break
+// off the longest and fall; it is cel-shaded, deeper toward its lower edge, with
+// short sheens in it and a glint on each drip's tip. Where its wavy upper edge has passed, the new wallpaper
 // shows; it slides off the bottom with the old.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
@@ -28,8 +29,13 @@ float H, W, CELL, FRONT, THICK;
 vec4 drip(float k) {
     float s = u.seed * 37.0;
     vec4 h = vec4(hash(vec2(k, s)), hash(vec2(k, s + 1.0)), hash(vec2(k, s + 2.0)), hash(vec2(k, s + 3.0)));
-    return vec4((k + 0.25 + 0.5 * h.x) * CELL, CELL * mix(0.2, 0.4, h.y),
-                H * mix(0.02, 0.15, h.z * h.z), mix(0.0, 0.35, h.w));
+    return vec4((k + 0.25 + 0.5 * h.x) * CELL, CELL * mix(0.2, 0.42, h.y),
+                H * mix(0.008, 0.2, pow(h.z, 2.5)), mix(0.0, 0.35, h.w));
+}
+
+// Whether drip k swells into a bead at its tip: the longer ones, now and then.
+bool beaded(float k, vec4 d) {
+    return d.z > H * 0.04 && hash(vec2(k, u.seed * 37.0 + 4.0)) > 0.45;
 }
 
 float tipOf(vec4 d) {
@@ -54,6 +60,13 @@ void main() {
         vec4 d = drip(k1 + float(j));
         float L = tipOf(d);
         float dc = sdSeg(p, vec2(d.x, FRONT - d.y), vec2(d.x, FRONT + L - d.y)) - d.y;
+        // A bead, a little wider than the drip, at its tip.
+        if (beaded(k1 + float(j), d)) {
+            float bead = length(p - vec2(d.x, FRONT + L - d.y * 0.7)) - d.y * 1.35;
+            float kb = d.y * 0.8;
+            float hb = max(kb - abs(dc - bead), 0.0) / kb;
+            dc = min(dc, bead) - hb * hb * kb * 0.25;
+        }
         float k = d.y * 0.7;
         float h = max(k - abs(db - dc), 0.0) / k;
         db = min(db, dc) - h * h * k * 0.25;
@@ -92,14 +105,20 @@ void main() {
     float inside = cover(-db) * cover(dt);
     if (inside > 0.0 || (db < 3.0 && dt > -3.0)) {
         vec3 g = mix(u.cFrostLight.rgb, u.cFrost.rgb, band(dt, 26.0));
-        g = mix(g, u.cFrostShade.rgb, band(db, -14.0));
-        // Streaks running down it with the pour.
-        float st = vnoise(vec2(p.x / 22.0, (p.y - FRONT) / 260.0 + u.seed * 7.0));
-        g = mix(g, u.cFrostLight.rgb, 0.4 * band(st, 0.74) * band(dt, 26.0) * (1.0 - band(db, -14.0)));
-        g = mix(g, u.cFrostShade.rgb, 0.3 * (1.0 - band(st, 0.22)) * band(dt, 26.0));
-        // A gloss along the lower edge, broken into strokes.
-        float gl = cover(2.2 - abs(db + 9.0)) * step(fract(p.x / 130.0 + u.seed), 0.7);
-        g = mix(g, u.cFilm.rgb, 0.9 * gl);
+        g = mix(g, u.cFrostShade.rgb, band(db, -6.0));
+        // Short sheens in it, drawn out a little by the pour.
+        float st = vnoise(vec2(p.x / 16.0, (p.y - FRONT) / 70.0 + u.seed * 7.0));
+        g = mix(g, u.cFrostLight.rgb, 0.35 * band(st, 0.8) * band(dt, 26.0) * (1.0 - band(db, -20.0)));
+        g = mix(g, u.cFrostShade.rgb, 0.1 * (1.0 - band(st, 0.18)) * band(dt, 26.0));
+        // A glint on each drip's round tip, up on its left side.
+        for (int j = -1; j <= 1; j++) {
+            float kk = k1 + float(j);
+            vec4 d = drip(kk);
+            float r = beaded(kk, d) ? d.y * 1.35 : d.y;
+            vec2 tc = vec2(d.x, FRONT + tipOf(d) - (beaded(kk, d) ? d.y * 0.7 : d.y));
+            float gl = sdSeg(p, tc + vec2(-0.45, -0.5) * r, tc + vec2(-0.55, 0.05) * r) - r * 0.13;
+            g = mix(g, u.cFilm.rgb, 0.9 * cover(-gl) * step(H * 0.02, d.z));
+        }
         g = mix(g, u.cFilm.rgb, 0.7 * cover(1.6 - abs(dt - 9.0)) * step(fract(p.x / 170.0 + 0.3), 0.55));
         vec4 c = over(vec4(0.0), u.cFrostShade.rgb * 0.7, 0.7 * cover(1.5 - abs(db)) * cover(dt + 1.5));
         c = over(c, u.cFrostShade.rgb * 0.7, 0.7 * cover(1.5 - abs(dt)) * cover(-db + 1.5));

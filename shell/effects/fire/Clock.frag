@@ -69,7 +69,9 @@ void main() {
     vec4 o = vec4(0.0);
 
     // ── The ring of flames, licking outward from the rim ──
-    float lick = fbm(vec2(turn * 22.0, u.time * 1.6)) * 0.75 + fbm(vec2(turn * 47.0 + 3.0, u.time * 2.7)) * 0.4;
+    // Sampled round the circle, so the ring has no seam where `turn` wraps.
+    vec2 dir = p / max(r, 1e-3);
+    float lick = fbm(dir * 3.5 + vec2(0.0, u.time * 1.6)) * 0.75 + fbm(dir * 7.5 + vec2(3.0, -u.time * 2.7)) * 0.4;
     float height = S * (0.05 + 0.1 * lick * lick);
     // Branch-free, so cover()'s derivatives hold everywhere.
     float out1 = (r - R) / height;

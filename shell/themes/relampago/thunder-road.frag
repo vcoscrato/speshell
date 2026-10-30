@@ -27,15 +27,31 @@ vec3 sky(float t) {
     return mix(d, e, (t - 0.68) / 0.32);
 }
 
-// Signed horizontal offset of p from a bolt that falls from y0 to y1 around x(y),
-// and its slope there; returns (distance across, 0..1 along from the top).
+// Where a bolt that falls from y0 to y1 around a line from x0 to x1 is at height y:
+// kinked by a coarse zig and a fine one.
+float boltX(float y, float x0, float x1, float y0, float y1, float amp, float seed) {
+    return mix(x0, x1, (y0 - y) / (y0 - y1)) + amp * (zig(y / 0.035, seed) + 0.45 * zig(y / 0.011, seed + 3.0));
+}
+
+// The distance from p to that bolt, straight runs between the corners where either
+// zig kinks, and how far along it p is (0..1 from the top).
 vec2 boltDist(vec2 p, float x0, float x1, float y0, float y1, float amp, float seed) {
-    float t = (y0 - p.y) / (y0 - y1);
-    float e = 0.0015;
-    float bx = mix(x0, x1, t) + amp * (zig(p.y / 0.035, seed) + 0.45 * zig(p.y / 0.011, seed + 3.0));
-    float bx2 = mix(x0, x1, t + e / (y0 - y1)) + amp * (zig((p.y - e) / 0.035, seed) + 0.45 * zig((p.y - e) / 0.011, seed + 3.0));
-    float slope = (bx2 - bx) / e;
-    return vec2(abs(p.x - bx) / sqrt(1.0 + slope * slope), t);
+    float d = 1e3;
+    float k0 = floor(p.y / 0.011);
+    for (int j = -2; j <= 2; j++) {
+        float ya = (k0 + float(j)) * 0.011, yb = ya + 0.011;
+        vec2 a = vec2(boltX(ya, x0, x1, y0, y1, amp, seed), ya);
+        vec2 b = vec2(boltX(yb, x0, x1, y0, y1, amp, seed), yb);
+        // At most one coarse corner falls between two fine ones.
+        float ym = ceil(ya / 0.035) * 0.035;
+        if (ym < yb) {
+            vec2 m = vec2(boltX(ym, x0, x1, y0, y1, amp, seed), ym);
+            d = min(d, min(sdSeg(p, a, m), sdSeg(p, m, b)));
+        } else {
+            d = min(d, sdSeg(p, a, b));
+        }
+    }
+    return vec2(d, (y0 - p.y) / (y0 - y1));
 }
 
 // A mesa or butte: flat-topped with steep walls above a talus skirt, lopsided, and
@@ -104,9 +120,69 @@ float saguaro(vec2 q, vec2 b, float h, float seed) {
     return d;
 }
 
+// ── The storm's tower of billows (see stormDist) ──
+const int PUFFS = 34;
+const int MID = 11;         // where the middle and the front puffs start among them
+const int FRONT = 22;
+float PX;                   // one pixel, in q
+
+// Coverage of a signed distance in q, without derivatives, so it is safe anywhere.
+float fill(float d) {
+    return smoothstep(PX, -PX, d);
+}
+
+// Smooth maximum of two distances, rounding the corner where they meet by k.
+float smax(float a, float b, float k) {
+    float h = clamp(0.5 - 0.5 * (b - a) / k, 0.0, 1.0);
+    return mix(b, a, h) + k * h * (1.0 - h);
+}
+
+// The tower's height at x: tallest over the left, falling away to the right.
+float stormTop(float x) {
+    return 0.95 - 0.27 * smoothstep(0.4, 0.8, x);
+}
+
+// Its flat underside at x, lumpy with small billows hanging from it.
+float stormBelly(float x) {
+    return 0.6 + 0.012 * vnoise(vec2(x * 9.0, 1.0)) - 0.007 * lobes(x, 11.0, 3.0);
+}
+
+// Billow i: its center and radius in z, the higher first, so the lower stand in front.
+vec3 stormPuff(int i) {
+    float fi = float(i);
+    float t = 1.0 - fi / float(PUFFS - 1);
+    float x = mix(-0.08, 0.72, hash(vec2(fi, 11.0)));
+    float r = mix(0.06, 0.11, hash(vec2(fi, 13.0))) * mix(1.0, 0.55, smoothstep(0.3, 0.78, x)) * mix(0.8, 1.0, t);
+    float y = mix(0.6 + r * 0.35, stormTop(x) - r * 0.75, t);
+    return vec3(x, y, r);
+}
+
+// The distance to the edge of the tower's billows from `from` on, its underside cut
+// off with a rounded corner. From 0 it is the whole tower: a core under its top that
+// fills the gaps between the billows, and small billows along its top that make its
+// outline lumpy.
+float stormDist(vec2 q, int from) {
+    float d = 1e5;
+    if (from == 0) {
+        d = max(q.y - stormTop(q.x) + 0.06, q.x - 0.68);
+        for (int k = 0; k < 18; k++) {
+            vec2 h = hash2(vec2(float(k), 31.0));
+            float x = mix(-0.06, 0.76, (float(k) + 0.2 + 0.6 * h.x) / 18.0);
+            float r = mix(0.03, 0.055, h.y) * mix(1.0, 0.65, smoothstep(0.3, 0.78, x));
+            d = min(d, length(q - vec2(x, stormTop(x) - r * 0.9)) - r);
+        }
+    }
+    for (int i = from; i < PUFFS; i++) {
+        vec3 o = stormPuff(i);
+        d = min(d, length(q - o.xy) - o.z);
+    }
+    return smax(d, stormBelly(q.x) - q.y, 0.02);
+}
+
 void main() {
     vec2 px = qt_TexCoord0 * u.resolution;
     vec2 q = vec2(px.x, u.resolution.y - px.y) / u.resolution.y;
+    PX = 1.0 / u.resolution.y;
     float aspect = u.resolution.x / u.resolution.y;
     vec2 sun = vec2(aspect * 0.78, HORIZON + 0.035);
     float ds = length((q - sun) * vec2(1.0, 1.15));
@@ -135,9 +211,9 @@ void main() {
     col = mix(col, mix(rgb(176, 64, 80), rgb(255, 150, 90), exp(-abs(q.x - sun.x) * 3.0)), slit * 0.85);
 
     // ── The thunderstorm: a cumulonimbus of billows heaped over the left, flat
-    //    underneath, its anvil spreading across the sky. Each billow is shaded from
-    //    the sunset (right, low), rimmed where the light catches it, and the ones
-    //    the bolt leaves from are lit from within ──
+    //    underneath, its anvil spreading across the sky. It is shaded from the
+    //    sunset (right, low), rimmed where the light catches it, and lit from
+    //    within where the bolt leaves it ──
     float bx0 = 0.5;                               // where the bolt leaves the cloud
     float base = 0.6 + 0.012 * vnoise(vec2(q.x * 9.0, 1.0));
     float storm = 0.0;
@@ -158,61 +234,54 @@ void main() {
         storm = anvil;
     }
 
-    // The tower of billows: spheres seen from the front. Where they overlap the one
-    // standing out furthest wins and is lit by its own normal; lower ones stand in
-    // front. A smooth union of them all fills the gaps with shadowed creases.
-    vec3 L = normalize(vec3(0.9, -0.2, 0.42));
-    float bestH = -1.0;
-    vec3 bestN = vec3(0.0, 0.0, 1.0);
-    float bestY = 0.0;
-    float sil = 1.0;
-    for (int i = 0; i < 46; i++) {
-        float fi = float(i);
-        vec3 h = vec3(hash(vec2(fi, 11.0)), hash(vec2(fi, 12.0)), hash(vec2(fi, 13.0)));
-        float x = mix(-0.08, 0.76, h.x);
-        float top = 0.95 - 0.27 * smoothstep(0.4, 0.8, x);
-        float r = mix(0.05, 0.11, h.z) * mix(1.0, 0.6, smoothstep(0.3, 0.78, x));
-        float y = mix(base + r * 0.3, top - r * 0.8, pow(h.y, 0.75));
-        vec2 rel = q - vec2(x, y);
-        float ang = atan(rel.y, rel.x);
-        float R = r * (1.0 + (vnoise5(vec2(ang * 1.8 + fi * 5.0, fi)) - 0.5) * 0.1);
-        float dl = length(rel) - R;
-        // Polynomial smooth minimum: a blobby union.
-        float k = 0.03;
-        float hh = clamp(0.5 + 0.5 * (dl - sil) / k, 0.0, 1.0);
-        sil = mix(dl, sil, hh) - k * hh * (1.0 - hh);
-        if (dl >= 0.0)
-            continue;
-        float hz = sqrt(R * R - dot(rel, rel));
-        float bias = 0.07 * (1.0 - (y - base) / 0.35);
-        if (hz + bias > bestH) {
-            bestH = hz + bias;
-            bestN = normalize(vec3(rel / R, hz / R));
-            bestY = y;
-        }
-    }
-    float tower = cover(-sil) * cover(q.y - base);
-    if (tower > 0.0) {
-        float lit = bestH > -1.0 ? dot(bestN, L) : -1.0;
-        lit += (vnoise5(q * 16.0) - 0.5) * 0.06;
-        // Higher billows sit in the deepening dusk, lower ones catch the sunset.
-        float warm = smoothstep(0.9, 0.62, bestH > -1.0 ? bestY : q.y);
+    // The tower of billows, lit as one body in flat tones, not billow by billow: by
+    // the sunset low on the right, light along its edge toward the sun and a rim of
+    // it right at the edge, shade along the edge away, the middle and front billows
+    // lit along their own edges and shading what lies behind them. Higher up it sits in the
+    // deepening dusk, lower down it catches the sunset, and round where the bolt
+    // leaves it glows from within.
+    float dAll = stormDist(q, 0);
+    if (dAll < PX * 2.0) {
+        vec2 toSun = normalize(vec2(1.0, -0.22));
+        float warm = smoothstep(0.9, 0.62, q.y);
         vec3 dark = mix(rgb(34, 26, 56), rgb(56, 36, 72), warm);
         vec3 midc = mix(rgb(64, 46, 90), rgb(104, 56, 94), warm);
         vec3 litc = mix(rgb(112, 70, 116), rgb(180, 84, 96), warm);
         vec3 rimc = mix(rgb(180, 102, 128), rgb(250, 152, 104), warm);
-        vec3 sc = mix(dark, midc, band(lit, -0.3));
-        sc = mix(sc, litc, band(lit, 0.58));
-        sc = mix(sc, rimc, band(lit, 0.86));
-        // Lit from within near the bolt.
-        float glow = exp(-length((q - vec2(bx0, base + 0.04)) * vec2(1.0, 1.3)) * 7.0) * (0.6 + 0.5 * bestN.z);
-        sc = mix(sc, rgb(150, 122, 200), band(glow, 0.4) * 0.75);
-        sc = mix(sc, rgb(226, 214, 248), band(glow, 0.62) * 0.8);
+        // Glowing from within round the bolt: the billows nearest it light up whole,
+        // their tones shifted toward lilac in two steps, the shading kept.
+        vec2 on = vec2(-1.0);
+        for (int i = 0; i < PUFFS; i++) {
+            vec3 o = stormPuff(i);
+            if (length(q - o.xy) < o.z)
+                on = o.xy;
+        }
+        float glow = exp(-length((on - vec2(bx0, 0.62)) * vec2(1.0, 1.4)) * 6.0);
+        float g1 = step(0.38, glow), g2 = step(0.62, glow);
+        dark = mix(mix(dark, rgb(78, 62, 126), g1), rgb(106, 88, 162), g2);
+        midc = mix(mix(midc, rgb(110, 92, 162), g1), rgb(146, 128, 200), g2);
+        litc = mix(mix(litc, rgb(160, 140, 210), g1), rgb(212, 198, 244), g2);
+
+        int from = stormDist(q, FRONT) < 0.0 ? FRONT : stormDist(q, MID) < 0.0 ? MID : 0;
+        float lb = from == 0 ? 0.022 : 0.014;
+        // Lit near its edge toward the sun, unless the way there crosses deep
+        // through a billow, which would light slivers inside notches of the edge.
+        float dl = min(stormDist(q + toSun * lb, from), stormDist(q + toSun * lb * 0.6, from) + lb * 0.4);
+        float dsh = stormDist(q - toSun * 0.04, 0);
+        vec3 sc = midc;
+        sc = mix(sc, dark, 1.0 - fill(dsh));
+        if (from < FRONT)
+            sc = mix(sc, mix(sc, dark, 0.6), fill(stormDist(q + toSun * 0.008, from == 0 ? MID : FRONT)));
+        sc = mix(sc, litc, 1.0 - fill(dl));
+        float sunward = 1.0 - fill(stormDist(q + toSun * 0.006, 0));
+        sc = mix(sc, rimc, (1.0 - fill(dAll + 0.003)) * sunward);
+        float tower = fill(dAll);
         col = mix(col, sc, tower);
         storm = max(storm, tower);
     }
-    // The flat base, glowing with the sunset beneath.
-    col = mix(col, rgb(214, 96, 92), cover(base + 0.008 - q.y) * cover(q.y - base) * storm);
+    // The underside, glowing with the sunset beneath.
+    float belly = stormBelly(q.x);
+    col = mix(col, rgb(214, 96, 92), fill(q.y - belly - 0.006) * fill(belly - q.y) * fill(dAll));
 
     // ── The bolt: from the cloud base down to the plain, branching ──
     float boltTop = base;
@@ -229,8 +298,9 @@ void main() {
         float yb = boltTop - (0.06 + 0.15 * hash(vec2(fi, 21.0))) * (boltTop - HORIZON);
         float len = (0.06 + 0.08 * hash(vec2(fi, 22.0)));
         float side = mod(fi, 2.0) < 1.0 ? -1.0 : 1.0;
-        float tb = (yb - HORIZON) / (boltTop - HORIZON);
-        float xb = mix(aspect * 0.24, bx0, tb) + 0.05 * (zig(yb / 0.035, 1.0) + 0.45 * zig(yb / 0.011, 4.0));
+        // Rooted on the main channel, less its own kink there.
+        float xb = boltX(yb, bx0, aspect * 0.24, boltTop, HORIZON - 0.012, 0.05, 1.0)
+                 - 0.02 * (zig(yb / 0.035, 7.0 + fi) + 0.45 * zig(yb / 0.011, 10.0 + fi));
         vec2 br = boltDist(q, xb, xb + side * len * 0.9, yb, yb - len, 0.02, 7.0 + fi);
         if (br.y > 0.0 && br.y < 1.0) {
             float w = 0.0016 * (1.0 - br.y);

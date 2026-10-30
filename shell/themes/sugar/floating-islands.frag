@@ -84,6 +84,13 @@ vec3 heap(vec3 col, vec2 q, vec2 c, float w, float h, float seed, vec3 lit, vec3
     return mix(col, mix(m, hz, haze), fill(dAll));
 }
 
+// Billows of the sea of cream, uneven: now and then a broader swell rides among them,
+// and their height wanders along the bank (0..1-ish).
+float swell(float x, float freq, float seed) {
+    float broad = 0.85 * lobes(x + 0.29 / freq, freq * 0.45, seed + 23.0) + 0.1;
+    return max(billows(x, freq, seed), broad) * (0.75 + 0.5 * vnoise(vec2(x * freq * 0.3, seed + 31.0)));
+}
+
 // The top of an island's cream at x, for island() of the same c, w, H, and seed.
 float islandTop(float x, vec2 c, float w, float H, float seed) {
     float dx = (x - c.x) / w;
@@ -397,14 +404,16 @@ void main() {
 
     // Banks of cream, rolling toward the viewer.
     float rimSun = exp(-abs(q.x - SUN.x) * 1.6);
-    float h1 = horizon - 0.02 + 0.03 * billows(q.x + 0.4, 4.5, 2.0);
+    float h1 = horizon - 0.02 + 0.03 * swell(q.x + 0.4, 4.5, 2.0);
     col = mix(col, rgb(244, 192, 186), below(h1, q.y));
     col = mix(col, mix(rgb(252, 214, 198), rgb(255, 236, 210), rimSun), below(h1, q.y) * (1.0 - below(h1 - 0.006, q.y)));
 
     // An island nearer, toward the sun, with a tower, meringue trees, and
     // a strawberry, and a bit of cone drifting under it.
     vec2 near = vec2(aspect * 0.8, 0.53);
-    col = island(col, q, near + vec2(0.06, -0.1), 0.012, 0.0025, 0.017, 15.0, hz, 0.24);
+    vec2 bit = near + vec2(0.06, -0.1);
+    col = island(col, q, bit, 0.012, 0.0025, 0.017, 15.0, hz, 0.24);
+    col = rosette(col, q, vec2(bit.x + 0.001, islandTop(bit.x + 0.001, bit, 0.012, 0.0025, 15.0) - 0.001), 0.0042, 2.6, mLit, mMid, mShade, hz, 0.24);
     col = island(col, q, near, 0.075, 0.016, 0.1, 5.0, hz, 0.22);
     col = tower(col, q, vec2(near.x - 0.014, islandTop(near.x - 0.014, near, 0.075, 0.016, 5.0) - 0.003), 0.0072, hz, 0.22);
     col = rosette(col, q, vec2(near.x + 0.03, islandTop(near.x + 0.03, near, 0.075, 0.016, 5.0) - 0.002), 0.0095, 3.2, mLit, mMid, mShade, hz, 0.22);
@@ -419,9 +428,13 @@ void main() {
         float x = islet.x + (i == 0 ? -0.008 : 0.016);
         col = rosette(col, q, vec2(x, islandTop(x, islet, 0.05, 0.012, 6.0) - 0.003), i == 0 ? 0.011 : 0.008, i == 0 ? 3.3 : 2.7, mLit, mMid, mShade, hz, 0.08);
     }
-    // Broken bits of cone drifting under it, each with its cap of cream.
-    col = island(col, q, isle + vec2(-0.21, -0.1), 0.024, 0.005, 0.034, 11.0, hz, 0.06);
-    col = island(col, q, isle + vec2(0.07, -0.21), 0.017, 0.0035, 0.024, 13.0, hz, 0.06);
+    // Broken bits of cone drifting under it, each with its cap of cream: a strawberry
+    // lying on one, a little meringue tree on the other.
+    vec2 bitA = isle + vec2(-0.21, -0.1), bitB = isle + vec2(0.07, -0.21);
+    col = island(col, q, bitA, 0.024, 0.005, 0.034, 11.0, hz, 0.06);
+    col = strawberry(col, q, vec2(bitA.x - 0.002, islandTop(bitA.x - 0.002, bitA, 0.024, 0.005, 11.0) + 0.003), 0.016, 0.9, hz, 0.06);
+    col = island(col, q, bitB, 0.017, 0.0035, 0.024, 13.0, hz, 0.06);
+    col = rosette(col, q, vec2(bitB.x + 0.002, islandTop(bitB.x + 0.002, bitB, 0.017, 0.0035, 13.0) - 0.001), 0.006, 2.7, mLit, mMid, mShade, hz, 0.06);
     col = island(col, q, isle, 0.17, 0.03, 0.22, 2.0, hz, 0.0);
     // A grove of meringue trees beside the rotunda.
     for (int i = 0; i < 4; i++) {
@@ -440,10 +453,10 @@ void main() {
     col = strawberry(col, q, vec2(sx3, islandTop(sx3, isle, 0.17, 0.03, 2.0) + 0.008), 0.028, 0.35, hz, 0.0);
     col = strawberry(col, q, vec2(sx2, islandTop(sx2, isle, 0.17, 0.03, 2.0) + 0.005), 0.026, 1.2, hz, 0.0);
 
-    float h2 = 0.27 + 0.04 * billows(q.x + 0.9, 3.2, 3.0);
+    float h2 = 0.27 + 0.04 * swell(q.x + 0.9, 3.2, 3.0);
     col = mix(col, rgb(234, 176, 180), below(h2, q.y));
     col = mix(col, mix(rgb(250, 208, 198), rgb(255, 230, 206), rimSun), below(h2, q.y) * (1.0 - below(h2 - 0.007, q.y)));
-    float u2 = h2 - 0.045 + 0.03 * billows(q.x + 4.1, 6.5, 12.0);
+    float u2 = h2 - 0.045 + 0.03 * swell(q.x + 4.1, 6.5, 12.0);
     col = mix(col, rgb(216, 154, 166), below(u2, q.y) * below(h2, q.y));
 
     // Candyfloss rising out of the nearer cream.
@@ -451,13 +464,13 @@ void main() {
     col = heap(col, q, vec2(aspect * 0.6, 0.2), 0.06, 0.07, 21.0, nLit, nMid, nShade, nRim, hz, 0.1);
     col = heap(col, q, vec2(aspect * 1.0, 0.18), 0.1, 0.1, 22.0, nLit, nMid, nShade, nRim, hz, 0.1);
 
-    float h3 = 0.17 + 0.05 * billows(q.x + 1.7, 2.6, 4.0);
+    float h3 = 0.17 + 0.05 * swell(q.x + 1.7, 2.6, 4.0);
     col = mix(col, rgb(196, 124, 150), below(h3, q.y));
     col = mix(col, mix(rgb(226, 156, 166), rgb(248, 192, 176), rimSun), below(h3, q.y) * (1.0 - below(h3 - 0.009, q.y)));
-    float u3 = h3 - 0.055 + 0.035 * billows(q.x + 2.9, 4.0, 13.0);
+    float u3 = h3 - 0.055 + 0.035 * swell(q.x + 2.9, 4.0, 13.0);
     col = mix(col, rgb(172, 104, 138), below(u3, q.y));
 
-    float h4 = 0.06 + 0.06 * billows(q.x + 2.3, 1.8, 5.0);
+    float h4 = 0.06 + 0.06 * swell(q.x + 2.3, 1.8, 5.0);
     col = mix(col, rgb(130, 78, 116), below(h4, q.y));
     col = mix(col, rgb(180, 116, 140), below(h4, q.y) * (1.0 - below(h4 - 0.01, q.y)));
 

@@ -27,19 +27,30 @@ layout(binding = 1) uniform sampler2D source;
 #include "../common/common.glsl"
 
 const vec2 LIGHT = vec2(-0.55, -0.83);
-const float CHUNK = 46.0;
+const float CHUNK = 64.0;
 const float JIT = 0.9;
 // How much of the crumble each chunk's own fall takes.
-const float W = 0.35;
+const float W = 0.8;
 
+// The site of a cell's chunk, as voronoiSite() places it, so chunks break along the
+// cracks drawn between them.
 vec2 chunkSite(vec2 cell) {
-    return (cell + 0.5 + (hash2(cell + 0.7) - 0.5) * JIT) * CHUNK;
+    return (cell + 0.5 + (hash2(cell) - 0.5) * JIT) * CHUNK;
 }
 
-// When the chunk around `site` starts to go, 0..1: top first, unevenly.
+// Where the slab landed: the middle of its bottom edge, at rest.
+vec2 impact() {
+    return vec2(u.panel.x + u.panel.z * 0.5, u.panel.y + u.panel.w);
+}
+
+// How far from the impact a point on the slab is, 0..1 at its furthest corners.
+float reach(vec2 q) {
+    return clamp(distance(q, impact()) / max(length(vec2(u.panel.z * 0.5, u.panel.w)), 1.0), 0.0, 1.0);
+}
+
+// When the chunk around `site` starts to go, 0..1: outward from the impact, unevenly.
 float chunkStart(vec2 site) {
-    float yN = clamp((site.y - u.panel.y) / max(u.panel.w, 1.0), 0.0, 1.0);
-    return clamp(0.72 * yN + 0.28 * hash(site * 0.031), 0.0, 1.0);
+    return clamp(0.55 * reach(site) + 0.45 * hash(site * 0.031), 0.0, 1.0);
 }
 
 float chunkAge(vec2 site) {
@@ -115,7 +126,7 @@ void main() {
     vec2 q = p - u.offset;                                 // point on the slab at rest
     vec2 c = u.panel.xy + u.panel.zw * 0.5;
     float aboveGround = smoothstep(0.75, -0.75, p.y - u.ground);
-    vec2 crackFrom = vec2(c.x, u.panel.y + u.panel.w);
+    vec2 crackFrom = impact();
 
     // The panel itself, where the stone has gone.
     float dPanel = sdRoundRect(q - c, u.panel.zw * 0.5, u.radius);
@@ -141,8 +152,7 @@ void main() {
             // The cracks: a few jagged ones run up from where it landed, and the chunk
             // borders open just before their chunks go.
             float e = voronoiEdge(q, CHUNK, JIT);
-            float soon = smoothstep(0.14, 0.0, chunkStart(own) - u.crumble * (1.0 + W)) * step(0.001, u.crumble);
-            float open = soon;
+            float open = smoothstep(0.08, 0.0, chunkStart(own) - u.crumble * (1.0 + W)) * step(0.001, u.crumble);
             float lc = landingCracks(q, crackFrom, u.panel.w * 1.05, u.cracks);
             sc = mix(sc, mix(sc, u.cLight.rgb, 0.3), cover(2.6 - lc) * 0.6);
             sc = mix(sc, u.cEdge.rgb, cover(1.1 - lc));
@@ -155,16 +165,19 @@ void main() {
     if (u.crumble > 0.0) {
         float bestK = -1.0;
         vec2 bq = vec2(0.0);
-        for (int j = -1; j <= 1; j++)
+        // A chunk falls up to about two and a half cells, so look that far up for one.
+        for (int j = -3; j <= 1; j++)
             for (int i = -1; i <= 1; i++) {
                 vec2 s = chunkSite(g + vec2(i, j));
                 float k = chunkAge(s);
                 if (k <= 0.0 || k >= 1.0)
                     continue;
                 float h = hash(s * 0.017);
-                vec2 drop = vec2((h - 0.5) * 12.0 * k, 0.9 * CHUNK * k * k);
-                float sc = 1.0 - 0.65 * k;
-                vec2 l = rot(q - s - drop, -(h - 0.5) * 2.4 * k) / max(sc, 1e-3);
+                // Knocked away from the impact, then falling, and nearing as it tips forward.
+                vec2 away = normalize(s - crackFrom + vec2(0.0, -1.0));
+                vec2 drop = away * 18.0 * k + vec2((h - 0.5) * 10.0 * k, 150.0 * k * k);
+                float sc = 1.0 + 0.12 * k;
+                vec2 l = rot(q - s - drop, -(h - 0.5) * 1.8 * k) / sc;
                 vec2 qs = s + l;
                 if (dot(l, l) > CHUNK * CHUNK * 1.2)
                     continue;
@@ -177,12 +190,13 @@ void main() {
             float body = cover(-d);
             if (body > 0.0) {
                 vec3 sc = stone(bq, c, d);
-                // Tipping forward out of the light: a shade darker, outlined.
-                sc = mix(sc, u.cDark.rgb, 0.3 * step(0.25, bestK));
-                float e = voronoiEdge(bq, CHUNK, JIT) * (1.0 - bestK);
+                // Tipping forward out of the light: darker as it turns, outlined.
+                sc = mix(sc, u.cDark.rgb, 0.35 * smoothstep(0.0, 0.7, bestK));
+                float e = voronoiEdge(bq, CHUNK, JIT);
+                sc = mix(sc, mix(sc, u.cLight.rgb, 0.35), cover(3.0 - e) * (1.0 - smoothstep(0.0, 0.5, bestK)));
                 sc = mix(sc, u.cEdge.rgb, cover(1.3 - e));
                 body *= 1.0 - smoothstep(0.75, 1.0, bestK);
-                stoneC = mix(stoneC, sc, body);
+                stoneC = stoneA > 0.0 ? mix(stoneC, sc, body) : sc;
                 stoneA = max(stoneA, body);
             }
         }
@@ -198,7 +212,7 @@ void main() {
                 float ci = cx + float(i);
                 vec2 h = hash2(vec2(ci, float(k) + 3.0));
                 vec2 start = vec2((ci + h.x) * COL, u.panel.y + 12.0 + h.y * (u.panel.w - 24.0));
-                float t0 = clamp(0.72 * h.y + 0.28 * hash(vec2(ci, float(k))), 0.0, 1.0);
+                float t0 = chunkStart(start);
                 float age = (u.crumble * (1.0 + W) - t0) * 0.9;
                 if (age <= 0.0 || age > 0.75)
                     continue;

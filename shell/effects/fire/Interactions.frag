@@ -4,7 +4,7 @@
 // shrinking as it burns out; 1 a spark streaking along its path (the item turns with
 // it); 2 a puff of smoke; 3 a burning streak on a slider's track, cooling from white
 // heat to a dying red; 4 an ember floating up, flickering as it cools; 5 a flash of
-// ignition.
+// ignition. `alpha` lets what is lit show through it.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {
@@ -14,6 +14,7 @@ layout(std140, binding = 0) uniform buf {
     float seed;
     float kind;
     float size;         // px across
+    float alpha;        // 0..1 how solid it is
     vec4 cCore;
     vec4 cMid;
     vec4 cOuter;
@@ -98,9 +99,10 @@ vec4 ember(vec2 p, float R) {
 
 vec4 flash(vec2 p, float R) {
     float k = sin(3.1415927 * pow(u.age, 0.45));
-    float a = atan(p.y, p.x);
-    // A ragged blob of flame, licking upward, not a ring.
-    float lick = 0.55 + 0.45 * vnoise(vec2(a * 2.2 + u.seed * 40.0, u.age * 5.0)) + 0.35 * max(0.0, -p.y / max(length(p), 1.0));
+    vec2 dir = p / max(length(p), 1e-3);
+    // A ragged blob of flame, licking upward, not a ring; round it by direction, not
+    // angle, so it has no notch where the angle wraps.
+    float lick = 0.55 + 0.45 * vnoise(dir * 2.2 + vec2(u.seed * 40.0, u.age * 5.0)) + 0.35 * max(0.0, -p.y / max(length(p), 1.0));
     float d = length(p) - R * k * lick;
     float inside = clamp(-d / max(R * k * 0.6, 1.0), 0.0, 1.0);
     return flameBands(inside, -d) * k;
@@ -111,5 +113,5 @@ void main() {
     float R = u.size * 0.5 - 1.0;
     vec4 c = u.kind < 0.5 ? tongue(p, R) : u.kind < 1.5 ? spark(p, R) : u.kind < 2.5 ? smoke(p, R)
         : u.kind < 3.5 ? scorch(p, R) : u.kind < 4.5 ? ember(p, R) : flash(p, R);
-    fragColor = c * u.qt_Opacity;
+    fragColor = c * u.alpha * u.qt_Opacity;
 }

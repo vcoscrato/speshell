@@ -118,7 +118,7 @@ void main() {
     vec2 light = normalize(vec2(-0.45, -1.0));
     float hold = clamp(u.lift * 1.4, 0.0, 1.0) * (1.0 - u.fall);
 
-    // ── Dust drifts: broad faint bands of dust circling far out, ragged at the edges ──
+    // ── Dust drifts: broad faint bands of dust circling far out, ragged and soft at the edges ──
     for (int j = 0; j < 2; j++) {
         float fj = float(j);
         float dist = 95.0 + 70.0 * fj;
@@ -143,7 +143,11 @@ void main() {
         float rag = (mix(fbm(rq), fbm(rq - vec2(P / 40.0, 0.0)), smoothstep(P - 160.0, P, s)) - 0.5) * 22.0;
         float w = (16.0 + 8.0 * fj) * pow(sin(3.14159265 * tt), 0.7);
         float f = w + rag - abs(d - wave);
-        over(col, a, u.cLight.rgb, cover(f) * (0.11 - 0.03 * fj));
+        // Thinning out over its last few px, and thicker and thinner along it, as dust
+        // is; the same cross-fade keeps that seamless where s wraps.
+        vec2 dq = vec2(s / 90.0 - u.time * 0.15, d / 30.0 + fj * 3.0);
+        float thick = mix(fbm(dq), fbm(dq - vec2(P / 90.0, 0.0)), smoothstep(P - 160.0, P, s));
+        over(col, a, u.cLight.rgb, smoothstep(0.0, 6.0, f) * smoothstep(0.2, 0.7, thick) * (0.15 - 0.04 * fj));
     }
 
     // ── Far layer: small dark stones circling slowly well behind the boulders ──

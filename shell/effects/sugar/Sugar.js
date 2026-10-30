@@ -70,6 +70,11 @@ function berryLight(theme) {
     return theme ? Colors.mix(theme.error, theme.text, 0.3) : "#f48791";
 }
 
+// A cherry's stem, green turning to wood.
+function stem(theme) {
+    return theme ? Colors.mix(theme.success, wood(theme), 0.55) : "#a99964";
+}
+
 // Gold, for leaf and dragées.
 function gold(theme) {
     return theme ? Colors.mix(theme.yellow, theme.peach, 0.3) : "#ffc570";

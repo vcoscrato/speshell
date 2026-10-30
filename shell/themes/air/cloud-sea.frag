@@ -38,8 +38,10 @@ vec3 spire(vec3 col, vec2 q, float c, float top, float w, float plateau, float s
     vec3 rock = dx < ridgeLine ? lit : shade;
     float strata = vnoise(vec2(q.x * 8.0, q.y * 70.0 + seed));
     rock = mix(rock, shade * 0.8, band(strata, 0.78) * 0.7);
-    // Sun-facing edge.
-    rock = mix(rock, rim, cover(0.0035 - (dx + w * (1.0 - side) + plateau)) * step(dx, 0.0));
+    // Sun-facing edge: a thin line inside the silhouette, where the spire is
+    // side = sideEdge wide at this height.
+    float sideEdge = min(pow(max(top - q.y, 0.0) / (0.9 * top), 1.0 / 1.5), 1.0);
+    rock = mix(rock, rim, cover(0.0035 - (sideEdge - side) * w) * step(dx, 0.0));
     return mix(col, rock, inside);
 }
 

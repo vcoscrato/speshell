@@ -110,13 +110,20 @@ void main() {
                                        + 0.06 * sin(3.0 * ang - t * 2.3 + seed * 2.0));
         float body = R - length(o);
         vec2 n = o / max(size, 1.0);
+        // Lit as clear water from the top left: a dark crescent on the far side, the
+        // disc less one moved toward the light, so it curves and tapers to points;
+        // inside it, the light that came through gathers in a bright arc.
+        vec2 toLight = vec2(-0.55, -0.83);
+        float lr = max(R, 0.5);
+        float far = length(o - toLight * lr * 0.38) - lr * 0.86;
         vec3 w = u.cMid.rgb;
-        w = mix(w, u.cDeep.rgb, cover(dot(n, vec2(0.55, 0.83)) - 0.3));
-        w = mix(w, u.cLight.rgb, cover(dot(n, vec2(-0.55, -0.83)) - 0.28) * cover(body - 1.5));
-        // Highlight and a smaller second glint, as on a lens of water.
+        w = mix(w, u.cDeep.rgb, cover(far));
+        float caustic = cover(body - 1.6) * cover(lr * 0.16 * smoothstep(0.25, 0.9, dot(n, -toLight) * size / lr) - (body - 1.6));
+        w = mix(w, mix(u.cLight.rgb, u.cFoam.rgb, 0.4), caustic * step(6.0, size) * 0.85);
+        // A glint toward the light, and a smaller one in the arc.
         w = mix(w, u.cFoam.rgb, cover(0.2 - length(n - vec2(-0.36, -0.4))) * step(5.5, size));
-        w = mix(w, u.cFoam.rgb, cover(0.09 - length(n - vec2(0.3, 0.42))) * step(9.0, size));
-        vec3 orb = mix(u.cDeep.rgb * 0.7, w, cover(body - 1.4));
+        w = mix(w, u.cFoam.rgb, cover(0.07 - length(n - vec2(0.38, 0.5))) * step(10.0, size));
+        vec3 orb = mix(mix(u.cDeep.rgb, u.cMid.rgb, 0.3), w, cover(body - 1.2));
         over(col, a, orb, cover(body) * mix(0.55, 1.0, z));
     }
 

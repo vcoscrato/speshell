@@ -5,12 +5,16 @@
 // like light around a lens, behind a white-hot ring with a warm glow and a faint
 // violet haze. With `debris`, as for a supernova, the front runs thick and thin in
 // filaments, flings streaks of ejecta ahead of it, and leaves sparks in its wake.
+// The item may sit inside a larger rect (`panel` within `rect`): past the item's
+// rounded edge the ring tapers off over a short reach instead of being cut.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {
     mat4 qt_Matrix;
     float qt_Opacity;
     vec4 rect;          // this item's rect on screen (px)
+    vec4 panel;         // the captured item's rect on screen (px), within rect
+    float radius;       // its corners' radius (px)
     vec2 origin;
     float circle;       // portal radius (px)
     float outside;      // 1: show the item outside the circle instead of inside
@@ -37,8 +41,13 @@ void main() {
     // Near the edge, sample from closer to it, so the item stretches along the rim.
     float bend = u.lens * exp(-max(s, 0.0) / max(u.lens * 2.5, 1.0));
     vec2 sp = p + dir * bend * (u.outside > 0.5 ? -1.0 : 1.0);
-    vec4 content = texture(source, clamp((sp - u.rect.xy) / u.rect.zw, 0.0, 1.0));
-    float shape = texture(source, qt_TexCoord0).a;
+    vec4 content = texture(source, clamp((sp - u.panel.xy) / u.panel.zw, 0.0, 1.0));
+    // Inside the item's box, its own alpha; outside it, how far off its edge.
+    vec2 puv = (p - u.panel.xy) / u.panel.zw;
+    vec2 inset = min(puv, 1.0 - puv) * u.panel.zw;
+    float inBox = step(0.0, min(inset.x, inset.y));
+    float shape = texture(source, clamp(puv, 0.0, 1.0)).a * inBox;
+    float dp = sdRoundRect(p - u.panel.xy - u.panel.zw * 0.5, u.panel.zw * 0.5, u.radius);
 
     float w = u.ringWidth;
     // Filaments: the front thickens and thins along its length, drifting as it grows.
@@ -50,14 +59,13 @@ void main() {
     float haze = exp(-max(-s, 0.0) / (26.0 * w)) * (1.0 - smoothstep(0.0, 3.0 * w, s));
     // The haze reaches further than the item's edge would cut it: fade it out there,
     // or a launcher portal still smaller than its panel shows the panel's rectangle.
-    vec2 inset = min(qt_TexCoord0, 1.0 - qt_TexCoord0) * u.rect.zw;
     haze *= smoothstep(0.0, 28.0 * w, min(inset.x, inset.y));
     vec4 rim = vec4(u.cHaze.rgb, 1.0) * haze * 0.35;
     rim = vec4(u.cGlow.rgb, 1.0) * glow * 0.9 + rim * (1.0 - glow * 0.9);
     rim = vec4(u.cHot.rgb, 1.0) * hot + rim * (1.0 - hot);
-    rim *= u.ring * shape;
+    rim *= u.ring * max(shape, 1.0 - smoothstep(0.0, 22.0 * w, dp));
 
-    vec4 shown = content * cover(s);
+    vec4 shown = content * inBox * cover(s);
     vec4 o = rim + shown * (1.0 - rim.a);
 
     if (u.debris > 0.0 && u.circle > 60.0) {

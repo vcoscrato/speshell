@@ -158,14 +158,18 @@ Item {
         live: root.capturing
     }
 
+    // Past the panel, so the ring tapers off beyond its edge rather than being cut.
     ShaderEffect {
+        readonly property real margin: 28
         visible: root.capturing && root.panel !== null
-        x: root.panelRect.x
-        y: root.panelRect.y
-        width: root.panelRect.width
-        height: root.panelRect.height
+        x: root.panelRect.x - margin
+        y: root.panelRect.y - margin
+        width: root.panelRect.width + 2 * margin
+        height: root.panelRect.height + 2 * margin
         property var source: panelTex
-        property rect rect: root.panelRect
+        property rect rect: Qt.rect(x, y, width, height)
+        property rect panel: root.panelRect
+        property real radius: root.theme && root.theme.surfaceRadius !== undefined ? root.theme.surfaceRadius : 16
         property point origin: root.origin
         property real circle: root.eased * root.revealMax
         property real outside: 0

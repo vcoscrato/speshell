@@ -2,8 +2,8 @@
 #extension GL_GOOGLE_include_directive : enable
 // Polar night: aurora curtains ripple over moonlit glacier peaks and are mirrored
 // in a still polar sea. An ice city of domes and a tall tower glows warm on the
-// far shore, faceted icebergs drift, a canoe carries a lantern home, and snow
-// falls over a drifted bank in the foreground.
+// far shore, faceted icebergs drift, both mirrored too, a canoe carries a lantern
+// home, and snow falls over a drifted bank in the foreground.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {
@@ -24,19 +24,39 @@ vec4 aurora(vec2 q, float aspect) {
         float yb = 0.55 + 0.05 * fi + 0.07 * sin(q.x * 2.1 + fi * 1.9) + 0.035 * sin(q.x * 5.3 + fi * 3.7);
         float hgt = (0.2 + 0.08 * fi) * (0.6 + 0.6 * vnoise(vec2(q.x * 3.0, fi * 4.0)));
         float rel = (q.y - yb) / hgt;
-        if (rel < 0.0 || rel > 1.0)
+        if (rel < 0.0 || rel > 1.8)
             continue;
         float span = smoothstep(0.05 + 0.4 * fi, 0.35 + 0.4 * fi, q.x) * smoothstep(aspect - 0.1 * fi, aspect - 0.5 - 0.2 * fi, q.x);
-        // A smooth curtain in flat tiers, brightest at its lower edge, with thin
-        // rays of light rising through it.
-        float s0 = pow(1.0 - rel, 1.3) * span * (1.0 - 0.2 * fi);
-        vec3 c = s0 > 0.55 ? rgb(150, 250, 200) : (s0 > 0.3 ? rgb(84, 214, 176) : rgb(56, 156, 170));
-        float ray = band(vnoise(vec2(q.x * 130.0 + fi * 13.0, fi)), 0.72) * smoothstep(0.9, 0.2, rel);
-        c = mix(c, s0 > 0.55 ? rgb(214, 255, 236) : rgb(140, 240, 200), ray * 0.7);
-        c = mix(c, rgb(214, 255, 236), cover(0.03 - rel) * step(0.3, s0));
-        float k = s0 > 0.3 ? 1.0 : (s0 > 0.12 ? 0.55 : 0.0);
-        if (k > best.a)
-            best = vec4(c, k);
+        // A smooth curtain in flat tiers, brightest at its lower edge and fading
+        // through fainter ones toward its top, with thin rays of light rising
+        // through it and past it, each dying out at its own height.
+        float ray = band(vnoise(vec2(q.x * 130.0 + fi * 13.0, fi)), 0.72);
+        float rayTop = 1.0 + 0.75 * vnoise(vec2(q.x * 45.0 + fi * 7.0, fi + 9.0));
+        // The faint tier is the same curtain drawn taller, so it thins out at its
+        // ends as the curtain does.
+        float s1 = pow(max(0.0, 1.0 - rel / 1.3), 1.3) * span * (1.0 - 0.2 * fi);
+        float rn = 0.6 * vnoise(vec2(q.x * 130.0 + fi * 13.0, fi)) + 0.4 * vnoise(vec2(q.x * 390.0, fi + 3.0));
+        vec4 c = vec4(rgb(56, 156, 170), s1 > 0.12 ? 0.3 : 0.0);
+        if (rel > 1.0) {
+            // Thinning as it rises, so each ends in a point.
+            float up = (rel - 1.0) / max(rayTop - 1.0, 1e-3);
+            float thin = band(rn, 0.7 + 0.25 * up) * step(0.45, vnoise(vec2(q.x * 18.0, fi + 5.0)));
+            float k = thin * step(0.3, span) * step(up, 1.0) * (up < 0.45 ? 0.3 : 0.16);
+            if (k > c.a)
+                c = vec4(rgb(84, 214, 176), k);
+        } else {
+            float s0 = pow(1.0 - rel, 1.3) * span * (1.0 - 0.2 * fi);
+            vec3 cc = s0 > 0.55 ? rgb(150, 250, 200) : (s0 > 0.3 ? rgb(84, 214, 176) : rgb(56, 156, 170));
+            cc = mix(cc, s0 > 0.55 ? rgb(214, 255, 236) : rgb(140, 240, 200), ray * 0.7 * smoothstep(1.0, 0.2, rel));
+            cc = mix(cc, rgb(214, 255, 236), cover(0.03 - rel) * step(0.3, s0));
+            float k = s0 > 0.3 ? 1.0 : (s0 > 0.12 ? 0.55 : 0.0);
+            // The rays carry the faint tiers up with them.
+            k = max(k, band(rn, 0.7) * step(0.12, s1) * (s0 > 0.04 ? 0.55 : 0.3));
+            if (k > c.a)
+                c = vec4(cc, k);
+        }
+        if (c.a > best.a)
+            best = c;
     }
     return best;
 }
@@ -78,6 +98,25 @@ vec3 berg(vec3 col, vec2 q, float c, float w, float ht, float seed, float water)
     return col;
 }
 
+// How much of the ice city's silhouette covers p, for its reflection: the shelf it
+// stands on, the domes, the tower and its spire, and the wall, as main() draws them.
+float citySilhouette(vec2 p, float cx0, float cx1, float aspect) {
+    if (p.x < cx0 - 0.03 || p.x > cx1 + 0.03)
+        return 0.0;
+    float shelf = HORIZON + 0.012;
+    float inX = cover(p.x - cx0) * cover(cx1 - p.x);
+    float c = below(shelf + 0.03 + 0.006 * step(0.5, fract(p.x / 0.008)), p.y) * inX;
+    for (int i = 0; i < 6; i++) {
+        float fi = float(i);
+        vec2 dc = vec2(mix(cx0 + 0.04, cx1 - 0.04, fi / 5.0) + 0.01 * hash(vec2(fi, 1.0)), shelf + 0.03);
+        c = max(c, cover(0.028 + 0.016 * hash(vec2(fi, 2.0)) - length(p - dc)));
+    }
+    float tx = aspect * 0.53, ty = p.y - shelf;
+    c = max(c, cover(0.02 * (1.0 - ty / 0.22) - abs(p.x - tx)) * cover(ty) * cover(0.12 - ty));
+    c = max(c, cover(0.009 * (1.0 - (ty - 0.12) / 0.05) - abs(p.x - tx)) * cover(ty - 0.12) * cover(0.17 - ty));
+    return c * cover(p.y - HORIZON + 0.002);
+}
+
 void main() {
     vec2 px = qt_TexCoord0 * u.resolution;
     vec2 q = vec2(px.x, u.resolution.y - px.y) / u.resolution.y;
@@ -86,6 +125,8 @@ void main() {
     float aa = 0.75 / u.resolution.y;
     vec2 moon = vec2(aspect * 0.15, 0.82);
     float e = 0.01;
+    // The ice city's ends on the far shore.
+    float cx0 = aspect * 0.36, cx1 = aspect * 0.66;
 
     vec3 col;
     if (q.y >= HORIZON) {
@@ -113,7 +154,6 @@ void main() {
         col = range(col, q, h1, h1L, h1R, rgb(56, 90, 124), rgb(26, 46, 72), rgb(140, 176, 206));
 
         // The ice city on the far shore: a crenellated wall, domes, and a tower.
-        float cx0 = aspect * 0.36, cx1 = aspect * 0.66;
         if (q.x > cx0 - 0.02 && q.x < cx1 + 0.02) {
             float shelf = HORIZON + 0.012 + 0.004 * vnoise(vec2(q.x * 40.0, 2.0));
             col = mix(col, rgb(150, 186, 214), below(shelf, q.y) * cover(q.x - cx0) * cover(cx1 - q.x));
@@ -156,13 +196,17 @@ void main() {
         // Mirrored mountains, dark.
         float h0 = 0.36 + 0.2 * ridge(m.x + 1.0, 2.4, 3.0);
         col = mix(col, rgb(18, 38, 60), below(h0, m.y) * 0.8 * breakup);
+        // The ice city, mirrored faintly and broken by the swell.
+        col = mix(col, rgb(56, 88, 118), citySilhouette(m, cx0, cx1, aspect) * 0.45 * band(vnoise(vec2(q.x * 10.0, q.y * 300.0)), 0.3));
         // The moon's path, in broken dashes.
         float path = cover(0.035 * (1.0 - t * 0.4) - abs(q.x - moon.x + 0.01 * sin(q.y * 90.0)));
         float dash = band(vnoise(vec2(q.x * 70.0, q.y * 300.0)), 0.55);
         col = mix(col, rgb(200, 222, 238), path * dash * (1.0 - 0.5 * t));
-        // The city's lights trail across the water.
-        for (int i = 0; i < 9; i++) {
-            float lx = aspect * 0.37 + 0.045 * float(i) * 1.12;
+        // The city's lights trail across the water, one under each lamp on the wall.
+        for (int i = 0; i < 16; i++) {
+            float lx = (ceil((cx0 - 0.022) / 0.045) + float(i)) * 0.045 + 0.022;
+            if (lx > cx1)
+                break;
             float streak = cover(0.0014 - abs(q.x - lx)) * cover(q.y - HORIZON + 0.07 + 0.02 * hash(vec2(float(i), 3.0)));
             col = mix(col, rgb(255, 190, 110), streak * band(vnoise(vec2(lx * 50.0, q.y * 420.0)), 0.45) * 0.75);
         }
@@ -189,8 +233,18 @@ void main() {
     col = mix(col, rgb(24, 30, 40), cover(0.0012 - abs(fig.x - 0.012 - (fig.y - 0.01) * 0.5)) * cover(fig.y + 0.02) * cover(0.03 - fig.y));
     col = mix(col, rgb(255, 200, 120), cover(0.004 - length(q - cn - vec2(0.045, 0.018))));
     col = mix(col, mix(col, rgb(255, 200, 120), 0.18), cover(0.02 - length(q - cn - vec2(0.045, 0.018))));
-    float wake = cover(0.0012 - abs(q.y - cn.y + 0.012 - 0.03 * max(cn.x - 0.06 - q.x, 0.0))) * cover(cn.x - 0.06 - q.x) * cover(q.x - cn.x + 0.32);
-    col = mix(col, rgb(70, 110, 140), wake);
+    // Its wake: two short broken lines spreading back from the stern, fading.
+    vec2 stern = cn + vec2(-0.07, -0.012);
+    float back = stern.x - q.x;
+    if (back > 0.0 && back < 0.2) {
+        float fadeW = 1.0 - back / 0.2;
+        for (int i = 0; i < 2; i++) {
+            float spread = i == 0 ? 0.1 : -0.16;
+            float line = cover(0.0013 * (0.5 + fadeW) - abs(q.y - stern.y - spread * back));
+            float dash = step(0.38, vnoise(vec2(back * 90.0, float(i) * 5.0)));
+            col = mix(col, rgb(96, 138, 168), line * dash * fadeW);
+        }
+    }
 
     // A snow bank in the foreground, shaded on its far side.
     float sb = 0.04 + 0.1 * pow(max(q.x / aspect - 0.45, 0.0) / 0.55, 1.3) + 0.012 * billows(q.x, 5.0, 2.0);

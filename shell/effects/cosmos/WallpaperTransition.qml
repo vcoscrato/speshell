@@ -58,6 +58,8 @@ Item {
         visible: root.sweep < 1
         property var source: outgoingTex
         property rect rect: Qt.rect(0, 0, width, height)
+        property rect panel: rect
+        property real radius: 0
         property point origin: root.origin
         property real circle: root.eased * root.maxRadius
         property real outside: 1

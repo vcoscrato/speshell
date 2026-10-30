@@ -5,8 +5,9 @@ import "common"
 // Fire's effects on Speshell's controls. A knob dragged along a slider sets the
 // track alight behind it: a burning streak with flames standing on it that die down
 // as it cools, throwing the odd spark; let go, it spits a few more. Picking something
-// lights it under the pointer: a flash, flames standing on the point, embers floating
-// up. A switch turned on catches the same way; turned off, it goes out in smoke.
+// lights it under the pointer without hiding it: a brief flash and a low flame you can
+// see through, embers rising off it clear of the text, and a wisp of smoke. A switch
+// turned on catches in full; turned off, it goes out in smoke.
 Item {
     id: root
 
@@ -21,29 +22,35 @@ Item {
         return a + Math.random() * (b - a);
     }
 
+    // Spawns a particle (see common/Particles.qml), `alpha` solid (1 unless given).
+    function put(p, alpha) {
+        p.props.alpha = alpha === undefined ? 1 : alpha;
+        bits.spawn(p);
+    }
+
     function tongue(x, y, vx, size) {
-        bits.spawn({ x: x, y: y, vx: vx, vy: -rnd(10, 70), gravity: -rnd(90, 220), drag: 2, life: rnd(0.3, 0.6),
-                     size: size, props: { kind: 0, seed: Math.random(), z: 1 } });
+        root.put({ x: x, y: y, vx: vx, vy: -rnd(10, 70), gravity: -rnd(90, 220), drag: 2, life: rnd(0.3, 0.6),
+                   size: size, props: { kind: 0, seed: Math.random(), z: 1 } });
     }
 
     function spark(x, y, vx, vy) {
-        bits.spawn({ x: x, y: y, vx: vx, vy: vy, gravity: 380, life: rnd(0.35, 0.6), size: 12, orient: true,
-                     props: { kind: 1, seed: Math.random(), z: 2 } });
+        root.put({ x: x, y: y, vx: vx, vy: vy, gravity: 380, life: rnd(0.35, 0.6), size: 12, orient: true,
+                   props: { kind: 1, seed: Math.random(), z: 2 } });
     }
 
     // A flame standing where it was lit, its base on the track.
     function trailFlame(x, y, size) {
-        bits.spawn({ x: x, y: y - size * 0.28, life: rnd(0.4, 0.7), size: size,
-                     props: { kind: 0, seed: Math.random(), z: 1 } });
+        root.put({ x: x, y: y - size * 0.28, life: rnd(0.4, 0.7), size: size,
+                   props: { kind: 0, seed: Math.random(), z: 1 } });
     }
 
     function streak(x, y) {
-        bits.spawn({ x: x, y: y, life: rnd(0.55, 0.7), size: 18, props: { kind: 3, seed: Math.random(), z: 0 } });
+        root.put({ x: x, y: y, life: rnd(0.55, 0.7), size: 18, props: { kind: 3, seed: Math.random(), z: 0 } });
     }
 
-    function smoke(x, y, vx) {
-        bits.spawn({ x: x, y: y, vx: vx, vy: -rnd(30, 50), drag: 2, life: rnd(0.6, 0.8), size: 20,
-                     props: { kind: 2, seed: Math.random(), z: 0 } });
+    function smoke(x, y, vx, alpha) {
+        root.put({ x: x, y: y, vx: vx, vy: -rnd(30, 50), drag: 2, life: rnd(0.6, 0.8), size: 20,
+                   props: { kind: 2, seed: Math.random(), z: 0 } }, alpha);
     }
 
     function slide(at, dx) {
@@ -69,33 +76,41 @@ Item {
     }
 
     function ember(x, y, delay) {
-        bits.spawn({ x: x, y: y, vx: rnd(-25, 25), vy: -rnd(40, 90), gravity: -rnd(40, 90), drag: 1.2,
-                     life: rnd(0.6, 1.0), delay: delay, size: Math.round(rnd(9, 13)),
-                     props: { kind: 4, seed: Math.random(), z: 2 } });
+        root.put({ x: x, y: y, vx: rnd(-25, 25), vy: -rnd(40, 90), gravity: -rnd(40, 90), drag: 1.2,
+                   life: rnd(0.6, 1.0), delay: delay, size: Math.round(rnd(9, 13)),
+                   props: { kind: 4, seed: Math.random(), z: 2 } });
     }
 
-    function flash(x, y, size) {
-        bits.spawn({ x: x, y: y, life: 0.2, size: size, props: { kind: 5, seed: Math.random(), z: 2 } });
+    function flash(x, y, size, life, alpha) {
+        root.put({ x: x, y: y, life: life, size: size, props: { kind: 5, seed: Math.random(), z: 2 } }, alpha);
     }
 
     // A flash where it lit, flames standing on (x, y) at `scale`, embers floating up.
     function ignite(x, y, scale, embers) {
-        root.flash(x, y, Math.round(26 * scale));
+        root.flash(x, y, Math.round(26 * scale), 0.2);
         var sizes = [28, 21, 18];
         var offsets = [0, -7, 7];
         for (var i = 0; i < 3; i++) {
             var size = Math.round(sizes[i] * scale);
-            bits.spawn({ x: x + (offsets[i] + rnd(-2, 2)) * scale, y: y - size * 0.28, vy: -rnd(5, 15),
-                         life: rnd(0.45, 0.65), delay: 0.03 + i * 0.04, size: size,
-                         props: { kind: 0, seed: Math.random(), z: 1 } });
+            root.put({ x: x + (offsets[i] + rnd(-2, 2)) * scale, y: y - size * 0.28, vy: -rnd(5, 15),
+                       life: rnd(0.45, 0.65), delay: 0.03 + i * 0.04, size: size,
+                       props: { kind: 0, seed: Math.random(), z: 1 } });
         }
         for (var j = 0; j < embers; j++)
             root.ember(x + rnd(-8, 8) * scale, y - rnd(2, 10) * scale, 0.08 + j * 0.06);
     }
 
     function pick(area, at) {
-        root.ignite(at.x, at.y, 1, 5);
-        root.smoke(at.x, at.y - 12, rnd(-8, 8));
+        root.flash(at.x, at.y, 16, 0.14, 0.45);
+        var size = Math.round(rnd(17, 21));
+        root.put({ x: at.x + rnd(-1.5, 1.5), y: at.y - size * 0.28, vy: -rnd(5, 15), life: rnd(0.3, 0.4),
+                   delay: 0.02, size: size, props: { kind: 0, seed: Math.random(), z: 1 } }, 0.5);
+        // Embers rising quickly off it, out of the line of text.
+        for (var j = 0; j < 5; j++)
+            root.put({ x: at.x + rnd(-5, 5), y: at.y - rnd(2, 6), vx: rnd(-55, 55), vy: -rnd(110, 170),
+                       gravity: -rnd(20, 60), drag: 1.4, life: rnd(0.6, 0.9), delay: 0.04 + j * 0.05,
+                       size: Math.round(rnd(8, 11)), props: { kind: 4, seed: Math.random(), z: 2 } });
+        root.smoke(at.x, at.y - 22, rnd(-8, 8), 0.7);
     }
 
     function toggle(area, on) {
@@ -119,6 +134,7 @@ Item {
                 property real seed: 0
                 property real kind: 0
                 property real size: width
+                property real alpha: 1
                 property color cCore: Flame.core(root.theme)
                 property color cMid: Flame.mid(root.theme)
                 property color cOuter: Flame.outer(root.theme)

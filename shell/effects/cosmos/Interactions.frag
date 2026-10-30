@@ -2,7 +2,7 @@
 #extension GL_GOOGLE_include_directive : enable
 // One particle of Cosmos's control effects, by `kind`: 0 a mote of star dust,
 // twinkling as it drifts; 1 a glint, a star flaring with four rays; 2 a constellation
-// drawing itself out from the center, star by star.
+// drawing itself out from the center, star by star, off the control it was picked on.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {
@@ -13,6 +13,8 @@ layout(std140, binding = 0) uniform buf {
     float kind;
     float size;         // px across
     float room;         // px of the layer above the center, so nothing leans off its top
+    vec4 keepOff;       // px from the center: the picked control's rect, which a
+                        // constellation keeps off; empty for none
     vec4 cStar;
     vec4 cHot;
     vec4 cGlow;
@@ -52,19 +54,44 @@ vec4 star(vec4 o, vec2 p, float r, float b, float rays) {
     return over(o, u.cHot.rgb, cover(r - length(p)) * b);
 }
 
+// How far p lies outside the control to keep off, < 0 inside; far away if none.
+float offControl(vec2 p) {
+    if (u.keepOff.z <= 0.0)
+        return 1e3;
+    vec2 h = u.keepOff.zw * 0.5;
+    vec2 d = abs(p - u.keepOff.xy - h) - h;
+    return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
+}
+
 vec4 constellation(vec2 p, float R) {
-    // A chain of stars wandering out from the center, and one branching off the third.
+    // A chain of stars wandering out from the center, and one branching off the third,
+    // heading away from the control and kept off it, so only the first star is on it.
     vec2 pos[6];
     pos[0] = vec2(0.0);
+    vec2 ac = u.keepOff.xy + u.keepOff.zw * 0.5;
     float a = u.seed * 6.2831853;
+    if (u.keepOff.z > 0.0 && length(ac) > 2.0)
+        a = atan(-ac.y, -ac.x) + (u.seed - 0.5) * 1.4;
     for (int i = 1; i < 6; i++) {
         vec2 from = i == 5 ? pos[2] : pos[i - 1];
-        a += (hash(vec2(u.seed, float(i))) - 0.5) * 2.6 + (i == 5 ? 1.9 : 0.0);
+        a += (hash(vec2(u.seed, float(i))) - 0.5) * (i == 1 ? 0.8 : 2.6) + (i == 5 ? 1.9 : 0.0);
         float stepLen = R * (0.3 + 0.2 * hash(vec2(float(i), u.seed)));
         vec2 next = from + stepLen * vec2(cos(a), sin(a) * 0.72);
         if (next.y < 4.0 - u.room) {
             a = -a;
             next = from + stepLen * vec2(cos(a), sin(a) * 0.72);
+        }
+        // Landed on the control: out past its nearest edge.
+        float inside = offControl(next);
+        if (inside < 8.0) {
+            vec2 h = u.keepOff.zw * 0.5, o = next - u.keepOff.xy - h;
+            vec2 gap = h - abs(o);
+            bool up = o.y < 0.0 && u.room < h.y - o.y + 10.0;
+            if (gap.x < gap.y || up)
+                next.x = u.keepOff.x + h.x + sign(o.x + 1e-3) * (h.x + 8.0 + 6.0 * hash(vec2(float(i), u.seed + 3.0)));
+            else
+                next.y = u.keepOff.y + h.y + sign(o.y + 1e-3) * (h.y + 8.0 + 6.0 * hash(vec2(float(i), u.seed + 3.0)));
+            a = atan(next.y - from.y, next.x - from.x);
         }
         float len = length(next);
         pos[i] = len > R * 0.9 ? next * R * 0.9 / len : next;
@@ -79,7 +106,9 @@ vec4 constellation(vec2 p, float R) {
         vec2 from = i == 5 ? pos[2] : pos[i - 1];
         vec2 to = mix(from, pos[i], k);
         float d = sdSeg(p, from, to);
-        o = over(o, mix(u.cGlow.rgb, u.cStar.rgb, 0.4), cover(0.75 - d) * 0.75 * fade);
+        // Faint where a line crosses the control, out of the way of its label.
+        float onIt = 1.0 - 0.75 * smoothstep(2.0, -2.0, offControl(p));
+        o = over(o, mix(u.cGlow.rgb, u.cStar.rgb, 0.4), cover(0.75 - d) * 0.75 * fade * onIt);
     }
     for (int i = 0; i < 6; i++) {
         float t0 = 0.04 + float(i) * 0.075;
@@ -90,7 +119,14 @@ vec4 constellation(vec2 p, float R) {
         float flare = 1.0 + 1.2 * exp(-since * 30.0);
         float twinkle = 0.75 + 0.25 * sin(u.age * 38.0 + h * 40.0);
         float r = (1.5 + 1.3 * h) * (i == 0 ? 1.3 : 1.0) * mix(1.0, flare, 0.5);
-        o = star(o, p - pos[i], r, min(1.0, fade * twinkle * flare), step(0.55, h) + (i == 0 ? 1.0 : 0.0));
+        float b = min(1.0, fade * twinkle * flare);
+        float rays = step(0.55, h) + (i == 0 ? 1.0 : 0.0);
+        // The first, on the control, flares and dims, rayless, off its label.
+        if (i == 0 && u.keepOff.z > 0.0) {
+            b *= 1.0 - 0.7 * smoothstep(0.1, 0.3, since);
+            rays = 0.0;
+        }
+        o = star(o, p - pos[i], r, b, rays);
     }
     return o;
 }

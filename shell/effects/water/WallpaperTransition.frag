@@ -1,11 +1,11 @@
 #version 440
 #extension GL_GOOGLE_include_directive : enable
 // A drop lands in the middle, seen from above: a ragged crown splashes out from it,
-// its spikes flinging droplets that ring where they land, and a jet leaps up and
-// falls back, sending a second, fainter ring after the first. The first ring spreads
-// out with the new wallpaper inside it, still rippling, and the old one outside,
-// bulging as the ring nears; its front bends the images most. The ring's slopes are
-// shaded in flat light and dark bands.
+// its tapering spikes shedding teardrops and flinging droplets in clumps that ring
+// where they land, and a jet leaps up and falls back, sending a second, fainter ring
+// after the first. The first ring spreads out with the new wallpaper inside it, still
+// rippling, and the old one outside, bulging as the ring nears; its front bends the
+// images most. The ring's slopes are shaded in flat light and dark bands.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {
@@ -78,28 +78,41 @@ void main() {
     if (t < 1.1 && r < 330.0 * K) {
         float body = -1e3;
         // The crown: a ragged rim thrown outward, thinning as it goes, with spikes
-        // standing out of it unevenly, each tipped with a drop.
+        // standing out of it unevenly: cones, broad at the rim and drawn to a point,
+        // some slots bare. From the tips of most a teardrop pinches off and flies on
+        // while the spike sinks back.
         float ca = smoothstep(0.0, 0.38, t);
         float rc = K * mix(8.0, 74.0, 1.0 - pow(1.0 - ca, 2.0));
         float rim = K * mix(7.0, 2.6, ca) * (1.0 - smoothstep(0.3, 0.46, t));
         float ang = atan(rel.y, rel.x);
         float rag = (vnoise(dir * 1.6 + 4.0) - 0.5) * 9.0 * K;
         body = max(body, rim - abs(r - rc - rag));
-        float N = 13.0;
+        float N = 16.0;
         float cell = floor(ang / TAU * N + 0.5);
         for (int k = -1; k <= 1; k++) {
-            float ci = cell + float(k);
+            float ci = mod(cell + float(k), N);
             float hi = hash(vec2(ci, 3.0));
-            float a = (ci + (hi - 0.5) * 0.6) / N * TAU;
+            if (hash(vec2(ci, 5.0)) < 0.25)
+                continue;
+            float a = (ci + (hi - 0.5) * 0.8) / N * TAU;
             vec2 sd = vec2(cos(a), sin(a));
-            float len = K * mix(8.0, 26.0, hash(vec2(ci, 7.0))) * sin(3.1415927 * clamp(t / 0.4, 0.0, 1.0));
-            vec2 base = u.center + sd * (rc + rag * 0.5);
-            float sp = sdSeg(p, base, base + sd * len);
-            float wS = K * mix(3.0, 1.6, clamp(dot(p - base, sd) / max(len, 1.0), 0.0, 1.0))
-                     * (1.0 - smoothstep(0.28, 0.4, t));
-            body = max(body, wS - sp);
-            float tipR = K * 3.4 * smoothstep(0.04, 0.12, t) * (1.0 - smoothstep(0.3, 0.42, t)) * mix(0.7, 1.1, hi);
-            body = max(body, tipR - length(p - base - sd * (len + 3.0 * K)));
+            float grow = sin(3.1415927 * clamp(t / 0.4, 0.0, 1.0));
+            float len = K * mix(6.0, 34.0, pow(hash(vec2(ci, 7.0)), 1.6)) * grow;
+            vec2 base = u.center + sd * (rc + rag * 0.5 - K * 2.0);
+            float along = clamp(dot(p - base, sd) / max(len, 1.0), 0.0, 1.0);
+            float wS = K * mix(5.0, 8.0, hi) * pow(1.0 - along, 1.1) * (1.0 - smoothstep(0.28, 0.4, t));
+            body = max(body, wS - sdSeg(p, base, base + sd * len));
+            if (hash(vec2(ci, 9.0)) < 0.3)
+                continue;
+            // The drop: pinching off the tip, then away along the spike's line, its
+            // tail pointing back where it came from.
+            float leave = max(0.0, t - mix(0.14, 0.24, hash(vec2(ci, 11.0))));
+            float tipR = K * mix(2.4, 3.6, hi) * smoothstep(0.0, 0.05, leave) * (1.0 - smoothstep(0.42, 0.56, t));
+            vec2 dc = base + sd * (len + tipR + K * 90.0 * leave);
+            float tail = K * 6.0 * smoothstep(0.0, 0.06, leave);
+            float drop = max(tipR - length(p - dc),
+                             tipR * 0.75 * (1.0 - clamp(dot(dc - p, sd) / max(tail + tipR, 1.0), 0.0, 1.0)) - sdSeg(p, dc, dc - sd * (tail + tipR)));
+            body = max(body, drop);
         }
 
         // The jet: leaping up toward us, so it swells, then falls back and shrinks.
@@ -113,7 +126,9 @@ void main() {
         for (int i = 0; i < FLUNG; i++) {
             float fi = float(i);
             vec3 rnd = vec3(hash(vec2(fi, 11.0)), hash(vec2(fi, 12.0)), hash(vec2(fi, 13.0)));
-            float a = (fi + rnd.x * 0.8) / float(FLUNG) * TAU;
+            // Thrown in clumps: each drop joins one of five, some of which stay empty.
+            float clump = floor(hash(vec2(fi, 14.0)) * 5.0);
+            float a = hash(vec2(clump, 15.0)) * TAU + (rnd.x - 0.5) * 0.9;
             vec2 sd = vec2(cos(a), sin(a));
             float t0 = 0.05 + 0.08 * rnd.y;
             float fly = mix(0.28, 0.46, rnd.z);

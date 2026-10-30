@@ -3,7 +3,8 @@ import "Flame.js" as Flame
 import "common"
 
 // Fire launcher transition: an ember flares and throws sparks, a burning edge sweeps the panel into
-// view, and flames simmer around it while open. Closing burns a hole through the
+// view, and flames simmer around it while open, embers drifting up off them, now and
+// then a curl of smoke, and their warm light on the air over the panel. Closing burns a hole through the
 // middle of the panel that spreads outward until it is gone. Reopening mid-exit
 // opens it the usual way: the hole's burning edge dies down while a new front sweeps
 // in from the ember's corner and fills the hole, the unburnt panel staying put.
@@ -25,6 +26,7 @@ Item {
     readonly property real burnTime: 0.55
     readonly property real tailTime: 0.35     // flames left burning after the panel is gone
     readonly property real simmer: 0.55       // rim flame strength while open
+    readonly property real emberRate: 9       // embers off the crown per second while open
 
     readonly property color core: Flame.core(root.theme)
 
@@ -32,6 +34,11 @@ Item {
     property bool sparkPending: true
     property bool exitDone: false
     property bool closedOnce: false   // a reopen mid-exit has no ember
+    // Embers not yet thrown off the crown, and seconds to the next curl of smoke.
+    property real embersOwed: 0
+    property real nextSmoke: 1.2
+    // The flames' light, easing after how fully they simmer.
+    property real glow: 0
 
     // sweep: 0..1 progress of the entrance front; burn: 0..1 progress of the exit hole;
     // refill: reopened mid-exit, the entrance front is filling the hole.
@@ -52,6 +59,8 @@ Item {
     readonly property real burnR: -20 + Math.pow(burn, 1.3) * (burnMax + 20)
     readonly property bool capturing: sweep < 1 || burn > 0
     readonly property real phaseAge: clock.clock - phaseStart
+    // 0..1 how fully the flames simmer round the open panel.
+    readonly property real simmering: root.active && !root.refill ? Math.max(0, Math.min(1, (root.sweep - 0.5) / 0.5)) : 0
 
     onActiveChanged: {
         phaseStart = clock.clock;
@@ -69,11 +78,13 @@ Item {
     EffectClock {
         id: clock
         onAdvanced: function(dt) {
+            root.glow += (root.simmering - root.glow) * Math.min(1, dt * 5);
             if (root.active) {
                 if (root.sparkPending && root.phaseAge < root.igniteTime)
                     return;
                 root.sparkPending = false;
                 root.sweep = Math.min(1, root.sweep + dt / root.sweepTime);
+                root.simmerBits(dt);
                 // Past the panel's corners the hole is filled and the panel whole.
                 if (root.refill && root.sweep >= 1) {
                     root.refill = false;
@@ -98,6 +109,53 @@ Item {
         }
     }
 
+    function rnd(a, b) {
+        return a + Math.random() * (b - a);
+    }
+
+    // While it simmers: embers thrown up off the crown, and now and then a curl of smoke.
+    function simmerBits(dt) {
+        if (root.simmering <= 0)
+            return;
+        var r = root.panelRect;
+        root.embersOwed += dt * root.emberRate * root.simmering;
+        while (root.embersOwed >= 1) {
+            root.embersOwed -= 1;
+            // Some small and quick, a few larger and lazier, swaying as they rise.
+            var big = Math.random() < 0.25;
+            bits.spawn({ x: r.x + r.width * rnd(0.04, 0.96), y: r.y - rnd(6, 18), vx: rnd(-18, 18),
+                         vy: -rnd(30, big ? 60 : 110), gravity: -rnd(10, 50), drag: 0.6,
+                         life: rnd(big ? 1.6 : 0.9, big ? 2.4 : 1.6), size: Math.round(big ? rnd(15, 19) : rnd(10, 13)),
+                         props: { kind: 4, seed: Math.random(), z: 1 } });
+        }
+        root.nextSmoke -= dt;
+        if (root.nextSmoke <= 0) {
+            root.nextSmoke = rnd(2.5, 5);
+            var x = r.x + r.width * rnd(0.15, 0.85), drift = rnd(-14, 14);
+            for (var i = 0; i < 3; i++)
+                bits.spawn({ x: x + drift * i * 0.4, y: r.y - 20 - i * 6, vx: drift + rnd(-6, 6), vy: -rnd(24, 36),
+                             drag: 0.4, life: rnd(1.4, 1.9), delay: i * 0.22, size: Math.round(30 + 10 * i),
+                             props: { kind: 2, seed: Math.random(), z: 0 } });
+        }
+    }
+
+    // The flames' warm light on the air over the panel's top edge, under them.
+    ShaderEffect {
+        readonly property real reach: 70
+        visible: strength > 0.005
+        x: root.panelRect.x - 40
+        y: root.panelRect.y - reach
+        width: root.panelRect.width + 80
+        height: reach
+        property size resolution: Qt.size(width, height)
+        property real edge: reach
+        property real inset: 40
+        property real time: clock.simTime
+        property real strength: root.glow
+        property color cGlow: Flame.glow(root.theme)
+        fragmentShader: Qt.resolvedUrl("qsb/LauncherTransition.glow.qsb")
+    }
+
     Flames {
         theme: root.theme
         anchors.fill: parent
@@ -110,6 +168,29 @@ Item {
         origin: exiting ? root.burnOrigin : root.revealOrigin
         burnR: exiting ? root.burnR : root.revealR
         core: root.core
+    }
+
+    // Embers and smoke off the crown, over the flames; gone quickly once it closes.
+    Particles {
+        id: bits
+        anchors.fill: parent
+        opacity: root.active ? 1 : Math.max(0, 1 - root.burn * 2.5)
+        delegate: Component {
+            ShaderEffect {
+                property real age: 0
+                property real seed: 0
+                property real kind: 0
+                property real size: width
+                property real alpha: 1
+                property color cCore: Flame.core(root.theme)
+                property color cMid: Flame.mid(root.theme)
+                property color cOuter: Flame.outer(root.theme)
+                property color cEdge: Flame.edge(root.theme)
+                property color cSmoke: root.theme ? root.theme.overlay : "#8a5048"
+                property color cGlint: root.theme ? root.theme.text : "#f3e3d3"
+                fragmentShader: Qt.resolvedUrl("qsb/Interactions.qsb")
+            }
+        }
     }
 
     // ── The panel between the fronts; otherwise the real panel shows ──

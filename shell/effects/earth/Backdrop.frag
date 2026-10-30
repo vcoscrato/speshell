@@ -2,9 +2,8 @@
 #extension GL_GOOGLE_include_directive : enable
 // Earth backdrop, drawn once over a surface's base color: a cut through
 // layered rock. Strata of slightly different stone tilt and buckle across the panel,
-// a few layers are cracked into blocks, pebbles lie scattered, and two small, faint
-// clusters of jade crystal grow out of the walls near the bottom, cel-shaded by facet. It stays a few percent off the
-// base so text reads.
+// a few layers are cracked into blocks, and pebbles of every shape lie scattered. It
+// stays a few percent off the base so text reads.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {
@@ -14,24 +13,24 @@ layout(std140, binding = 0) uniform buf {
     vec4 cBase;
     vec4 cDeep;
     vec4 cText;
-    vec4 cAccent;
 } u;
 #include "../common/common.glsl"
 
-// One crystal: a hexagonal prism seen side-on, growing from `root` along `dir` for
-// `len` px, `w` px wide. Returns (coverage, facet shade 0..1).
-vec2 crystal(vec2 p, vec2 root, vec2 dir, float len, float w) {
-    vec2 rel = p - root;
-    float y = dot(rel, dir);
-    float x = dot(rel, vec2(-dir.y, dir.x));
-    float tip = len - w * 1.1;
-    float sd = max(abs(x) - w, max(-y, y - (len - abs(x) * 1.1)));
-    float cover1 = cover(-sd);
-    // Three faces: a lit one, a narrow middle one, a shaded one; the tip facets
-    // catch more light than the sides.
-    float face = x < -w * 0.25 ? 1.0 : (x < w * 0.3 ? 0.6 : 0.25);
-    face = y > tip - abs(x) * 0.0 && y > len - w * 1.1 - abs(x) * 0.2 ? min(1.0, face + 0.35) : face;
-    return vec2(cover1, face);
+// The edge distance of the pebble in `cell`, at c and about r across: a lopsided round,
+// squashed and turned its own way, and in some cells chipped flat on a side or two.
+float pebble(vec2 p, vec2 c, float r, vec2 cell) {
+    vec2 q = rot(p - c, hash(cell + 5.0) * 3.1415927);
+    q.x /= 1.0 + 0.5 * hash(cell + 2.0);
+    float a = atan(q.y, q.x);
+    float d = length(q) - r * (1.0 + 0.16 * sin(2.0 * a + 6.3 * hash(cell + 6.0)) + 0.08 * sin(3.0 * a + 6.3 * hash(cell + 7.0)));
+    float chip = hash(cell + 8.0);
+    if (chip < 0.4) {
+        float b = 6.2831853 * hash(cell + 9.0);
+        d = max(d, dot(q, vec2(cos(b), sin(b))) - r * 0.5);
+        if (chip < 0.15)
+            d = max(d, dot(q, vec2(cos(b + 2.2), sin(b + 2.2))) - r * 0.6);
+    }
+    return d;
 }
 
 void main() {
@@ -57,32 +56,21 @@ void main() {
         col = mix(col, u.cDeep.rgb, 0.3 * (1.0 - smoothstep(0.3, 1.2, e)));
     }
 
-    // Pebbles: rounded, flat-lit stones with a dark lower rim.
+    // Pebbles, each its own size, shape, and stone: lit along the edge toward the
+    // light at the top left, in shade along the far one.
     vec2 cell = floor(p / 36.0);
     if (hash(cell + 4.0) < 0.10) {
-        vec2 c = (cell + 0.25 + 0.5 * hash2(cell)) * 36.0;
-        float r = 2.0 + 3.0 * hash(cell + 1.0);
-        vec2 v = (p - c) / vec2(1.0 + 0.5 * hash(cell + 2.0), 1.0);
-        float body = cover(r - length(v));
-        float lower = step(0.0, v.y + v.x * 0.3);
-        col = mix(col, mix(u.cText.rgb, u.cDeep.rgb, 0.4 + 0.5 * lower), body * 0.16);
-    }
-
-    // Jade: two small clusters growing out of the walls near the bottom, where a
-    // tall panel runs out of content, faint enough to stay with the rock.
-    vec3 jade = u.cAccent.rgb;
-    for (int i = 0; i < 7; i++) {
-        float fi = float(i);
-        bool right = i < 4;
-        vec2 base = right ? vec2(u.size.x - 6.0, H - 34.0) : vec2(6.0, H - 70.0);
-        float a = (right ? -2.45 : -0.75) + (hash(vec2(fi, 1.0)) - 0.5) * 1.0;
-        vec2 dir = vec2(cos(a), sin(a));
-        vec2 root = base + vec2(0.0, (hash(vec2(fi, 3.0)) - 0.5) * 30.0);
-        float len = 14.0 + 20.0 * hash(vec2(fi, 4.0));
-        float w = len * (0.17 + 0.05 * hash(vec2(fi, 5.0)));
-        vec2 c = crystal(p, root, dir, len, w);
-        vec3 facet = mix(u.cDeep.rgb, mix(jade, u.cText.rgb, 0.2 * c.y), 0.35 + 0.65 * c.y);
-        col = mix(col, facet, c.x * 0.13);
+        vec2 c = (cell + 0.3 + 0.4 * hash2(cell)) * 36.0;
+        float r = 1.8 + 3.2 * pow(hash(cell + 1.0), 1.5);
+        vec2 toLight = vec2(-0.55, -0.83) * r * 0.4;
+        float body = cover(-pebble(p, c, r, cell));
+        float lit = 1.0 - cover(-pebble(p + toLight, c, r, cell));
+        float dark = 1.0 - cover(-pebble(p - toLight, c, r, cell));
+        float tone = hash(cell + 3.0);
+        vec3 stone = mix(u.cText.rgb, u.cDeep.rgb, 0.3 + 0.4 * tone);
+        stone = mix(stone, u.cDeep.rgb, 0.6 * dark);
+        stone = mix(stone, u.cText.rgb, 0.5 * lit * (1.0 - dark));
+        col = mix(col, stone, body * mix(0.12, 0.2, hash(cell + 10.0)));
     }
 
     fragColor = vec4(col, 1.0) * u.qt_Opacity;

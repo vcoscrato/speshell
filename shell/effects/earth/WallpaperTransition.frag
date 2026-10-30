@@ -115,14 +115,16 @@ vec3 shardOf(vec2 c, vec2 grp) {
 
 // ── Debris ──
 
-// A lumpy dust puff at `c`, radius `r`, as (coverage, shade).
+// A lumpy dust puff at `c`, radius `r`, as (coverage, shade): thinning out toward its
+// edge, and shaded softly away from the light, so it reads as dust, not a blot.
 vec2 puff(vec2 p, vec2 c, float r, float seed) {
     vec2 o = p - c;
-    float ang = atan(o.y, o.x);
-    float lumps = (vnoise(vec2(ang * 1.8 + seed * 9.0, seed)) - 0.5) * 0.5 * r
-                + (vnoise(vec2(ang * 5.0 + seed * 3.0, 4.0)) - 0.5) * 0.2 * r;
+    vec2 dir = o / max(length(o), 1e-3);
+    float lumps = (vnoise(dir * 1.8 + seed * 9.0) - 0.5) * 0.5 * r
+                + (vnoise(dir * 5.0 + seed * 3.0 + 4.0) - 0.5) * 0.2 * r;
     float d = length(o) - r - lumps;
-    return vec2(cover(-d), cover(o.y + o.x * 0.4 - r * 0.15));
+    float body = smoothstep(r * 0.3, -r * 0.45, d) * (0.65 + 0.35 * vnoise(p / 14.0 + seed * 5.0));
+    return vec2(body, smoothstep(-0.7 * r, 0.9 * r, o.y + o.x * 0.4));
 }
 
 void main() {
@@ -252,11 +254,16 @@ void main() {
                     if (k > bestK) { bestK = k; bestQ = q; bestS = s; }
                 }
         }
+        // The dust lies behind the shards still falling.
+        col = over(col, mix(u.cDust.rgb, u.cDustShade.rgb, dustShade / max(dust, 1e-4)), dust);
+        dust = 0.0;
+        dustShade = 0.0;
         if (bestK >= 0.0) {
             vec4 tex = texture(source, bestQ / u.resolution);
             // Tilting away from the light: a flat shade darker, then another.
             tex.rgb *= mix(1.0, 0.8, step(0.2, bestK)) * mix(1.0, 0.82, step(0.55, bestK));
-            // Its broken rim: lit along the top, its thickness dark below.
+            // Its broken rim: lit where it faces the light, its thickness dark where
+            // it faces away, each widest where it faces most.
             vec2 xq = toCells(bestQ);
             vec2 aq = cellOf(xq);
             vec2 gq = groupOf(aq);
@@ -278,10 +285,11 @@ void main() {
             vec2 qd = bestQ - u.center;
             vec2 sn = normalize((en.x / qU) * qd + (en.y / qV) * vec2(-qd.y, qd.x) + 1e-5);
             float facing = dot(sn, LIGHT);
-            float thick = clamp(qV * 0.08, 1.5, 9.0) * smoothstep(0.0, 0.3, bestK);
-            tex.rgb = mix(tex.rgb, u.cCrack.rgb, cover(1.3 - e * bestS));
-            tex.rgb = mix(tex.rgb, mix(tex.rgb, u.cCrack.rgb, 0.5), cover(thick - e * bestS) * step(facing, -0.2));
-            tex.rgb = mix(tex.rgb, mix(tex.rgb, u.cLip.rgb, 0.45), cover(2.2 - e * bestS) * step(0.35, facing));
+            float thick = clamp(qV * 0.1, 2.0, 11.0) * smoothstep(0.0, 0.25, bestK);
+            float es = e * bestS;
+            tex.rgb = mix(tex.rgb, mix(tex.rgb, u.cCrack.rgb, 0.65), cover(thick * smoothstep(0.0, 0.6, -facing) - es));
+            tex.rgb = mix(tex.rgb, mix(tex.rgb, u.cLip.rgb, 0.6), cover(max(2.0, thick * 0.6) * smoothstep(0.0, 0.6, facing) - es));
+            tex.rgb = mix(tex.rgb, u.cCrack.rgb, cover(1.3 - es));
             float fade = 1.0 - smoothstep(0.85, 1.0, bestK);
             col = tex * fade + col * (1.0 - fade);
         }
@@ -326,8 +334,7 @@ void main() {
         dust = max(dust, k);
         dustShade = max(dustShade, k * pf.y);
     }
-    vec3 dustCol = mix(u.cDust.rgb, u.cDustShade.rgb, dustShade / max(dust, 1e-4) > 0.5 ? 1.0 : 0.0);
-    col = over(col, dustCol, dust);
+    col = over(col, mix(u.cDust.rgb, u.cDustShade.rgb, dustShade / max(dust, 1e-4)), dust);
 
     fragColor = col * u.qt_Opacity;
 }

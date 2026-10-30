@@ -50,8 +50,11 @@ void main() {
 
     // Rim fuel: discrete wandering jets along the outline, hottest on top.
     float d = sdRoundRect(p - c, u.panel.zw * 0.5, u.radius);
-    float rim = smoothstep(14.0, 3.0, d) * step(0.0, d);
-    float topBias = mix(0.5, 1.0, smoothstep(c.y, u.panel.y, p.y));
+    // The outline, roughened, so nothing traces its straight edges.
+    float dr = d + (vnoise(p / 13.0 + vec2(0.0, u.time * 0.7)) - 0.5) * 8.0;
+    float rim = smoothstep(14.0, 3.0, d) * smoothstep(-1.0, 4.0, dr);
+    // Mostly on top: weak jets up the sides would rise along them as straight streaks.
+    float topBias = mix(0.2, 1.0, smoothstep(c.y, u.panel.y, p.y));
     float s = p.x + (p.y - u.panel.y) * sign(p.x - c.x);
     float jets = vnoise(vec2(s / 20.0, u.time * 1.1)) * 0.75 + vnoise(vec2(s / 9.0, u.time * 2.6)) * 0.25;
     // Peaked rather than flat-topped, so each jet burns highest at its middle and the
@@ -71,7 +74,7 @@ void main() {
     // big as the screen's burns in separate jets with gaps between, larger and fewer,
     // so it reads as tongues of flame rather than a solid ring.
     float sparse = smoothstep(1.5, 4.0, u.fieldScale);
-    float onFront = smoothstep(26.0, 4.0, abs(bf - u.burnR + 6.0)) * step(d, 6.0);
+    float onFront = smoothstep(26.0, 4.0, abs(bf - u.burnR + 6.0)) * smoothstep(10.0, 2.0, dr);
     float grain = mix(1.0, 1.35, sparse);
     float patches = vnoise(p / (26.0 * grain) + vec2(0.0, u.time * 0.9)) * 0.7
                   + vnoise(p / (11.0 * grain) - vec2(0.0, u.time * 2.0)) * 0.3;
@@ -89,8 +92,12 @@ void main() {
     dens = max(dens, src);
     heat = max(heat, srcHeat);
     // Nothing burns over panel areas the front passed a while ago.
-    // Faded rather than cut: a hard cut at quarter resolution shows as stair steps.
-    float behind = u.clearBehind * step(d, 0.0) * smoothstep(35.0, 75.0, u.burnR - bf);
+    // Faded rather than cut, inside the roughened outline: a hard cut at quarter
+    // resolution shows as stair steps, and along the outline as straight lines. With
+    // no rim simmering, the front's flames just outside the outline go too, or they
+    // linger round it as a frame.
+    float reach = mix(12.0, 2.0, step(1e-3, u.emit));
+    float behind = u.clearBehind * smoothstep(reach, -8.0, dr) * smoothstep(35.0, 75.0, u.burnR - bf);
     dens *= 1.0 - behind;
     heat *= 1.0 - behind;
 

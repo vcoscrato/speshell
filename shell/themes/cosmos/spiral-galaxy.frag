@@ -94,16 +94,23 @@ void main() {
     vec2 pq = q - pc;
     float pd = length(pq);
     if (pd < pr + 0.01) {
-        float cy = rot(pq, 0.18).y / pr;
-        float bands = vnoise(vec2(cy * 9.0, 2.0)) + 0.3 * vnoise(vec2(cy * 26.0 + pq.x * 2.0, 5.0));
+        // A sphere, its pole tipped a little toward us, so its bands curve with latitude.
+        vec2 d = pq / pr;
+        vec3 n = vec3(d, sqrt(max(0.0, 1.0 - dot(d, d))));
+        vec2 dt = rot(d, 0.18);
+        float lat = dt.y * 0.94 + n.z * 0.34;
+        float bands = vnoise(vec2(lat * 14.0, 2.0)) + 0.3 * vnoise(vec2(lat * 34.0 + dt.x * 2.0, 5.0));
         vec3 body = mix(rgb(60, 56, 54), rgb(80, 73, 69), band(bands, 0.62));
         body = mix(body, rgb(102, 92, 84), band(bands, 0.88));
+        // Lit from the galaxy, mostly from the side: the terminator curves round it.
         vec2 light = normalize(gc - pc);
-        float lit = dot(pq / pr, light);
-        body = mix(rgb(29, 32, 33), body, band(lit, 0.42));
-        // The lit limb: a warm crescent.
-        body = mix(body, rgb(214, 93, 14), band(lit, 0.72) * band(pd / pr, 0.94));
-        body = mix(body, rgb(250, 189, 47), band(lit, 0.82) * band(pd / pr, 0.975));
+        float lit = dot(n, normalize(vec3(light, 0.3)));
+        body = mix(rgb(29, 32, 33), body, band(lit, 0.08));
+        body = mix(body, mix(body, rgb(29, 32, 33), 0.3), 1.0 - band(lit, 0.3));
+        // The lit limb: warm crescents, each the disc less a larger one shifted away
+        // from the light, so they taper to points round the limb.
+        body = mix(body, rgb(214, 93, 14), band(length(d + light * 0.21), 1.15));
+        body = mix(body, rgb(250, 189, 47), band(length(d + light * 0.145), 1.12));
         col = mix(col, body, cover(pr - pd));
     }
     // Faint haze around the planet.

@@ -2,8 +2,8 @@
 #extension GL_GOOGLE_include_directive : enable
 // Air backdrop, drawn once over a surface's base color: a far and a near
 // bank of cloud, flat-shaded with a lit crest, threads of wind bending across the
-// panel and curling at their tips, and a few leaves and specks caught in them. It
-// stays a few percent off the base so text reads.
+// panel, each in its own waves, and curling up or down at their tips, and a few
+// leaves and specks caught in them. It stays a few percent off the base so text reads.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {
@@ -54,28 +54,43 @@ void main() {
         float len = u.size.x * (0.3 + 0.4 * hash(vec2(fi, 4.0)));
         float x0 = (u.size.x - len - 30.0) * hash(vec2(fi, 5.0));
         float phase = 6.2831853 * hash(vec2(fi, 6.0));
+        // Each its own wavelength, with a smaller ripple riding on it.
+        float lambda = mix(50.0, 110.0, hash(vec2(fi, 8.0)));
+        float lambda2 = lambda * mix(0.35, 0.5, hash(vec2(fi, 9.0)));
+        float amp2 = amp * mix(0.12, 0.3, hash(vec2(fi, 10.0)));
+        float phase2 = 6.2831853 * hash(vec2(fi, 11.0));
         float t = (p.x - x0) / len;
         float dist = 1e3;
         float w = 0.0;
         if (t > -0.05 && t < 1.0) {
-            float y = y0 + amp * sin(p.x / 70.0 + phase);
-            float slope = amp / 70.0 * cos(p.x / 70.0 + phase);
+            float y = y0 + amp * sin(p.x / lambda + phase) + amp2 * sin(p.x / lambda2 + phase2);
+            float slope = amp / lambda * cos(p.x / lambda + phase) + amp2 / lambda2 * cos(p.x / lambda2 + phase2);
             dist = abs(p.y - y) / sqrt(1.0 + slope * slope);
             // Tapered from nothing at the tail, full where it curls.
             w = 1.0 * smoothstep(0.0, 0.6, t);
         }
-        // The tip rolls over into a tightening curl: forward, up, and back.
-        vec2 tip = vec2(x0 + len, y0 + amp * sin((x0 + len) / 70.0 + phase));
+        // The tip rolls over into a tightening curl, along the way the thread was going:
+        // forward, then up and back, or down and back, once or nearly twice round.
+        float xt = x0 + len;
+        vec2 tip = vec2(xt, y0 + amp * sin(xt / lambda + phase) + amp2 * sin(xt / lambda2 + phase2));
+        vec2 along = normalize(vec2(1.0, amp / lambda * cos(xt / lambda + phase) + amp2 / lambda2 * cos(xt / lambda2 + phase2)));
+        float turn = hash(vec2(fi, 12.0)) < 0.35 ? -1.0 : 1.0;
+        vec2 up = vec2(along.y, -along.x) * turn;
         float R0 = 8.0 + 6.0 * hash(vec2(fi, 7.0));
-        vec2 rel = p - (tip - vec2(0.0, R0));
-        float th = atan(rel.x, rel.y);
-        th = th < 0.0 ? th + 6.2831853 : th;
-        if (th < 5.0) {
-            float R = R0 * (1.0 - 0.09 * th);
-            float d = abs(length(rel) - R);
-            if (d < dist) {
-                dist = d;
-                w = 1.0 - th / 5.5;
+        float thMax = mix(4.6, 9.5, hash(vec2(fi, 13.0)));
+        float shrink = 0.5 / thMax;
+        vec2 rel = p - (tip + up * R0);
+        vec2 lq = vec2(dot(rel, along), dot(rel, -up));
+        float th0 = atan(lq.x, lq.y);
+        th0 = th0 < 0.0 ? th0 + 6.2831853 : th0;
+        for (int k = 0; k < 2; k++) {
+            float th = th0 + 6.2831853 * float(k);
+            if (th < thMax) {
+                float d = abs(length(lq) - R0 * (1.0 - shrink * th));
+                if (d < dist) {
+                    dist = d;
+                    w = 1.0 - th / (thMax * 1.1);
+                }
             }
         }
         col = mix(col, wind, 0.11 * cover(w - dist + 0.3) * step(0.01, w));

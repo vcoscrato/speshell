@@ -58,8 +58,10 @@ void main() {
     float along = clamp(1.0 - dx / max(u.crackLen, 1.0), 0.0, 1.0);
     float seamY = u.origin.y + (vnoise(vec2(p.x / 26.0, 1.0)) - 0.5) * 9.0 + (vnoise(vec2(p.x / 8.0, 2.0)) - 0.5) * 4.0;
     float w = u.crackOpen * 5.0 * pow(along, 0.4);
-    float seam = cover(w - abs(p.y - seamY)) * step(0.001, along);
-    float lip = cover(w + 2.0 - abs(p.y - seamY - 2.0)) * step(0.001, along) * (1.0 - seam);
+    // Both fade out as it shuts, so no hairline is left where it was.
+    float shut = smoothstep(0.0, 0.15, u.crackOpen);
+    float seam = cover(w - abs(p.y - seamY)) * step(0.001, along) * shut;
+    float lip = cover(w + 2.0 * u.crackOpen - abs(p.y - seamY - 2.0)) * step(0.001, along) * (1.0 - seam) * shut;
     col = mix(col, u.cDust.rgb, lip * 0.8);
     a = max(a, lip * 0.8);
     col = mix(col, u.cDark.rgb, seam);

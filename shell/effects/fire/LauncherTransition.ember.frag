@@ -33,8 +33,9 @@ void main() {
 
     // Taller above than below, with a ragged, flickering rim.
     vec2 e = vec2(q.x, q.y * (q.y < 0.0 ? 0.72 : 1.0));
-    float ang = atan(e.y, e.x);
-    float r = length(e) * (1.0 + 0.32 * (vnoise(vec2(ang * 2.2 + 7.0, u.age * 9.0)) - 0.5));
+    // Round the circle by direction, not angle, so the rim has no notch where it wraps.
+    vec2 dir = e / max(length(e), 1e-3);
+    float r = length(e) * (1.0 + 0.32 * (vnoise(dir * 2.2 + vec2(7.0, u.age * 9.0)) - 0.5));
 
     vec4 col = vec4(0.0);
     float glowR = mix(3.0, 12.0, grow) * mix(1.6, 2.4, grow);

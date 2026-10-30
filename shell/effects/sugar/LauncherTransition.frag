@@ -4,7 +4,8 @@
 // frosting clockwise round it from its top-left, just outside its edge: shells ribbed
 // by the star nozzle, each swelling from a point to a round head, shaded round. The
 // bag rides the border's head, leaning back and out so it never covers the panel, and
-// lifts away when done; then sugar pearls are set on the shells one by one. Eaten,
+// lifts away when done; then glacé cherries are set on it one by one, each falling
+// onto the shells from above, its shadow closing in, and landing with a hop. Eaten,
 // bites with scalloped tooth marks take the panel and its border away, their edges
 // showing the sponge inside and a line of cream.
 layout(location = 0) in vec2 qt_TexCoord0;
@@ -20,7 +21,14 @@ layout(std140, binding = 0) uniform buf {
     float pipe;         // 0..1 the bag's way round the border
     float arrive;       // 0..1 the bag coming in
     float lift;         // 0..1 the bag lifting away when done
-    float pearls;       // 0..1 the pearls set round the border
+    vec4 cherry0;       // each cherry: where it sits (px, from the panel's center),
+    vec4 cherry1;       // the angle facing out there, its way down 0..1 (0: none)
+    vec4 cherry2;
+    vec4 cherry3;
+    vec4 cherry4;
+    vec4 cherry5;
+    vec4 cherry6;
+    vec4 cherry7;
     vec4 bite0;         // each bite: center (px), radius (px), seed
     vec4 bite1;
     vec4 bite2;
@@ -33,6 +41,10 @@ layout(std140, binding = 0) uniform buf {
     vec4 cMetalShade;
     vec4 cSponge;
     vec4 cCream;
+    vec4 cBerry;
+    vec4 cBerryDeep;
+    vec4 cBerryLight;
+    vec4 cStem;
 } u;
 layout(binding = 1) uniform sampler2D source;
 #include "../common/common.glsl"
@@ -41,6 +53,7 @@ layout(binding = 1) uniform sampler2D source;
 const float PI = 3.1415927;
 const float OFF = 4.0;          // px the border's middle sits outside the panel
 const float SHELL = 6.5;        // px, a shell's half width at its head
+const float CHERRY = 8.5;       // px, a cherry's radius
 
 // Signed distance to a bite: a round mouthful whose edge is scalloped by teeth, the
 // rounds of each tooth's mark biting outward, cusps between them.
@@ -58,6 +71,62 @@ vec2 rrNormal(vec2 q, vec2 h, float r) {
     vec2 e = vec2(0.5, 0.0);
     return normalize(vec2(sdRoundRect(q + e.xy, h, r) - sdRoundRect(q - e.xy, h, r),
                           sdRoundRect(q + e.yx, h, r) - sdRoundRect(q - e.yx, h, r)) + 1e-5);
+}
+
+// A glacé cherry over o: ch as the cherry uniforms, light the light's direction on
+// screen. It falls from above, larger and its shadow apart from it, lands at 0.7
+// and hops; glossy round, a dimple where its stem leaves, leaning out from the panel.
+vec4 cherry(vec4 o, vec2 q, vec4 ch, vec2 light) {
+    float k = ch.w;
+    if (k <= 0.0 || length(q - ch.xy) > 40.0)
+        return o;
+    float fall = min(1.0, k / 0.7);
+    float land = max(0.0, (k - 0.7) / 0.3);
+    // Its height over the border: falling, then a small hop after landing.
+    float z = 1.0 - fall * fall + 0.2 * sin(PI * land) * (1.0 - land);
+    float R = CHERRY * (1.0 + 0.8 * z);
+    float fade = smoothstep(0.0, 0.25, k);
+    vec2 n = vec2(cos(ch.z), sin(ch.z));
+    vec2 t = vec2(-n.y, n.x);
+
+    // Its shadow on the frosting, apart from it and soft while it is high.
+    vec2 sc = ch.xy - light * (1.5 + 16.0 * z);
+    float soft = 1.0 + 5.0 * z;
+    o = over(o, u.cFrostShade.rgb * 0.4, 0.5 * (1.0 - 0.6 * z) * fade * smoothstep(soft, -soft, length(q - sc) - R));
+
+    // The body, shaded as a sphere lit from the light's side and a little above.
+    vec2 pd = (q - ch.xy) / R;
+    float l = length(pd);
+    vec3 N = vec3(pd, sqrt(max(0.0, 1.0 - l * l)));
+    float diff = max(0.0, dot(N, normalize(vec3(light, 1.1))));
+    vec3 col = mix(u.cBerryDeep.rgb, u.cBerry.rgb, smoothstep(0.05, 0.8, diff));
+    col = mix(col, u.cBerryLight.rgb, 0.55 * smoothstep(0.85, 1.0, diff));
+    // The frosting's pink thrown back into its shaded rim.
+    col = mix(col, u.cFrost.rgb, 0.35 * smoothstep(0.6, 1.0, l) * smoothstep(0.0, 0.6, dot(pd, -light) / max(l, 1e-3)));
+    vec2 dimple = n * 0.25;
+    col = mix(col, u.cBerryDeep.rgb, 0.55 * (1.0 - smoothstep(0.0, 0.32, length(pd - dimple))));
+    // A window of light on the lit side, long across the light.
+    vec2 hp = pd - light * 0.42;
+    float spec = 1.0 - length(vec2(dot(hp, light) / 0.11, dot(hp, vec2(-light.y, light.x)) / 0.2));
+    col = mix(col, u.cFilm.rgb, clamp(spec * R * 0.25, 0.0, 1.0));
+    o = over(o, col, fade * cover(R - length(q - ch.xy)));
+
+    // The stem, from the dimple, leaning out and bending to one side.
+    float s = R / CHERRY;
+    vec2 a = ch.xy + n * R * 0.25;
+    vec2 m = a + n * R * 1.3;
+    vec2 e = a + n * R * 2.1 + t * R * 0.9;
+    float d = 1e3;
+    vec2 prev = a;
+    for (int j = 1; j <= 4; j++) {
+        float f = float(j) / 4.0;
+        vec2 b = mix(mix(a, m, f), mix(m, e, f), f);
+        d = min(d, sdSeg(q, prev, b));
+        prev = b;
+    }
+    o = over(o, u.cStem.rgb * 0.55, fade * cover(1.3 * s - d));
+    o = over(o, u.cStem.rgb, fade * cover(0.65 * s - d));
+    return o;
 }
 
 void main() {
@@ -97,7 +166,6 @@ void main() {
         float s = rrArc(q, h, u.radius);
         float n = floor(perim / 16.0 + 0.5);
         float P = perim / n;
-        float i = floor(s / P);
         float f = fract(s / P);
         float w = SHELL * (0.3 + 0.7 * sin(PI * pow(f, 0.62)));
         float head = u.pipe * perim;
@@ -114,19 +182,21 @@ void main() {
         bc = mix(bc, u.cFrostShade.rgb, 0.45 * band(rib, 0.72) * (1.0 - band(rib, 0.9)));
         vec4 b = over(vec4(0.0), u.cFrostShade.rgb * 0.7, cover(1.0 - d) * 0.75);
         b = over(b, bc, cover(-d));
-        // A pearl on each shell's head, set one by one.
-        float set = clamp((u.pearls * n - i) * 3.0, 0.0, 1.0);
-        if (set > 0.0) {
-            float pr = 2.6 * (1.0 + 0.6 * sin(PI * set) * (1.0 - set)) * set;
-            vec2 pc = rrPoint((i + 0.55) * P, h, u.radius);
-            pc += rrNormal(pc, h, u.radius) * OFF;
-            vec2 pd = (q - pc) / max(pr, 0.01);
-            vec3 col = mix(u.cFilm.rgb, u.cMetalShade.rgb, 0.12 + 0.45 * band(dot(pd, -light), 0.25));
-            col = mix(col, u.cFilm.rgb, cover((0.3 - length(pd - light * 0.4)) * pr));
-            b = over(b, u.cFrostShade.rgb * 0.6, cover(pr + 0.7 - length(q - pc)) * 0.6);
-            b = over(b, col, cover(pr - length(q - pc)));
-        }
         o = b * alive + o * (1.0 - b.a * alive);
+    }
+
+    // ── The cherries on the border ──
+    if (dr > -20.0 && dr < 50.0) {
+        vec4 ch = vec4(0.0);
+        ch = cherry(ch, q, u.cherry0, light);
+        ch = cherry(ch, q, u.cherry1, light);
+        ch = cherry(ch, q, u.cherry2, light);
+        ch = cherry(ch, q, u.cherry3, light);
+        ch = cherry(ch, q, u.cherry4, light);
+        ch = cherry(ch, q, u.cherry5, light);
+        ch = cherry(ch, q, u.cherry6, light);
+        ch = cherry(ch, q, u.cherry7, light);
+        o = ch * alive + o * (1.0 - ch.a * alive);
     }
 
     // ── The piping bag at the head of the border, leaning back and out ──

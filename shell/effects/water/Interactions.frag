@@ -33,9 +33,11 @@ vec4 drop(vec2 p, float R) {
     float tail = clamp(-p.x / (R * 0.9), 0.0, 1.0);
     float d = min(length(p - vec2(R * 0.2, 0.0)) - r,
                   max(abs(p.y) - r * (1.0 - tail), max(p.x - R * 0.2, -p.x - R * 0.9)));
-    vec4 c = over(vec4(0.0), u.cDeep.rgb, cover(-d));
-    c = over(c, u.cWater.rgb, cover(-d - 1.0));
-    c = over(c, u.cLight.rgb, cover(-d - 1.0) * band(-p.y, r * 0.25));
+    // Clear: what lies under it shows through, inside a light rim.
+    vec4 c = over(vec4(0.0), u.cDeep.rgb, cover(-d) * (1.0 - cover(-d - 1.0)) * 0.7);
+    c = over(c, u.cWater.rgb, cover(-d - 1.0) * 0.4);
+    c = over(c, u.cLight.rgb, cover(-d - 1.0) * band(-p.y, r * 0.25) * 0.6);
+    c = over(c, u.cLight.rgb, cover(-d) * cover(d + 2.2) * 0.75);
     c = over(c, u.cFoam.rgb, cover(r * 0.35 - length(p - vec2(R * 0.3, -r * 0.35))));
     return c * (u.arrive > 0.5 ? step(0.05, k) : 1.0 - smoothstep(0.75, 1.0, u.age));
 }
@@ -56,11 +58,13 @@ vec4 ripple(vec2 p, float R) {
 }
 
 // Water's cel bands for a body with signed inside distance `d` and a highlight where
-// `lit` is high.
+// `lit` is high. It is clear, so the text it lands on shows through: a faint body
+// inside a light rim, its outline and lit side the only solid parts.
 vec4 waterBody(vec4 c, float d, float lit) {
-    c = over(c, u.cDeep.rgb, cover(d + 1.0));
-    c = over(c, u.cWater.rgb, cover(d));
-    return over(c, u.cLight.rgb, cover(d) * step(0.55, lit));
+    c = over(c, u.cDeep.rgb, cover(d + 1.0) * (1.0 - cover(d)) * 0.7);
+    c = over(c, u.cWater.rgb, cover(d) * 0.35);
+    c = over(c, u.cLight.rgb, cover(d) * cover(1.6 - d) * 0.85);
+    return over(c, u.cLight.rgb, cover(d) * step(0.55, lit) * 0.6);
 }
 
 vec4 crown(vec2 p, float R) {

@@ -5,7 +5,7 @@ import "common/Colors.js" as Colors
 // Cosmos's effects on Speshell's controls. A knob dragged along a slider leaves a
 // trail of star dust that twinkles out, with now and then a glint; let go, a star
 // flares where it stops. Picking something draws a constellation out from the pointer,
-// star by star. A switch turned on flares and strings a few stars off it; turned off,
+// star by star, off the control so it never lies over its label. A switch turned on flares and strings a few stars off it; turned off,
 // a little dust drifts off it.
 Item {
     id: root
@@ -31,9 +31,11 @@ Item {
         bits.spawn({ x: x, y: y, life: 0.4, size: size, props: { kind: 1, seed: Math.random(), z: 2 } });
     }
 
-    // Stars strung out from (x, y) one by one; `room` px above it to lean into.
-    function constellation(x, y, size, life, room) {
-        bits.spawn({ x: x, y: y, life: life, size: size, props: { kind: 2, seed: Math.random(), room: room, z: 1 } });
+    // Stars strung out from (x, y) one by one; `room` px above it to lean into, and
+    // `area` (if any) the control to keep off.
+    function constellation(x, y, size, life, room, area) {
+        var keepOff = area ? Qt.vector4d(area.x - x, area.y - y, area.width, area.height) : Qt.vector4d(0, 0, 0, 0);
+        bits.spawn({ x: x, y: y, life: life, size: size, props: { kind: 2, seed: Math.random(), room: room, keepOff: keepOff, z: 1 } });
     }
 
     function burst(x, y, count, speed) {
@@ -65,7 +67,7 @@ Item {
     }
 
     function pick(area, at) {
-        root.constellation(at.x, at.y, 130, 1.0, at.y);
+        root.constellation(at.x, at.y, 130, 1.0, at.y, area);
     }
 
     function toggle(area, on) {
@@ -94,6 +96,7 @@ Item {
                 property color cGlow: root.theme ? root.theme.accent : "#fe8019"
                 property color cHaze: root.theme ? root.theme.pink : "#d3869b"
                 property real room: 10000
+                property vector4d keepOff: Qt.vector4d(0, 0, 0, 0)
                 fragmentShader: Qt.resolvedUrl("qsb/Interactions.qsb")
             }
         }

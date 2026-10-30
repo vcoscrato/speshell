@@ -5,7 +5,8 @@ import "common"
 
 // Earth launcher transition: the ground cracks open below the launcher and the
 // launcher punches up out of it as a stone slab, flinging rock chips and dust; it
-// lands with a jolt that cracks it, and its stone crumbles off to leave the panel.
+// lands with a jolt that cracks it, and its stone breaks off from there outward to
+// leave the panel.
 // Boulders rise after it and hover around the launcher while it is open. Closing
 // drops them, pulls the stone back over the panel, and sinks the slab back into the
 // ground.
@@ -21,7 +22,7 @@ Item {
     signal closingFinished()
 
     // ── Choreography (seconds) ──────────────────────────────
-    readonly property real enterTime: 0.85
+    readonly property real enterTime: 1.0
     readonly property real exitTime: 0.7
     readonly property real tailTime: 0.25
 
@@ -39,27 +40,27 @@ Item {
     // Overshoots slightly before settling, like a slab punched up.
     function backOut(x) { var c = 1.9; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); }
 
-    // Entrance: the ground cracks (0-0.12), the slab punches up and overshoots
-    // (0.1-0.48), lands with a jolt that cracks it (0.48-0.64), and its shell
-    // crumbles off top first (0.58-1). Exit: the chunks fly back (0-0.25), then it
-    // sinks, slowly at first (0.22-0.85).
+    // Entrance: the ground cracks (0-0.1), the slab punches up and overshoots
+    // (0.08-0.37), lands with a jolt that cracks it (0.37-0.5), and its shell breaks
+    // off from where it landed outward (0.42-1). Exit: the chunks fly back (0-0.25),
+    // then it sinks, slowly at first (0.22-0.85).
     readonly property real rise: leave > 0
         ? Math.pow(span(leave, 0.22, 0.85), 2) * depth
-        : (1 - backOut(span(enter, 0.1, 0.48))) * depth
-    readonly property real cracks: leave > 0 ? 1 : span(enter, 0.48, 0.64)
-    readonly property real crumble: leave > 0 ? 1 - span(leave, 0, 0.25) : span(enter, 0.58, 1)
+        : (1 - backOut(span(enter, 0.08, 0.37))) * depth
+    readonly property real cracks: leave > 0 ? 1 : span(enter, 0.37, 0.5)
+    readonly property real crumble: leave > 0 ? 1 - span(leave, 0, 0.25) : span(enter, 0.42, 1)
     // A short sideways jolt on landing.
-    readonly property real jolt: leave > 0 ? 0 : 4 * Math.sin(span(enter, 0.48, 0.64) * Math.PI * 4) * (1 - span(enter, 0.48, 0.64))
+    readonly property real jolt: leave > 0 ? 0 : 4 * Math.sin(span(enter, 0.37, 0.5) * Math.PI * 4) * (1 - span(enter, 0.37, 0.5))
     readonly property real crackOpen: leave > 0
         ? Math.min(span(leave, 0.15, 0.3), 1 - span(leave, 0.88, 1))
-        : Math.min(span(enter, 0, 0.12), 1 - span(enter, 0.62, 0.95))
-    readonly property real crackLen: (panelRect.width / 2 + 40) * (leave > 0 ? 1 : span(enter, 0, 0.18))
-    readonly property real burstAt: 0.1
+        : Math.min(span(enter, 0, 0.1), 1 - span(enter, 0.48, 0.75))
+    readonly property real crackLen: (panelRect.width / 2 + 40) * (leave > 0 ? 1 : span(enter, 0, 0.14))
+    readonly property real burstAt: 0.08
     property real burst: -1
     // Boulders: rise once the slab has landed, drop first when it closes.
-    readonly property real lift: span(enter, 0.5, 1)
+    readonly property real lift: span(enter, 0.4, 1)
     readonly property real fall: span(leave, 0, 0.55)
-    readonly property real dust: leave > 0 ? span(leave, 0.22, 1) : span(enter, 0.1, 1)
+    readonly property real dust: leave > 0 ? span(leave, 0.22, 1) : span(enter, 0.08, 1)
 
     // The slab's stone: one ramp of the theme's neutrals, warmed a little.
     readonly property color slabLight: Stone.tone(root.theme, "subtextBright", 0.2, "#c9c0a0")
