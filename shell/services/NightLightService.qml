@@ -27,7 +27,7 @@ Singleton {
         if (!root.available)
             return;
         root.setEnabled(on);
-        OsdService.show("night-light", on ? "Night light on" : "Night light off", "", -1);
+        OsdService.show("night-light", on ? "Night light on" : "Night light off");
     }
 
     Process {

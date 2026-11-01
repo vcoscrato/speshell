@@ -1,13 +1,14 @@
 #!/bin/sh
-# usage: preview/shot.sh THEME [SHOT...]  (SHOT: a panel id, `launcher`, `themes`, `wallpapers`, or `bar`;
-# none: every panel this machine has, and the launcher)
+# usage: preview/shot.sh THEME [SHOT...]  (SHOT: a panel id, `launcher`, `themes`, `wallpapers`, `osd`, or `bar`;
+# none: every panel this machine has, the launcher, and the OSD)
 # Renders the real bar offscreen in THEME, with each panel open in turn, into
 # ~/.cache/speshell-preview/shots/THEME/<shot>.png, cropped to the panel, and a contact
 # sheet of them all in THEME-sheet.png. Uses your config.ini (SHOT_CONFIG names another)
 # with a fresh data directory, so your theme, notes, and app themes stay untouched.
 # SHOT_QUERY is typed into the launcher or the theme gallery; SHOT_MEDIA=1 shows the playing track, hidden
 # by default since its cover is someone else's art; SHOT_SAMPLES=1 fills the
-# notifications with made-up ones.
+# notifications with made-up ones; SHOT_OSD picks the OSD's level (output, input,
+# brightness, keyboard) or, for anything else, a state.
 set -e
 SCENES=$(cd "$(dirname "$0")/scenes" && pwd)
 PREVIEW_OUT=${PREVIEW_OUT:-${XDG_CACHE_HOME:-$HOME/.cache}/speshell-preview}
@@ -34,7 +35,7 @@ printf '{"theme":"%s"}\n' "$THEME" > "$WORK/data/speshell/theme.json"
 printf '#!/bin/sh\nexit 0\n' > "$WORK/bin/gsettings" && chmod +x "$WORK/bin/gsettings"
 
 LOG="$WORK/shot.log"
-PATH="$WORK/bin:$PATH" XDG_CONFIG_HOME="$WORK/config" XDG_DATA_HOME="$WORK/data" THEME="$THEME" SHOTS="$*" SHOT_QUERY="${SHOT_QUERY:-}" SHOT_MEDIA="${SHOT_MEDIA:-}" SHOT_SAMPLES="${SHOT_SAMPLES:-}" \
+PATH="$WORK/bin:$PATH" XDG_CONFIG_HOME="$WORK/config" XDG_DATA_HOME="$WORK/data" THEME="$THEME" SHOTS="$*" SHOT_QUERY="${SHOT_QUERY:-}" SHOT_MEDIA="${SHOT_MEDIA:-}" SHOT_SAMPLES="${SHOT_SAMPLES:-}" SHOT_OSD="${SHOT_OSD:-}" \
     OUT="$OUT/full" QT_FORCE_STDERR_LOGGING=1 timeout 120 quickshell --no-color -p "$WORK/tree/shot.qml" >"$LOG" 2>&1 || true
 grep -E "WARN|ERROR|rror:" "$LOG" | grep -vE "window masks|Registration|notification|quickshell.dbus" || true
 

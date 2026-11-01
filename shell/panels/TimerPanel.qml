@@ -60,8 +60,8 @@ Card {
     }
 
     implicitWidth: Math.round(Theme.panelWidth * 0.8)
+    panel: "timer"
     title: root.isSet ? "Timer" : "New timer"
-    iconName: "timer"
 
     // ── New: a name, then a preset or a typed length ──
     Field {
@@ -176,19 +176,10 @@ Card {
         }
     }
 
-    Rectangle {
+    ProgressBar {
         visible: root.isSet
-        width: parent.width
-        height: Theme.spacingTiny
-        radius: height / 2
-        color: Theme.surface2
-
-        Rectangle {
-            width: root.isSet ? parent.width * root.timer.remainingSeconds / root.timer.totalSeconds : 0
-            height: parent.height
-            radius: parent.radius
-            color: root.paused ? Theme.overlay : Theme.accent
-        }
+        value: root.isSet ? root.timer.remainingSeconds / root.timer.totalSeconds : 0
+        fillColor: root.paused ? Theme.overlay : Theme.accent
     }
 
     // ── Running: more time, pause or resume, and stop ──

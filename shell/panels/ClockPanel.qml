@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.components
 import qs.services
+import "../components/Format.js" as Format
 
 // The clock panel: the theme's clock face over the date, beside the month.
 Item {
@@ -33,7 +34,7 @@ Item {
                 id: dateText
                 role: "heading"
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: Qt.formatDate(face.now, "dddd, d MMMM")
+                text: Format.date(face.now)
             }
         }
 

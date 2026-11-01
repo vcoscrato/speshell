@@ -8,8 +8,7 @@ import qs.services
 // Bluetooth on and off, and the connected, paired, and nearby devices.
 Card {
     id: root
-    title: "Bluetooth"
-    iconName: "bluetooth"
+    panel: "bluetooth"
     property bool presented: false
 
     readonly property var adapter: BluetoothService.adapter
@@ -91,8 +90,6 @@ Card {
             title: list.title
             count: list.devices.length
         }
-
-        Item { width: 1; height: Theme.spacingTiny }
 
         Repeater {
             model: list.devices

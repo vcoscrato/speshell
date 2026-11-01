@@ -106,8 +106,8 @@ Scope {
         }
         function close(): void { PanelService.dismiss(); }
         function list(): string {
-            return Object.keys(PanelService.labels).filter(PanelService.isSupported)
-                .map(name => name + "\t" + PanelService.labels[name]).join("\n");
+            return Object.keys(PanelService.panels).filter(PanelService.isSupported)
+                .map(name => name + "\t" + PanelService.panels[name].label).join("\n");
         }
     }
 
@@ -190,7 +190,7 @@ Scope {
         function set(percent: int): void {
             BrightnessService.setPercent(percent);
             BrightnessService.commit();
-            OsdService.showPercent("brightness", "Brightness", BrightnessService.percent);
+            OsdService.showLevel("brightness");
         }
         function get(): string { return BrightnessService.available ? String(BrightnessService.percent) : ""; }
         function keyboard(): void { BrightnessService.cycleKeyboard(); }

@@ -1,7 +1,8 @@
 import QtQuick
 import qs.services
 
-// A labelled group of device rows: title, count, and an optional status on the right.
+// The heading of a group of device rows: title, count, and an optional status on the
+// right, over a rule, with room below it before the rows.
 Item {
     id: root
 
@@ -11,13 +12,14 @@ Item {
     property bool statusActive: false
 
     width: parent ? parent.width : 300
-    implicitHeight: Math.max(22, sectionRow.implicitHeight + Theme.spacingTiny)
+    implicitHeight: Math.max(22, sectionRow.implicitHeight + Theme.spacingTiny) + Theme.spacingTiny
     height: implicitHeight
 
     Row {
         id: sectionRow
 
         anchors.verticalCenter: parent.verticalCenter
+        anchors.verticalCenterOffset: -Theme.spacingTiny / 2
         spacing: Theme.spacingSmall
 
         Label {
@@ -26,28 +28,19 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
         }
 
-        Rectangle {
+        Pill {
             visible: root.count > 0
-            radius: Theme.borderRadius
-            height: Math.max(16, countText.implicitHeight + Theme.spacingTiny)
-            width: countText.width + 10
-            color: Theme.alpha(Theme.overlay, Theme.tintStrong)
             anchors.verticalCenter: parent.verticalCenter
-
-            Label {
-                id: countText
-                anchors.centerIn: parent
-                text: root.count
-                font.pixelSize: Theme.fontSizeMicro
-                color: Theme.subtext
-            }
+            text: root.count
+            toneColor: Theme.overlay
+            textColor: Theme.subtext
         }
     }
 
     Label {
         role: "caption"
         anchors.right: parent.right
-        anchors.verticalCenter: parent.verticalCenter
+        anchors.verticalCenter: sectionRow.verticalCenter
         text: root.status
         color: root.statusActive ? Theme.accent : Theme.overlay
         visible: text !== ""
@@ -57,6 +50,7 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
+        anchors.bottomMargin: Theme.spacingTiny
         height: Theme.separatorThickness
         color: Theme.controlFill
     }

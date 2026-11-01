@@ -7,8 +7,7 @@ import "../components/Format.js" as Format
 // The playing track: its cover, title and artist, position, and the player's controls.
 Card {
     id: root
-    title: "Now playing"
-    iconName: "media"
+    panel: "media"
     property bool presented: false
 
     readonly property var player: MediaService.player
@@ -168,75 +167,16 @@ Card {
             spacing: Theme.spacingMicro
             visible: root.player && root.player.length > 0
 
-            Rectangle {
-                id: seekBar
-
-                // Where a drag holds the position, 0 to 1, or -1 while it follows the track.
-                property real dragRatio: -1
-
+            // A drag seeks where it lets go; the wheel by five seconds.
+            StyledSlider {
                 width: parent.width
-                height: 4
-                radius: height / 2
-                color: Theme.surface2
-
-                Accessible.role: Accessible.Slider
+                to: Math.max(1, root.player ? root.player.length : 1)
+                value: MediaService.displayedPosition
+                stepSize: 5
+                live: false
                 Accessible.name: "Track position"
-                Accessible.description: root.player
-                    ? Format.clock(MediaService.displayedPosition)
-                        + " of " + Format.clock(root.player.length)
-                    : ""
-
-                Rectangle {
-                    id: seekFill
-                    width: seekBar.dragRatio >= 0 ? seekBar.dragRatio * parent.width
-                        : (root.player && root.player.length > 0)
-                        ? Math.min(1, MediaService.displayedPosition / root.player.length) * parent.width
-                        : 0
-                    height: parent.height
-                    radius: parent.radius
-                    color: Theme.accent
-                }
-
-                // The position's knob, while the pointer is on the bar.
-                Rectangle {
-                    x: seekFill.width - width / 2
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 10
-                    height: 10
-                    radius: 5
-                    color: Theme.accent
-                    opacity: seekArea.containsMouse || seekArea.pressed ? 1 : 0
-
-                    Behavior on opacity {
-                        NumberAnimation { duration: Theme.animDurationFast }
-                    }
-                }
-
-                // Taller than the bar, so it is easy to hit; a drag seeks where it lets go.
-                MouseArea {
-                    id: seekArea
-
-                    function ratioAt(x) {
-                        return Math.max(0, Math.min(1, x / seekBar.width));
-                    }
-
-                    anchors.fill: parent
-                    anchors.topMargin: -Theme.spacingSmall
-                    anchors.bottomMargin: -Theme.spacingSmall
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onPressed: mouse => seekBar.dragRatio = seekArea.ratioAt(mouse.x)
-                    onPositionChanged: mouse => {
-                        if (seekArea.pressed)
-                            seekBar.dragRatio = seekArea.ratioAt(mouse.x);
-                    }
-                    onReleased: {
-                        if (root.player && root.player.length > 0)
-                            MediaService.seek(seekBar.dragRatio * root.player.length);
-                        seekBar.dragRatio = -1;
-                    }
-                    onCanceled: seekBar.dragRatio = -1
-                }
+                onPressedChanged: if (!pressed) MediaService.seek(valueAt(position))
+                onWheelAdjusted: nextValue => MediaService.seek(nextValue)
             }
 
             Row {

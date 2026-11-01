@@ -68,10 +68,8 @@ PanelWindow {
                 required property var modelData
                 // Replaced notifications update the live object in place.
                 readonly property var live: modelData.notification
-                readonly property bool internal: String(modelData.id).indexOf("internal:") === 0
-                readonly property string notificationIcon: modelData.image || (
-                    modelData.appIcon ? Quickshell.iconPath(modelData.appIcon, true) : ""
-                )
+                // What it says now.
+                readonly property var shown: toastCard.live ?? toastCard.modelData
                 readonly property color toneColor: modelData.urgency === 2 ? Theme.error : Theme.accent
                 // What is left of its time on screen, from 1 to 0.
                 property real remaining: 1
@@ -141,18 +139,14 @@ PanelWindow {
                     }
                 }
 
-                // Pops in as the OSD does.
-                scale: 0.96
-                opacity: 0
                 Component.onCompleted: {
-                    entranceAnim.start();
+                    entrance.play();
                     toastCard.startCountdown();
                 }
 
-                ParallelAnimation {
-                    id: entranceAnim
-                    NumberAnimation { target: toastCard; property: "scale"; to: 1.0; duration: Theme.animDuration; easing.type: Theme.animEasing }
-                    NumberAnimation { target: toastCard; property: "opacity"; to: 1.0; duration: Theme.animDuration }
+                PopIn {
+                    id: entrance
+                    card: toastCard
                 }
 
                 // A click runs the default action and goes to the app, and dismisses the toast.
@@ -180,20 +174,9 @@ PanelWindow {
                     Row {
                         spacing: Theme.spacingSmall
 
-                        Image {
-                            width: Theme.iconSizeMedium
-                            height: Theme.iconSizeMedium
+                        NotificationIcon {
                             anchors.verticalCenter: parent.verticalCenter
-                            visible: toastCard.notificationIcon !== ""
-                            source: toastCard.notificationIcon
-                            sourceSize: Qt.size(32, 32)
-                            fillMode: Image.PreserveAspectFit
-                        }
-
-                        SpeshellMark {
-                            size: Theme.iconSizeMedium
-                            anchors.verticalCenter: parent.verticalCenter
-                            visible: toastCard.internal && toastCard.notificationIcon === ""
+                            notification: toastCard.modelData
                         }
 
                         Label {
@@ -206,14 +189,14 @@ PanelWindow {
 
                     Label {
                         role: "title"
-                        text: (toastCard.live ? toastCard.live.summary : toastCard.modelData.summary) || ""
+                        text: NotificationService.summaryText(toastCard.shown)
                         width: parent.width
                         elide: Text.ElideRight
                         visible: text !== ""
                     }
 
                     Label {
-                        text: (toastCard.live ? toastCard.live.body : toastCard.modelData.body) || ""
+                        text: NotificationService.bodyText(toastCard.shown)
                         color: Theme.subtext
                         width: parent.width
                         elide: Text.ElideRight
@@ -243,7 +226,7 @@ PanelWindow {
                 }
 
                 // Drains toward the left until the toast closes on its own.
-                Rectangle {
+                ProgressBar {
                     visible: toastCard.timed
                     anchors {
                         left: toastContent.left
@@ -253,15 +236,8 @@ PanelWindow {
                         bottomMargin: Theme.spacingSmall
                     }
                     height: 2
-                    radius: 1
-                    color: Theme.controlFill
-
-                    Rectangle {
-                        width: parent.width * toastCard.remaining
-                        height: parent.height
-                        radius: parent.radius
-                        color: Theme.alpha(toastCard.toneColor, Theme.tintOutline)
-                    }
+                    value: toastCard.remaining
+                    fillColor: Theme.alpha(toastCard.toneColor, Theme.tintOutline)
                 }
 
                 IconButton {
@@ -272,8 +248,8 @@ PanelWindow {
                     anchors.topMargin: Theme.spacingMedium
                     iconName: "close"
                     size: Theme.controlHeightSmall
-                    iconSize: Theme.iconSizeTiny
-                    iconColor: Theme.overlay
+                    iconSize: Theme.iconSizeSmall
+                    iconColor: containsMouse ? Theme.error : Theme.overlay
                     hoverColor: Theme.alpha(Theme.error, Theme.tintStrong)
                     tooltipText: "Dismiss notification"
                     onClicked: NotificationService.dismissPopup(toastCard.modelData.popupId)

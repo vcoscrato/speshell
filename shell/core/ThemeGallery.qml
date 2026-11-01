@@ -1,9 +1,6 @@
 pragma ComponentBehavior: Bound
-// Quickshell's type info marks PanelWindow uncreatable, though QML creates it.
-// qmllint disable uncreatable-type
 import QtQuick
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Wayland
 import Quickshell.Widgets
 import qs.components
@@ -19,7 +16,7 @@ import "../services/ThemeProvider.js" as ThemeProvider
 // another wallpaper of the current theme. Applying lets the gallery's interface go,
 // sets the theme under its wallpaper, already the one on screen, and then lets that go
 // too, so nothing goes back to the old theme.
-PanelWindow {
+ModalWindow {
     id: root
 
     // The interface shows and takes the keyboard.
@@ -31,8 +28,6 @@ PanelWindow {
     // How far closing has come: "chrome" while the interface fades, "waiting" for the
     // wallpaper behind and the desktop to settle, "backdrop" while it fades; "" open.
     property string leaving: ""
-    property bool focusGrabActive: false
-    property var targetScreen: null
     property string selectedId: ""
     // The wallpaper previewed, one of the selected theme's, or "" for none.
     property string wallpaperPath: ""
@@ -75,20 +70,12 @@ PanelWindow {
     readonly property int cardHeight: Math.round(root.cardWidth * 9 / 16)
 
     visible: root.presenting && root.targetScreen !== null
-    screen: root.targetScreen
-    color: "transparent"
-    focusable: true
-    aboveWindows: true
-    exclusionMode: ExclusionMode.Ignore
     updatesEnabled: root.visible
 
     WlrLayershell.namespace: "speshell-themes"
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: root.visible && root.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    takesKeyboard: root.visible && root.opened
     // Click-through while it fades out.
     mask: root.opened ? null : passThrough
-
-    anchors { left: true; right: true; top: true; bottom: true }
 
     // Follows ThemeService.galleryShown, starting at the theme in use.
     function open() {
@@ -359,11 +346,6 @@ PanelWindow {
 
     Region { id: passThrough }
 
-    HyprlandFocusGrab {
-        active: root.focusGrabActive && HyprlandService.running
-        windows: [root]
-    }
-
     // Each layer's fade out.
     Timer {
         id: fadeTimer
@@ -387,7 +369,7 @@ PanelWindow {
         onTriggered: {
             if (!root.visible || !root.opened)
                 return;
-            filterInput.forceActiveFocus();
+            filterInput.focusInput();
             root.focusGrabActive = true;
         }
     }
@@ -551,55 +533,27 @@ PanelWindow {
                 spacing: Theme.spacingSmall
 
                 // Takes what is typed; shows once there is something.
-                Rectangle {
+                Field {
+                    id: filterInput
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Math.max(160, filterInput.contentWidth + Theme.spacingSmall * 3 + Theme.iconSizeSmall)
-                    height: Theme.controlHeight
-                    radius: Theme.borderRadius
-                    color: Theme.controlFill
-                    border.width: Theme.borderWidth
-                    border.color: Theme.selectedBorder
-                    opacity: filterInput.text !== "" ? 1 : 0
+                    width: Math.max(160, contentWidth + padding * 3 + Theme.iconSizeSmall)
+                    opacity: text !== "" ? 1 : 0
+                    iconName: "search"
+                    placeholder: root.atWallpapers ? "Filter wallpapers" : "Filter themes"
 
-                    AppIcon {
-                        id: filterIcon
-                        anchors.left: parent.left
-                        anchors.leftMargin: Theme.spacingSmall
-                        anchors.verticalCenter: parent.verticalCenter
-                        name: "search"
-                        size: Theme.iconSizeSmall
-                        iconColor: Theme.accent
-                    }
-
-                    TextInput {
-                        id: filterInput
-                        anchors.left: filterIcon.right
-                        anchors.right: parent.right
-                        anchors.leftMargin: Theme.spacingSmall
-                        anchors.rightMargin: Theme.spacingSmall
-                        anchors.verticalCenter: parent.verticalCenter
-                        color: Theme.text
-                        selectionColor: Theme.accent
-                        selectedTextColor: Theme.onAccent
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSmall
-                        clip: true
-                        Accessible.name: root.atWallpapers ? "Filter wallpapers" : "Filter themes"
-
-                        Keys.onPressed: event => {
-                            if (event.key === Qt.Key_Escape) {
-                                root.retreat();
-                            } else if (event.key === Qt.Key_Left) {
-                                root.move(-1, event.isAutoRepeat);
-                            } else if (event.key === Qt.Key_Right) {
-                                root.move(1, event.isAutoRepeat);
-                            } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                                root.advance();
-                            } else {
-                                return;
-                            }
-                            event.accepted = true;
+                    onKeyPressed: event => {
+                        if (event.key === Qt.Key_Escape) {
+                            root.retreat();
+                        } else if (event.key === Qt.Key_Left) {
+                            root.move(-1, event.isAutoRepeat);
+                        } else if (event.key === Qt.Key_Right) {
+                            root.move(1, event.isAutoRepeat);
+                        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                            root.advance();
+                        } else {
+                            return;
                         }
+                        event.accepted = true;
                     }
                 }
 
@@ -807,293 +761,68 @@ PanelWindow {
         }
 
         // The themes, each over its wallpaper in its own colors.
-        ListView {
+        GalleryDock {
             id: dock
             // Room for the selection ring.
             readonly property int ring: 5
 
-            opacity: root.atWallpapers ? 0 : 1
-            visible: opacity > 0
-            enabled: !root.atWallpapers
-            anchors.horizontalCenter: parent.horizontalCenter
+            shown: !root.atWallpapers
             anchors.bottom: hints.top
-            anchors.bottomMargin: Theme.spacingXL
             width: Math.min(contentWidth, parent.width - root.margin * 2)
             height: root.cardHeight + dock.ring * 2
-            orientation: ListView.Horizontal
-            interactive: false
-            spacing: Theme.spacingSmall
-            clip: true
             model: root.themes
 
-            Behavior on opacity {
-                NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasing }
-            }
-
-            // The card inset by the ring, as for the wallpapers.
-            delegate: Item {
-                id: card
+            delegate: GalleryCard {
+                id: themeCard
                 required property var modelData
-                readonly property var palette: Theme.mergePalette(card.modelData.colors)
-                readonly property bool chosen: card.modelData.id === root.selectedId
-                readonly property string wallpaper: ThemeService.wallpaperFor(card.modelData.id)
 
-                width: root.cardWidth + dock.ring * 2
-                height: dock.height
-                scale: card.chosen ? 1 : cardMouse.containsMouse ? 0.97 : 0.93
-
-                Behavior on scale {
-                    NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasing }
+                ring: dock.ring
+                cardWidth: root.cardWidth
+                pixelRatio: root.devicePixelRatio
+                colors: Theme.mergePalette(themeCard.modelData.colors)
+                image: ThemeService.wallpaperFor(themeCard.modelData.id)
+                title: themeCard.modelData.name
+                chosen: themeCard.modelData.id === root.selectedId
+                inUse: themeCard.modelData.id === ThemeService.themeId
+                swatches: [colors.accent, colors.red, colors.yellow, colors.green, colors.blue, colors.pink]
+                onPicked: {
+                    root.select(themeCard.modelData.id);
+                    root.moved();
                 }
-
-                Rectangle {
-                    anchors.fill: parent
-                    radius: Theme.borderRadius + dock.ring
-                    color: "transparent"
-                    border.width: 2
-                    border.color: card.palette.accent
-                    opacity: card.chosen ? 1 : 0
-
-                    Behavior on opacity {
-                        NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasing }
-                    }
-                }
-
-                ClippingRectangle {
-                    id: tile
-                    anchors.fill: parent
-                    anchors.margins: dock.ring
-                    radius: Theme.borderRadius
-                    color: card.palette.crust
-                    opacity: card.chosen || cardMouse.containsMouse ? 1 : 0.8
-
-                    Behavior on opacity {
-                        NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasing }
-                    }
-
-                    DefaultWallpaper {
-                        anchors.fill: parent
-                        crust: card.palette.crust
-                        surface: card.palette.surface2
-                        accent: card.palette.accent
-                        visible: cardImage.status !== Image.Ready
-                    }
-
-                    Image {
-                        id: cardImage
-                        anchors.fill: parent
-                        source: ThemeProvider.fileUrl(card.wallpaper)
-                        sourceSize: Qt.size(tile.width * root.devicePixelRatio, tile.height * root.devicePixelRatio)
-                        fillMode: Image.PreserveAspectCrop
-                        asynchronous: true
-                    }
-
-                    Rectangle {
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.bottom: parent.bottom
-                        height: parent.height * 0.6
-                        gradient: Gradient {
-                            GradientStop { position: 0; color: Theme.alpha(card.palette.crust, 0) }
-                            GradientStop { position: 1; color: Theme.alpha(card.palette.crust, 0.9) }
-                        }
-                    }
-
-                    Label {
-                        anchors.left: parent.left
-                        anchors.right: swatches.left
-                        anchors.bottom: parent.bottom
-                        anchors.margins: Theme.spacingSmall
-                        role: "title"
-                        color: card.palette.text
-                        text: card.modelData.name
-                        elide: Text.ElideRight
-                    }
-
-                    Row {
-                        id: swatches
-                        anchors.right: parent.right
-                        anchors.bottom: parent.bottom
-                        anchors.margins: Theme.spacingSmall
-                        anchors.bottomMargin: Theme.spacingSmall + 4
-                        spacing: 3
-
-                        Repeater {
-                            model: [card.palette.accent, card.palette.red, card.palette.yellow,
-                                card.palette.green, card.palette.blue, card.palette.pink]
-
-                            delegate: Rectangle {
-                                required property string modelData
-
-                                width: 8
-                                height: 8
-                                radius: 4
-                                color: modelData
-                            }
-                        }
-                    }
-
-                    // The theme in use.
-                    Rectangle {
-                        anchors.top: parent.top
-                        anchors.right: parent.right
-                        anchors.margins: Theme.spacingSmall
-                        width: 20
-                        height: 20
-                        radius: 10
-                        color: card.palette.accent
-                        visible: card.modelData.id === ThemeService.themeId
-
-                        AppIcon {
-                            anchors.centerIn: parent
-                            name: "check"
-                            size: Theme.iconSizeTiny
-                            iconColor: ThemeProvider.readableOn(card.palette.accent, card.palette.text, card.palette.crust)
-                        }
-                    }
-                }
-
-                MouseArea {
-                    id: cardMouse
-                    anchors.fill: tile
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        if (card.modelData.id !== root.selectedId) {
-                            root.select(card.modelData.id);
-                            root.moved();
-                        }
-                    }
-                    onDoubleClicked: root.advance()
-                }
+                onConfirmed: root.advance()
             }
         }
 
         // The selected theme's wallpapers, at the same size and place as the themes.
-        ListView {
+        GalleryDock {
             id: wallpaperDock
 
-            opacity: root.atWallpapers ? 1 : 0
-            visible: opacity > 0
-            enabled: root.atWallpapers
-            anchors.horizontalCenter: parent.horizontalCenter
+            shown: root.atWallpapers
             anchors.bottom: hints.top
-            anchors.bottomMargin: Theme.spacingXL
             width: Math.min(contentWidth, parent.width - root.margin * 2)
             height: dock.height
-            orientation: ListView.Horizontal
-            interactive: false
-            spacing: Theme.spacingSmall
-            clip: true
             // Loads its images only while it shows.
             model: wallpaperDock.visible ? root.wallpapers : []
 
             onCountChanged: if (root.wallpaperIndex >= 0) wallpaperDock.positionViewAtIndex(root.wallpaperIndex, ListView.Contain)
 
-            Behavior on opacity {
-                NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasing }
-            }
-
-            delegate: Item {
+            delegate: GalleryCard {
                 id: wallpaperCard
                 required property var modelData
-                readonly property bool chosen: wallpaperCard.modelData.path === root.wallpaperPath
 
-                width: root.cardWidth + dock.ring * 2
-                height: wallpaperDock.height
-                scale: wallpaperCard.chosen ? 1 : wallpaperMouse.containsMouse ? 0.97 : 0.93
-
-                Behavior on scale {
-                    NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasing }
+                ring: dock.ring
+                cardWidth: root.cardWidth
+                pixelRatio: root.devicePixelRatio
+                colors: Theme
+                image: wallpaperCard.modelData.path
+                title: root.sentenceCase(wallpaperCard.modelData.title)
+                chosen: wallpaperCard.modelData.path === root.wallpaperPath
+                inUse: root.selectedActive && wallpaperCard.modelData.path === ThemeService.wallpaper
+                onPicked: {
+                    root.wallpaperPath = wallpaperCard.modelData.path;
+                    root.moved();
                 }
-
-                Rectangle {
-                    anchors.fill: parent
-                    radius: Theme.borderRadius + dock.ring
-                    color: "transparent"
-                    border.width: 2
-                    border.color: Theme.accent
-                    opacity: wallpaperCard.chosen ? 1 : 0
-
-                    Behavior on opacity {
-                        NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasing }
-                    }
-                }
-
-                ClippingRectangle {
-                    id: wallpaperTile
-                    anchors.fill: parent
-                    anchors.margins: dock.ring
-                    radius: Theme.borderRadius
-                    color: Theme.crust
-                    opacity: wallpaperCard.chosen || wallpaperMouse.containsMouse ? 1 : 0.8
-
-                    Behavior on opacity {
-                        NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasing }
-                    }
-
-                    Image {
-                        anchors.fill: parent
-                        source: ThemeProvider.fileUrl(wallpaperCard.modelData.path)
-                        sourceSize: Qt.size(wallpaperTile.width * root.devicePixelRatio, wallpaperTile.height * root.devicePixelRatio)
-                        fillMode: Image.PreserveAspectCrop
-                        asynchronous: true
-                    }
-
-                    Rectangle {
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.bottom: parent.bottom
-                        height: parent.height * 0.6
-                        gradient: Gradient {
-                            GradientStop { position: 0; color: Theme.alpha(Theme.crust, 0) }
-                            GradientStop { position: 1; color: Theme.alpha(Theme.crust, 0.9) }
-                        }
-                    }
-
-                    Label {
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.bottom: parent.bottom
-                        anchors.margins: Theme.spacingSmall
-                        role: "title"
-                        text: root.sentenceCase(wallpaperCard.modelData.title)
-                        elide: Text.ElideRight
-                    }
-
-                    // The wallpaper in use.
-                    Rectangle {
-                        anchors.top: parent.top
-                        anchors.right: parent.right
-                        anchors.margins: Theme.spacingSmall
-                        width: 20
-                        height: 20
-                        radius: 10
-                        color: Theme.accent
-                        visible: root.selectedActive && wallpaperCard.modelData.path === ThemeService.wallpaper
-
-                        AppIcon {
-                            anchors.centerIn: parent
-                            name: "check"
-                            size: Theme.iconSizeTiny
-                            iconColor: Theme.onAccent
-                        }
-                    }
-                }
-
-                MouseArea {
-                    id: wallpaperMouse
-                    anchors.fill: wallpaperTile
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        if (!wallpaperCard.chosen) {
-                            root.wallpaperPath = wallpaperCard.modelData.path;
-                            root.moved();
-                        }
-                    }
-                    onDoubleClicked: root.apply()
-                }
+                onConfirmed: root.apply()
             }
         }
 
@@ -1151,6 +880,168 @@ PanelWindow {
             anchors.verticalCenter: parent.verticalCenter
             role: "caption"
             text: hint.label
+        }
+    }
+
+    // The row of themes or of wallpapers along the bottom, fading in while `shown`.
+    component GalleryDock: ListView {
+        property bool shown: false
+
+        opacity: shown ? 1 : 0
+        visible: opacity > 0
+        enabled: shown
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottomMargin: Theme.spacingXL
+        orientation: ListView.Horizontal
+        interactive: false
+        spacing: Theme.spacingSmall
+        clip: true
+
+        Behavior on opacity {
+            NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasing }
+        }
+    }
+
+    // A theme or a wallpaper along the bottom, over its image in `colors` (a palette, as
+    // Theme's): its name, the swatches given, a ring while chosen, and a check on the one
+    // in use. A click picks it, a double-click goes on with it.
+    component GalleryCard: Item {
+        id: card
+
+        // Room for the selection ring around the card.
+        property int ring: 0
+        property int cardWidth: 0
+        property real pixelRatio: 1
+        property var colors: Theme
+        property string image: ""
+        property string title: ""
+        property bool chosen: false
+        property bool inUse: false
+        property var swatches: []
+
+        signal picked()
+        signal confirmed()
+
+        width: card.cardWidth + card.ring * 2
+        height: parent ? parent.height : 0
+        scale: card.chosen ? 1 : cardMouse.containsMouse ? 0.97 : 0.93
+
+        Behavior on scale {
+            NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasing }
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            radius: Theme.borderRadius + card.ring
+            color: "transparent"
+            border.width: 2
+            border.color: card.colors.accent
+            opacity: card.chosen ? 1 : 0
+
+            Behavior on opacity {
+                NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasing }
+            }
+        }
+
+        ClippingRectangle {
+            id: tile
+            anchors.fill: parent
+            anchors.margins: card.ring
+            radius: Theme.borderRadius
+            color: card.colors.crust
+            opacity: card.chosen || cardMouse.containsMouse ? 1 : 0.8
+
+            Behavior on opacity {
+                NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasing }
+            }
+
+            DefaultWallpaper {
+                anchors.fill: parent
+                crust: card.colors.crust
+                surface: card.colors.surface2
+                accent: card.colors.accent
+                visible: cardImage.status !== Image.Ready
+            }
+
+            Image {
+                id: cardImage
+                anchors.fill: parent
+                source: ThemeProvider.fileUrl(card.image)
+                sourceSize: Qt.size(tile.width * card.pixelRatio, tile.height * card.pixelRatio)
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+            }
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: parent.height * 0.6
+                gradient: Gradient {
+                    GradientStop { position: 0; color: Theme.alpha(card.colors.crust, 0) }
+                    GradientStop { position: 1; color: Theme.alpha(card.colors.crust, 0.9) }
+                }
+            }
+
+            Label {
+                anchors.left: parent.left
+                anchors.right: swatchRow.left
+                anchors.bottom: parent.bottom
+                anchors.margins: Theme.spacingSmall
+                role: "title"
+                color: card.colors.text
+                text: card.title
+                elide: Text.ElideRight
+            }
+
+            Row {
+                id: swatchRow
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.margins: Theme.spacingSmall
+                anchors.bottomMargin: Theme.spacingSmall + 4
+                spacing: 3
+
+                Repeater {
+                    model: card.swatches
+
+                    delegate: Rectangle {
+                        required property color modelData
+
+                        width: 8
+                        height: 8
+                        radius: 4
+                        color: modelData
+                    }
+                }
+            }
+
+            Rectangle {
+                anchors.top: parent.top
+                anchors.right: parent.right
+                anchors.margins: Theme.spacingSmall
+                width: 20
+                height: 20
+                radius: 10
+                color: card.colors.accent
+                visible: card.inUse
+
+                AppIcon {
+                    anchors.centerIn: parent
+                    name: "check"
+                    size: Theme.iconSizeTiny
+                    iconColor: ThemeProvider.readableOn(card.colors.accent, card.colors.text, card.colors.crust)
+                }
+            }
+        }
+
+        MouseArea {
+            id: cardMouse
+            anchors.fill: tile
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: if (!card.chosen) card.picked()
+            onDoubleClicked: card.confirmed()
         }
     }
 }

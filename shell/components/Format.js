@@ -33,6 +33,16 @@ function time(date) {
     return Qt.formatTime(date, "HH:mm");
 }
 
+// "Friday, 31 October": a day.
+function date(day) {
+    return Qt.formatDate(day, "dddd, d MMMM");
+}
+
+// "Fri 31 Oct": a day, where room is short.
+function shortDate(day) {
+    return Qt.formatDate(day, "ddd d MMM");
+}
+
 // "just now", "5 min ago", "3 h ago", "2 d ago": how long before `nowMs` the time
 // `then` (a Date or ms) was.
 function ago(then, nowMs) {

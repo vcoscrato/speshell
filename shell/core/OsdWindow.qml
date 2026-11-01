@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import qs.components
 import qs.services
 
 // A transient card over everything on the focused screen that never takes focus:
@@ -12,8 +13,6 @@ PanelWindow {
     id: root
 
     required property Item card
-    // Where the card's pop-in starts.
-    property real entranceScale: 0.96
     property bool shown: false
     property var targetScreen: null
 
@@ -27,10 +26,8 @@ PanelWindow {
         if (root.shown)
             return;
         root.targetScreen = HyprlandService.focusedScreen();
-        root.card.opacity = 0;
-        root.card.scale = root.entranceScale;
         root.shown = true;
-        entranceAnimation.restart();
+        entrance.play();
     }
 
     function dismiss() {
@@ -49,24 +46,9 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
-    ParallelAnimation {
-        id: entranceAnimation
-
-        NumberAnimation {
-            target: root.card
-            property: "opacity"
-            to: 1
-            duration: Theme.animDuration
-            easing.type: Theme.animEasing
-        }
-
-        NumberAnimation {
-            target: root.card
-            property: "scale"
-            to: 1
-            duration: Theme.animDuration
-            easing.type: Easing.OutBack
-        }
+    PopIn {
+        id: entrance
+        card: root.card
     }
 
     NumberAnimation {

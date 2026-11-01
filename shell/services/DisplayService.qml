@@ -416,7 +416,7 @@ Singleton {
         root.announceLayout = root.setLayout(mode);
         if (!root.announceLayout)
             OsdService.show("display", "Displays unchanged",
-                root.displayEditingLocked ? "Another change is in progress" : "", -1);
+                root.displayEditingLocked ? "Another change is in progress" : "");
     }
 
     function activeDraftCount() {
@@ -833,7 +833,7 @@ Singleton {
                 if (root.announceLayout)
                     OsdService.show("display", failure !== "" ? "Display change failed"
                         : root.draftLayoutMode === "mirror" ? "Displays mirrored" : "Displays extended",
-                        failure, -1);
+                        failure);
                 root.announceLayout = false;
                 root.hasPending = false;
                 root.pendingSummary = "";

@@ -7,8 +7,7 @@ import qs.services
 // Clipboard history to search and copy back from.
 Card {
     id: root
-    title: "Clipboard"
-    iconName: "clipboard"
+    panel: "clipboard"
 
     property bool presented: false
     property string query: ""

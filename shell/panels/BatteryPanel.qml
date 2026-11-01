@@ -10,14 +10,7 @@ Card {
 
     readonly property color tone: Theme.toneColor(BatteryService.tone)
 
-    readonly property var modeOptions: [
-        { value: "saver", label: "Saver" },
-        { value: "balanced", label: "Balanced" },
-        { value: "maximum", label: "Maximum" }
-    ]
-
-    title: "Battery"
-    iconName: "battery"
+    panel: "battery"
 
     Item {
         width: parent.width
@@ -130,19 +123,7 @@ Card {
         }
     }
 
-    SettingRow {
-        label: "Power mode"
-        info: (PowerService.profilesAvailable
-                ? "Sets the system's power profile and Speshell's animations together."
-                : "Sets how much Speshell animates.")
-            + (PowerService.onSaver ? " Picked now, it lasts until plugged in." : "")
-
-        SegmentedControl {
-            options: root.modeOptions
-            currentValue: PowerService.mode
-            onValueSelected: value => PowerService.setMode(value)
-        }
-    }
+    PowerModeRow {}
 
     SettingRow {
         label: "Saver on battery"

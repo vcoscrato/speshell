@@ -8,23 +8,24 @@ import Quickshell
 Singleton {
     id: root
 
-    // Every panel by id, with its label.
-    readonly property var labels: ({
-        audio: "Speaker",
-        battery: "Battery",
-        bluetooth: "Bluetooth",
-        clipboard: "Clipboard",
-        clock: "Clock",
-        display: "Displays",
-        media: "Now playing",
-        microphone: "Microphone",
-        network: "Network",
-        notes: "Notes",
-        notifications: "Notifications",
-        power: "Power",
-        timer: "Timer",
-        tools: "Tools",
-        weather: "Weather"
+    // Every panel by id: its name and the icon of its header, which a Card with its id
+    // shows, and of its bar button while its state doesn't change it.
+    readonly property var panels: ({
+        audio: { label: "Speaker", icon: "audio-output" },
+        battery: { label: "Battery", icon: "battery" },
+        bluetooth: { label: "Bluetooth", icon: "bluetooth" },
+        clipboard: { label: "Clipboard", icon: "clipboard" },
+        clock: { label: "Clock", icon: "calendar" },
+        display: { label: "Displays", icon: "display" },
+        media: { label: "Now playing", icon: "media" },
+        microphone: { label: "Microphone", icon: "audio-input" },
+        network: { label: "Network", icon: "wifi" },
+        notes: { label: "Notes", icon: "notes" },
+        notifications: { label: "Notifications", icon: "bell" },
+        power: { label: "Power", icon: "power" },
+        timer: { label: "Timer", icon: "timer" },
+        tools: { label: "Tools", icon: "tools" },
+        weather: { label: "Weather", icon: "cloud" }
     })
     // Dropdowns open across the bars.
     property int openDropdowns: 0
@@ -36,7 +37,7 @@ Singleton {
     signal dismissRequested()
 
     function has(panel) {
-        return Object.prototype.hasOwnProperty.call(root.labels, panel);
+        return Object.prototype.hasOwnProperty.call(root.panels, panel);
     }
 
     function isSupported(panel) {
@@ -58,12 +59,12 @@ Singleton {
     // The icon of a panel's bar button, showing its state.
     function icon(panel) {
         if (panel === "audio") {
-            if (AudioService.outputMuted)
+            if (AudioService.output.muted)
                 return "audio-output-muted";
-            return AudioService.outputVolumePercent <= 35 ? "audio-output-low" : "audio-output-high";
+            return AudioService.output.volumePercent <= 35 ? "audio-output-low" : "audio-output-high";
         }
         if (panel === "microphone")
-            return AudioService.inputMuted ? "audio-input-muted" : "audio-input";
+            return AudioService.input.muted ? "audio-input-muted" : "audio-input";
         if (panel === "display")
             return BrightnessService.available ? "brightness" : "display";
         if (panel === "network") {
@@ -84,15 +85,15 @@ Singleton {
             return NotificationService.dndEnabled ? "bell-off" : "bell";
         if (panel === "weather")
             return WeatherService.ready ? WeatherService.current.icon : "weather-cloudy";
-        return ({ tools: "tools", clipboard: "clipboard", notes: "notes", power: "power" })[panel] || "missing";
+        return root.has(panel) ? root.panels[panel].icon : "missing";
     }
 
     // A panel's state in a few words, for its bar button's label.
     function status(panel) {
         if (panel === "audio")
-            return (AudioService.outputDeviceLabel || "Volume") + ": " + AudioService.outputVolumePercent + "%";
+            return (AudioService.output.deviceLabel || "Volume") + ": " + AudioService.output.volumePercent + "%";
         if (panel === "microphone")
-            return (AudioService.inputDeviceLabel || "Mic") + ": " + AudioService.inputVolumePercent + "%";
+            return (AudioService.input.deviceLabel || "Mic") + ": " + AudioService.input.volumePercent + "%";
         if (panel === "display" && BrightnessService.available)
             return "Brightness: " + BrightnessService.percent + "%";
         if (panel === "network") {
@@ -121,7 +122,7 @@ Singleton {
         }
         if (panel === "weather")
             return WeatherService.status === "unknown" ? "Weather: location not found" : WeatherService.summary || "Weather";
-        return root.labels[panel] || "";
+        return root.has(panel) ? root.panels[panel].label : "";
     }
 
     // Text beside a panel's icon on its bar button: the battery's charge, unless it

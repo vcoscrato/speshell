@@ -6,8 +6,10 @@ import qs.core
 import qs.services
 
 // Renders Speshell's real bar offscreen over the theme's wallpaper, once with nothing
-// open (`bar`) and once with each panel in SHOTS open, the launcher (`launcher`), or the
-// theme gallery at its themes (`themes`) or the theme's wallpapers (`wallpapers`).
+// open (`bar`) and once with each panel in SHOTS open, the launcher (`launcher`), the
+// theme gallery at its themes (`themes`) or the theme's wallpapers (`wallpapers`), or the
+// OSD (`osd`) at the level SHOT_OSD names (`output`, `input`, `brightness`, `keyboard`)
+// or, for anything else, at a state.
 // shot.sh copies this file to the root of a copy of the tree, so `qs.*` and the shipped
 // themes resolve. For each shot it saves OUT/<name>.png and logs the area to keep as
 // "crop <name> x y w h".
@@ -26,6 +28,7 @@ ShellRoot {
     property var bar: null
     property var launcher: null
     property var gallery: null
+    property var osd: null
     property int waits: 0
 
     function create(path, properties) {
@@ -60,7 +63,7 @@ ShellRoot {
             shell.find(scene, item => "coverButton" in item).visible = false;
         const asked = (Quickshell.env("SHOTS") || "").split(" ").filter(name => name !== "");
         shell.shots = ["bar"].concat(asked.length > 0 ? asked
-            : Object.keys(PanelService.labels).filter(panel => PanelService.isSupported(panel)).concat(["launcher"]));
+            : Object.keys(PanelService.panels).filter(panel => PanelService.isSupported(panel)).concat(["launcher", "osd"]));
         shell.advance();
     }
 
@@ -97,6 +100,8 @@ ShellRoot {
             shell.gallery = shell.create("core/ThemeGallery.qml", {});
             ThemeService.openGallery(name);
             typing.restart();
+        } else if (name === "osd") {
+            shell.showOsd();
         } else if (name !== "bar") {
             const button = shell.bar.buttonFor(name);
             // The weather's button shows once the forecast arrives.
@@ -117,6 +122,23 @@ ShellRoot {
         settle.restart();
     }
 
+    // The OSD where it shows on a screen: centered, above the bottom edge.
+    function showOsd() {
+        shell.osd = shell.create("core/LevelOsdWindow.qml", {});
+        const level = Quickshell.env("SHOT_OSD") || "output";
+        if (["output", "input", "brightness", "keyboard"].includes(level))
+            OsdService.showLevel(level);
+        else
+            OsdService.show("airplane", "Airplane mode on", "");
+        const card = shell.osd.card;
+        const body = shell.find(card, item => "pinnedContent" in item);
+        card.anchors.fill = undefined;
+        card.width = Qt.binding(() => body.implicitWidth + Theme.panelPadding * 2);
+        card.height = Qt.binding(() => body.implicitHeight + Theme.panelPadding * 2);
+        card.x = Qt.binding(() => (scene.width - card.width) / 2);
+        card.y = Qt.binding(() => scene.height - 64 - card.height);
+    }
+
     function save(name) {
         // The bar's dropdown: the one item that hosts a panel.
         const dropdown = shell.find(scene, item => "panelItem" in item && "anchorX" in item);
@@ -124,6 +146,10 @@ ShellRoot {
         if (name === "launcher") {
             const width = shell.launcher.paletteWidth + Theme.spacingXL * 2;
             area = Qt.rect((scene.width - width) / 2, 0, width, scene.height * 0.8);
+        } else if (name === "osd") {
+            const card = shell.osd.card;
+            const margin = Theme.spacingLarge;
+            area = Qt.rect(card.x - margin, card.y - margin, card.width + margin * 2, card.height + margin * 2);
         } else if (dropdown && dropdown.visible) {
             const margin = Theme.spacingLarge;
             const at = dropdown.mapToItem(scene, 0, 0);
@@ -136,6 +162,10 @@ ShellRoot {
             if (shell.launcher) {
                 shell.launcher.destroy();
                 shell.launcher = null;
+            }
+            if (shell.osd) {
+                shell.osd.destroy();
+                shell.osd = null;
             }
             if (shell.gallery) {
                 ThemeService.closeGallery();

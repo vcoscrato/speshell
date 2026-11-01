@@ -76,13 +76,15 @@ Item {
         }
     }
 
-    HoverLabel {
+    Tooltip {
         visible: root.containingWindowVisible
             && root.pointerInside
             && !root.menuOpen
             && root.labelText !== ""
         text: root.labelText
-        above: root.above
+        below: !root.above
+        // At once, as the bar is glanced over.
+        delay: 0
     }
 
     TrayMenu {

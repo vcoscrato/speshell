@@ -7,8 +7,7 @@ import qs.services
 // The wired and Wi-Fi connections, NetworkManager's VPNs, Tailscale, and the networks nearby.
 Card {
     id: root
-    title: "Network"
-    iconName: "wifi"
+    panel: "network"
     property bool presented: false
     readonly property bool wifiReady: NetworkService.wifiOn && NetworkService.wifiDevice !== null
     readonly property bool connecting: NetworkService.connectingNetwork !== null && NetworkService.connectedWifi === null
@@ -276,8 +275,6 @@ Card {
                 status: NetworkService.nearbyStatusText()
                 statusActive: NetworkService.isScanning
             }
-
-            Item { width: 1; height: Theme.spacingTiny }
 
             Repeater {
                 model: NetworkService.displayedNetworks

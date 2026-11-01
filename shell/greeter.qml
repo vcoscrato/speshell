@@ -1,6 +1,4 @@
 pragma ComponentBehavior: Bound
-// Quickshell's type info marks PanelWindow uncreatable, though QML creates it.
-// qmllint disable uncreatable-type
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -191,28 +189,19 @@ ShellRoot {
     Variants {
         model: Quickshell.screens
 
-        PanelWindow {
+        ModalWindow {
             id: window
 
             required property var modelData
             // The credentials show on one screen, which has the keyboard.
             readonly property bool primary: window.modelData === HyprlandService.focusedScreen()
 
-            screen: window.modelData
+            targetScreen: window.modelData
             color: Theme.crust
             focusable: window.primary
-            exclusionMode: ExclusionMode.Ignore
+            takesKeyboard: window.primary
 
             WlrLayershell.namespace: "speshell-greeter"
-            WlrLayershell.layer: WlrLayer.Overlay
-            WlrLayershell.keyboardFocus: window.primary ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-
-            anchors {
-                left: true
-                right: true
-                top: true
-                bottom: true
-            }
 
             Gate {
                 anchors.fill: parent
@@ -250,35 +239,14 @@ ShellRoot {
                     }
                 }
 
-                Field {
-                    id: password
+                GatePassword {
                     visible: window.primary
-                    masked: true
-                    autoFocus: true
-                    iconName: "lock"
+                    draft: root.draft
                     placeholder: root.busy ? "Logging in…" : "Password"
-                    onEdited: root.draft = password.text
+                    message: root.message
+                    messageIsError: root.messageIsError
+                    onDraftEdited: text => root.draft = text
                     onAccepted: root.submit()
-                    onCancelled: root.draft = ""
-
-                    Connections {
-                        target: root
-
-                        function onDraftChanged() {
-                            if (password.text !== root.draft)
-                                password.text = root.draft;
-                        }
-                    }
-                }
-
-                Label {
-                    role: "caption"
-                    visible: window.primary && root.message !== ""
-                    width: parent.width
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.Wrap
-                    text: root.message
-                    color: root.messageIsError ? Theme.error : Theme.subtext
                 }
 
                 Item {

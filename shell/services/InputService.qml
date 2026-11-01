@@ -9,7 +9,7 @@ import Quickshell.Io
 Singleton {
     id: root
 
-    property var touchpads: []
+    readonly property var touchpads: HyprlandService.touchpads
     readonly property bool available: HyprlandService.running && root.touchpads.length > 0
     property bool touchpadEnabled: true
 
@@ -33,22 +33,6 @@ Singleton {
             return;
         root.setTouchpadEnabled(on);
         OsdService.show(root.touchpadEnabled ? "touchpad" : "touchpad-off",
-            root.touchpadEnabled ? "Touchpad on" : "Touchpad off", "", -1);
-    }
-
-    Process {
-        running: HyprlandService.running
-        command: ["hyprctl", "devices", "-j"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    const mice = JSON.parse(text || "{}").mice || [];
-                    root.touchpads = mice.map(mouse => String(mouse.name || ""))
-                        .filter(name => /touchpad/i.test(name));
-                } catch (error) {
-                    console.warn("[Speshell] Could not read Hyprland's devices:", error);
-                }
-            }
-        }
+            root.touchpadEnabled ? "Touchpad on" : "Touchpad off");
     }
 }

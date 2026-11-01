@@ -56,10 +56,12 @@ Row {
                     : (workspace.info.occupied ? Theme.text : Theme.subtext)
             }
 
-            HoverLabel {
+            Tooltip {
                 visible: workspace.pointerInside && workspace.info.title !== ""
                 text: workspace.info.title
-                above: root.labelAbove
+                below: !root.labelAbove
+                // At once, as the bar is glanced over.
+                delay: 0
             }
 
             MouseArea {

@@ -8,8 +8,7 @@ import qs.services
 // on request and kept or reverted.
 Card {
     id: root
-    title: "Displays"
-    iconName: "display"
+    panel: "display"
     visible: FeatureSupport.supportsDisplayControl
 
     property bool presented: false
@@ -197,26 +196,11 @@ Card {
             spacing: Theme.spacingSmall
             visible: root.multiple || root.noticeText() !== ""
 
-            Rectangle {
+            Pill {
                 id: layoutBadge
-
                 visible: root.multiple
                 anchors.verticalCenter: parent.verticalCenter
-                width: badgeText.width + 14
-                height: Math.max(18, badgeText.implicitHeight + Theme.spacingTiny)
-                radius: Theme.borderRadius
-                color: Theme.selectedFill
-                border.width: Theme.borderWidth
-                border.color: Theme.selectedBorder
-
-                Label {
-                    id: badgeText
-                    role: "caption"
-                    anchors.centerIn: parent
-                    text: root.layoutLabel(DisplayService.draftLayoutMode)
-                    font.weight: Font.Bold
-                    color: Theme.accent
-                }
+                text: root.layoutLabel(DisplayService.draftLayoutMode)
             }
 
             Label {
@@ -231,61 +215,35 @@ Card {
             }
         }
 
-        Rectangle {
-            width: parent.width
+        Notice {
             visible: DisplayService.confirming || DisplayService.reverting
-            implicitHeight: confirmationColumn.implicitHeight + Theme.spacingMedium * 2
-            radius: Theme.borderRadius
-            color: Theme.alpha(Theme.warning, Theme.tintSubtle)
-            border.width: Theme.borderWidth
-            border.color: Theme.alpha(Theme.warning, Theme.tintOutline)
+            heading: DisplayService.reverting
+                ? "Restoring previous display settings…"
+                : "Keep these display settings?"
+            detail: DisplayService.confirming
+                ? "Changes revert automatically in " + DisplayService.confirmationSecondsRemaining + " seconds."
+                : ""
 
-            Column {
-                id: confirmationColumn
-
-                x: Theme.spacingMedium
-                y: Theme.spacingMedium
-                width: parent.width - Theme.spacingMedium * 2
+            Row {
+                width: parent.width
                 spacing: Theme.spacingSmall
+                visible: DisplayService.confirming
 
-                Label {
-                    role: "title"
-                    width: parent.width
-                    text: DisplayService.reverting
-                        ? "Restoring previous display settings…"
-                        : "Keep these display settings?"
+                ActionButton {
+                    width: (parent.width - parent.spacing) / 2
+                    text: "Revert"
+                    iconName: "back"
+                    enabled: !DisplayService.applying
+                    onClicked: DisplayService.revertDisplayChanges()
                 }
 
-                Label {
-                    width: parent.width
-                    visible: DisplayService.confirming
-                    text: "Changes revert automatically in "
-                        + DisplayService.confirmationSecondsRemaining + " seconds."
-                    color: Theme.subtext
-                    wrapMode: Text.WordWrap
-                }
-
-                Row {
-                    width: parent.width
-                    spacing: Theme.spacingSmall
-                    visible: DisplayService.confirming
-
-                    ActionButton {
-                        width: (parent.width - parent.spacing) / 2
-                        text: "Revert"
-                        iconName: "back"
-                        enabled: !DisplayService.applying
-                        onClicked: DisplayService.revertDisplayChanges()
-                    }
-
-                    ActionButton {
-                        width: (parent.width - parent.spacing) / 2
-                        text: "Keep changes"
-                        iconName: "check"
-                        kind: "primary"
-                        enabled: !DisplayService.applying
-                        onClicked: DisplayService.keepDisplayChanges()
-                    }
+                ActionButton {
+                    width: (parent.width - parent.spacing) / 2
+                    text: "Keep changes"
+                    iconName: "check"
+                    kind: "primary"
+                    enabled: !DisplayService.applying
+                    onClicked: DisplayService.keepDisplayChanges()
                 }
             }
         }
@@ -549,41 +507,8 @@ Card {
                     }
                 }
 
-                Row {
-                    width: parent.width
-                    spacing: Theme.spacingSmall
+                BrightnessLevel {
                     visible: root.canControlSelectedBrightness
-
-                    // Labelled as the setting rows around it are.
-                    Label {
-                        id: brightnessLabel
-                        text: "Brightness"
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-
-                    StyledSlider {
-                        width: parent.width - brightnessLabel.width - brightnessValue.width - parent.spacing * 2
-                        anchors.verticalCenter: parent.verticalCenter
-                        from: BrightnessService.minimumPercent
-                        value: BrightnessService.percent
-                        enabled: root.canControlSelectedBrightness
-                        progressColor: Theme.yellow
-                        onMoved: BrightnessService.setPercent(value)
-                        onWheelAdjusted: function(nextValue) {
-                            BrightnessService.setPercent(nextValue);
-                        }
-                        onPressedChanged: if (!pressed) BrightnessService.commit()
-                    }
-
-                    Label {
-                        id: brightnessValue
-                        text: BrightnessService.percent + "%"
-                        color: Theme.subtext
-                        width: 32
-                        font.features: { "tnum": 1 }
-                        horizontalAlignment: Text.AlignRight
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
                 }
 
                 SettingRow {

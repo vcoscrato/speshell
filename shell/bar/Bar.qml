@@ -5,6 +5,7 @@ import Quickshell.Services.SystemTray
 import Quickshell.Wayland
 import qs.components
 import qs.services
+import "../components/Format.js" as Format
 
 // Speshell's bar, one per screen, along its top or bottom: the Speshell mark, which
 // opens the launcher, and the screen's workspaces; the clock between the playing track
@@ -118,18 +119,18 @@ PanelWindow {
 
     function step(panel, direction) {
         if (panel === "audio")
-            AudioService.stepOutputVolume(direction);
+            AudioService.output.stepVolume(direction);
         else if (panel === "microphone")
-            AudioService.stepInputVolume(direction);
+            AudioService.input.stepVolume(direction);
         else if (panel === "display")
             BrightnessService.stepPercent(direction);
     }
 
     function cycleDevice(panel) {
         if (panel === "audio")
-            AudioService.cycleOutputDevice();
+            AudioService.output.cycleDevice();
         else if (panel === "microphone")
-            AudioService.cycleInputDevice();
+            AudioService.input.cycleDevice();
     }
 
     screen: root.modelData
@@ -194,7 +195,7 @@ PanelWindow {
             readonly property real requiredWidth: root.edgePadding * 2 + leftRow.width + rightRow.width
                 + strip.gap * 2 + strip.beforeClock + clockButton.width + strip.afterClock
             // What going compact saves, so the bar knows its full width while compact.
-            readonly property real compactSavings: clockMetrics.advanceWidth(clockButton.dateText + "   ")
+            readonly property real compactSavings: clockMetrics.advanceWidth(Format.shortDate(clock.date) + "   ")
                 + (weatherButton.visible && WeatherService.ready
                     ? chipMetrics.advanceWidth(WeatherService.temperatureText(WeatherService.current.temperature)) + Theme.spacingSmall
                     : 0)
@@ -296,7 +297,6 @@ PanelWindow {
             BarButton {
                 id: clockButton
 
-                readonly property string dateText: Qt.formatDateTime(clock.date, "ddd d MMM")
 
                 size: root.itemSize
                 labelAbove: !root.atTop
@@ -305,8 +305,8 @@ PanelWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 open: root.dropdownButton === clockButton
                 horizontalPadding: Theme.spacingLarge
-                label: strip.compact ? Qt.formatDateTime(clock.date, "dddd d MMMM") : ""
-                text: (strip.compact ? "" : clockButton.dateText + "   ") + Qt.formatDateTime(clock.date, "HH:mm")
+                label: strip.compact ? Format.date(clock.date) : ""
+                text: (strip.compact ? "" : Format.shortDate(clock.date) + "   ") + Format.time(clock.date)
                 fontSize: Theme.fontSizeNormal
                 fontWeight: Font.DemiBold
                 onClicked: pointer => root.toggleDropdown("clock", clockButton, pointer)

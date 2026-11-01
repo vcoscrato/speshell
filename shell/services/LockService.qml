@@ -25,7 +25,6 @@ Singleton {
     property string draft: ""
 
     readonly property string markerPath: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/speshell-locked"
-    readonly property string sessionId: Quickshell.env("XDG_SESSION_ID") || ""
 
     signal unlocked()
 
@@ -37,7 +36,7 @@ Singleton {
         root.draft = "";
         root.locked = true;
         Quickshell.execDetached(["touch", root.markerPath]);
-        root.hintLocked(true);
+        SessionService.setLockedHint(true);
     }
 
     function submit() {
@@ -60,17 +59,8 @@ Singleton {
         root.message = "";
         root.locked = false;
         Quickshell.execDetached(["rm", "-f", root.markerPath]);
-        root.hintLocked(false);
+        SessionService.setLockedHint(false);
         root.unlocked();
-    }
-
-    // Tells logind, which shows it as the session's LockedHint.
-    function hintLocked(on) {
-        if (root.sessionId === "")
-            return;
-        Quickshell.execDetached(["gdbus", "call", "--system", "--dest", "org.freedesktop.login1",
-            "--object-path", "/org/freedesktop/login1/session/auto",
-            "--method", "org.freedesktop.login1.Session.SetLockedHint", on ? "true" : "false"]);
     }
 
     PamContext {

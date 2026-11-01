@@ -15,8 +15,7 @@ Card {
 
     property bool presented: false
 
-    title: "Tools"
-    iconName: "tools"
+    panel: "tools"
     property double now: Date.now()
 
     // A tool installed since shows up.

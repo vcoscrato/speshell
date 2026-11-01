@@ -38,18 +38,16 @@ Singleton {
     property string activeAction: ""
     property string errorMessage: ""
 
-    // Whether logind can hibernate: a swap that fits memory, and resume set up.
-    property bool canHibernate: false
 
-    function actionLabel(action) {
-        if (action === "lock") return "Lock";
-        if (action === "sleep") return "Sleep";
-        if (action === "hibernate") return "Hibernate";
-        if (action === "logout") return "Log out";
-        if (action === "restart") return "Restart";
-        if (action === "poweroff") return "Power off";
-        return "Power action";
-    }
+    // Each action's name, icon, and tone.
+    readonly property var actions: ({
+        lock: { label: "Lock", icon: "lock", tone: "accent" },
+        sleep: { label: "Sleep", icon: "sleep", tone: "accent" },
+        hibernate: { label: "Hibernate", icon: "hibernate", tone: "accent" },
+        logout: { label: "Log out", icon: "logout", tone: "warning" },
+        restart: { label: "Restart", icon: "restart", tone: "warning" },
+        poweroff: { label: "Power off", icon: "power", tone: "error" }
+    })
 
     function commandError(collector, fallback) {
         var detail = collector && collector.text ? collector.text.trim() : "";
@@ -179,16 +177,6 @@ Singleton {
         }
     }
 
-    // Prints ('yes',) when hibernating works.
-    Process {
-        running: true
-        command: ["gdbus", "call", "--system", "--dest", "org.freedesktop.login1",
-            "--object-path", "/org/freedesktop/login1", "--method", "org.freedesktop.login1.Manager.CanHibernate"]
-        stdout: StdioCollector {
-            onStreamFinished: root.canHibernate = text.indexOf("'yes'") >= 0
-        }
-    }
-
     Process {
         id: actionProcess
         running: false
@@ -200,7 +188,7 @@ Singleton {
             if (exitCode !== 0) {
                 root.fail(root.commandError(
                     actionError,
-                    root.actionLabel(action) + " failed."
+                    (root.actions[action]?.label ?? "Power action") + " failed."
                 ));
                 return;
             }

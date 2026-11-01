@@ -12,29 +12,12 @@ Card {
 
     property bool presented: false
 
-    title: "Power"
-    iconName: "power"
+    panel: "power"
     // The action waiting for a second click; empty when none is.
     property string pendingAction: ""
 
     // In two rows: what leaves the session waiting, and what ends it.
-    readonly property var rows: [
-        [
-            { id: "lock", label: "Lock", iconName: "lock", tone: "accent" },
-            { id: "sleep", label: "Sleep", iconName: "sleep", tone: "accent" },
-            { id: "hibernate", label: "Hibernate", iconName: "hibernate", tone: "accent" }
-        ],
-        [
-            { id: "logout", label: "Log out", iconName: "logout", tone: "warning" },
-            { id: "restart", label: "Restart", iconName: "restart", tone: "warning" },
-            { id: "poweroff", label: "Power off", iconName: "power", tone: "error" }
-        ]
-    ]
-    readonly property var modeOptions: [
-        { value: "saver", label: "Saver" },
-        { value: "balanced", label: "Balanced" },
-        { value: "maximum", label: "Maximum" }
-    ]
+    readonly property var rows: [["lock", "sleep", "hibernate"], ["logout", "restart", "poweroff"]]
 
     headerActions: Row {
         spacing: Theme.spacingTiny
@@ -104,7 +87,7 @@ Card {
             id: row
 
             required property var modelData
-            readonly property var shown: row.modelData.filter(action => action.id !== "hibernate" || PowerService.canHibernate)
+            readonly property var shown: row.modelData.filter(action => action !== "hibernate" || SessionService.canHibernate)
 
             width: parent.width
             spacing: Theme.spacingSmall
@@ -115,19 +98,20 @@ Card {
                 delegate: ActionTile {
                     id: tile
 
-                    required property var modelData
-                    readonly property bool pending: root.pendingAction === tile.modelData.id
+                    required property string modelData
+                    readonly property var action: PowerService.actions[tile.modelData]
+                    readonly property bool pending: root.pendingAction === tile.modelData
 
                     width: (row.width - row.spacing * (row.shown.length - 1)) / row.shown.length
                     stacked: true
-                    label: PowerService.activeAction === tile.modelData.id ? "Working…"
-                        : tile.pending ? tile.modelData.label + "?" : tile.modelData.label
-                    iconName: tile.modelData.iconName
-                    tone: tile.modelData.tone
+                    label: PowerService.activeAction === tile.modelData ? "Working…"
+                        : tile.pending ? tile.action.label + "?" : tile.action.label
+                    iconName: tile.action.icon
+                    tone: tile.action.tone
                     enabled: !PowerService.busy
                     active: tile.pending
                     countdownMs: confirmationTimer.interval
-                    onActivated: root.activate(tile.modelData.id)
+                    onActivated: root.activate(tile.modelData)
                 }
             }
         }
@@ -151,17 +135,7 @@ Card {
     }
 
     // A laptop picks it in the Battery panel.
-    SettingRow {
+    PowerModeRow {
         visible: !FeatureSupport.supportsBattery
-        label: "Power mode"
-        info: PowerService.profilesAvailable
-            ? "Sets the system's power profile and Speshell's animations together."
-            : "Sets how much Speshell animates."
-
-        SegmentedControl {
-            options: root.modeOptions
-            currentValue: PowerService.mode
-            onValueSelected: value => PowerService.setMode(value)
-        }
     }
 }

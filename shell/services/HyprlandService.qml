@@ -20,6 +20,8 @@ Singleton {
     // The main keyboard's layout, as "Portuguese (Brazil)", and how many it switches
     // between.
     property string keyboard: ""
+    // The touchpads' names, for InputService.
+    property var touchpads: []
     property string keyboardLayout: ""
     readonly property int keyboardLayouts: root.keyboardLayoutList.length
     // The layouts it switches between, as { code: "BR", name: "Portuguese (Brazil)" },
@@ -99,7 +101,10 @@ Singleton {
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
-                    const main = JSON.parse(text).keyboards.find(keyboard => keyboard.main);
+                    const parsed = JSON.parse(text);
+                    root.touchpads = (parsed.mice || []).map(mouse => String(mouse.name || ""))
+                        .filter(name => /touchpad/i.test(name));
+                    const main = (devices.keyboards || []).find(keyboard => keyboard.main);
                     if (!main)
                         return;
                     const layouts = String(main.layout || "").split(",");
@@ -116,7 +121,9 @@ Singleton {
                                     || root.xkbNames[layout] || layout.toUpperCase()
                         };
                     });
-                } catch (error) {}
+                } catch (error) {
+                    console.warn("[Speshell] Could not read Hyprland's devices:", error);
+                }
             }
         }
     }

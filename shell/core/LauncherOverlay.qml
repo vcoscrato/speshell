@@ -1,10 +1,7 @@
 pragma ComponentBehavior: Bound
-// Quickshell's type info marks PanelWindow uncreatable, though QML creates it.
-// qmllint disable uncreatable-type
 import QtQuick
 import QtQuick.Templates as T
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Wayland
 import Quickshell.Widgets
 import qs.components
@@ -12,13 +9,11 @@ import qs.services
 
 // The launcher window: the search field and results over a dimmed screen, entering and
 // leaving with the theme's launcher transition.
-PanelWindow {
+ModalWindow {
     id: root
     property bool opened: false
     // Mapped on screen; outlives `opened` while an effects transition plays the exit.
     property bool presenting: false
-    property bool focusGrabActive: false
-    property var targetScreen: null
     property int selectedIndex: 0
     readonly property bool mapped: root.visible && root.backingWindowVisible
     // Latched per presentation so an effects change, e.g. from a theme picked while it
@@ -41,20 +36,12 @@ PanelWindow {
         + Math.max(0, root.configuredVisibleRows - 1) * root.resultSpacing
 
     visible: root.presenting && root.targetScreen !== null
-    screen: root.targetScreen
-    color: "transparent"
-    focusable: true
-    aboveWindows: true
-    exclusionMode: ExclusionMode.Ignore
     updatesEnabled: root.visible
 
     WlrLayershell.namespace: "speshell-launcher"
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: root.visible && root.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    takesKeyboard: root.visible && root.opened
     // Click-through while the exit transition plays.
     mask: root.opened ? null : passThrough
-
-    anchors { left: true; right: true; top: true; bottom: true }
 
     function clampSelected() {
         root.selectedIndex = root.resultCount <= 0
@@ -142,11 +129,6 @@ PanelWindow {
 
     Region { id: passThrough }
 
-    HyprlandFocusGrab {
-        active: root.focusGrabActive && HyprlandService.running
-        windows: [root]
-    }
-
     // An effects transition must emit closingFinished(); this bounds a broken one.
     Timer {
         id: closeSafetyTimer
@@ -161,8 +143,8 @@ PanelWindow {
         onTriggered: {
             if (!root.mapped || !root.opened)
                 return;
-            searchField.forceActiveFocus();
-            searchField.cursorPosition = searchField.text.length;
+            searchBox.focusInput();
+            searchBox.cursorPosition = searchBox.text.length;
             root.focusGrabActive = true;
         }
     }
@@ -202,10 +184,7 @@ PanelWindow {
         Surface {
             anchors.fill: parent
             backdrop: true
-            roundTopLeft: true
-            roundTopRight: true
-            roundBottomRight: true
-            roundBottomLeft: true
+            rounded: true
         }
 
         MouseArea {
@@ -222,81 +201,44 @@ PanelWindow {
             anchors.margins: Theme.spacingLarge
             spacing: Theme.spacingMedium
 
-            Rectangle {
+            Field {
                 id: searchBox
-                width: parent.width
-                height: Math.max(48,
-                    Math.ceil(Theme.fontSizeLarge * 1.35)
-                        + Theme.spacingMedium * 2)
-                // Field's look, at the launcher's size.
-                radius: Theme.borderRadius
-                color: Theme.controlFill
-                border.width: Theme.borderWidth
-                border.color: searchField.activeFocus ? Theme.accent : Theme.controlBorder
+                large: true
+                iconName: "search"
+                placeholder: "Search apps, calculate, ! for commands, ? for the web"
 
-                AppIcon {
-                    anchors.left: parent.left
-                    anchors.leftMargin: Theme.spacingMedium
-                    anchors.verticalCenter: parent.verticalCenter
-                    name: "search"
-                    size: Theme.iconSizeMedium
-                    iconColor: searchField.activeFocus ? Theme.accent : Theme.subtext
+                onTextChanged: {
+                    LauncherService.setQuery(text);
+                    root.selectedIndex = 0;
+                    resultsList.contentY = 0;
                 }
 
-                TextInput {
-                    id: searchField
-                    anchors.left: parent.left
-                    anchors.leftMargin: 44
-                    anchors.right: parent.right
-                    anchors.rightMargin: Theme.spacingMedium
-                    anchors.verticalCenter: parent.verticalCenter
-                    height: parent.height
-                    text: LauncherService.query
-                    selectByMouse: true
-                    color: Theme.text
-                    selectionColor: Theme.accent
-                    selectedTextColor: Theme.onAccent
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeLarge
-                    verticalAlignment: TextInput.AlignVCenter
-                    clip: true
-
-                    onTextChanged: {
-                        LauncherService.setQuery(text);
-                        root.selectedIndex = 0;
-                        resultsList.contentY = 0;
+                onKeyPressed: event => {
+                    if (event.key === Qt.Key_Escape) {
+                        LauncherService.close();
+                    } else if (event.key === Qt.Key_Down) {
+                        root.moveSelection(1);
+                    } else if (event.key === Qt.Key_Up) {
+                        root.moveSelection(-1);
+                    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                        root.activateSelected();
+                    } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
+                        if (root.resultCount > 0)
+                            LauncherService.complete(root.results[root.selectedIndex]);
+                    } else {
+                        return;
                     }
-
-                    Keys.onPressed: function(event) {
-                        if (event.key === Qt.Key_Escape) {
-                            LauncherService.close();
-                            event.accepted = true;
-                        } else if (event.key === Qt.Key_Down) {
-                            root.moveSelection(1);
-                            event.accepted = true;
-                        } else if (event.key === Qt.Key_Up) {
-                            root.moveSelection(-1);
-                            event.accepted = true;
-                        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                            root.activateSelected();
-                            event.accepted = true;
-                        } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
-                            if (root.resultCount > 0)
-                                LauncherService.complete(root.results[root.selectedIndex]);
-                            event.accepted = true;
-                        }
-                    }
+                    event.accepted = true;
                 }
 
-                Label {
-                    anchors.left: searchField.left
-                    anchors.right: searchField.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "Search apps, calculate, ! for commands, ? for the web"
-                    elide: Text.ElideRight
-                    color: Theme.subtext
-                    font.pixelSize: Theme.fontSizeNormal
-                    visible: searchField.text === "" && !searchField.preeditText
+                // Follows the query set elsewhere, as by a completion.
+                Connections {
+                    target: LauncherService
+
+                    function onQueryChanged() {
+                        if (searchBox.text !== LauncherService.query)
+                            searchBox.text = LauncherService.query;
+                    }
                 }
             }
 

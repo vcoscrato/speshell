@@ -17,7 +17,7 @@ just check                               # every effect in every scene but picks
 just bench fire                          # GPU time per frame at 1080p, phase by phase
 just bench -a HEAD earth                 # the same, against the last commit
 just shot fire                           # the real bar with each panel open, and a contact sheet
-just shot earth network settings         # only those panels (or `launcher`)
+just shot earth network settings         # only those panels (or `launcher`, `osd`)
 ```
 
 Scenes drive `EffectClock` with virtual time, 1/60 s per frame, so captures match real playback, and every scene draws in the colors of the theme named like the effect. The wallpaper scene hosts this checkout's `shell/core/WallpaperView.qml`. The clock scene shows the face over the backdrop, at the clock panel's size and at twice it, ticking from 10:09:30 and keeping still from 3 s, as in power saver. The controls scene plays a script on mock controls in those colors: a slider dragged and let go twice, another stepped by the wheel, an audio device and a segment picked, a switch turned on and off, and a square button picked. Env knobs:
@@ -26,7 +26,7 @@ Scenes drive `EffectClock` with virtual time, 1/60 s per frame, so captures matc
 - `CLOSE_AT`, `REOPEN_AT`, `SWITCH_AT`, and `SPEED` for the scenes; `SWITCH_AGAIN_AT` switches the wallpaper back mid-transition, to see one cut short.
 - `THEME_INI`: another theme's `theme.ini`, to see the effect in its colors.
 - `KEEP_FRAMES=1` keeps the frames, about 700 MB per run; `EVERY_FRAME=1` captures at 60 fps instead of 30.
-- For shot, `SHOT_CONFIG`: another `config.ini` than yours, `SHOT_QUERY`: what to type into the launcher or the theme gallery, and `SHOT_MEDIA=1` to show the playing track, hidden by default since its cover is someone else's art. Shots run from a copy of the tree with a fresh data directory, with a timer and a screen recording running, and land in `~/.cache/speshell-preview/shots/<theme>/`.
+- For shot, `SHOT_CONFIG`: another `config.ini` than yours, `SHOT_QUERY`: what to type into the launcher or the theme gallery, `SHOT_OSD`: the OSD's level (`output`, the default, `input`, `brightness`, or `keyboard`) or anything else for a state, and `SHOT_MEDIA=1` to show the playing track, hidden by default since its cover is someone else's art. Shots run from a copy of the tree with a fresh data directory, with a timer and a screen recording running, and land in `~/.cache/speshell-preview/shots/<theme>/`.
 - For bench, `-a REF` to compare against a commit, `-p` to pick phases (`open`, `motion`, `wallpaper`, `controls`, `clock`), `-r` for the runs per phase, and `-m` for the Markdown Cost table. It renders on the NVIDIA GPU of a hybrid laptop; `BENCH_GPU=default` leaves the choice to the system.
 
 `just clean` removes compiled shaders and everything in `~/.cache/speshell-preview/`.

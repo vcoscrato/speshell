@@ -1,7 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Templates as T
-import Quickshell
 import qs.components
 import qs.services
 import "../components/Format.js" as Format
@@ -9,8 +8,8 @@ import "../components/Format.js" as Format
 // The notification history, Do Not Disturb, and clearing it.
 Card {
     id: root
-    title: "Notifications" + (notifList.length > 0 ? " (" + notifList.length + ")" : "")
-    iconName: "bell"
+    panel: "notifications"
+    title: PanelService.panels.notifications.label + (notifList.length > 0 ? " (" + notifList.length + ")" : "")
 
     property var notifList: NotificationService.notificationHistory
     readonly property int maxVisibleNotifications: 5
@@ -67,37 +66,6 @@ Card {
         return root.notificationRowHeight * rows + Theme.spacingTiny * (rows - 1);
     }
 
-    function compactText(value) {
-        return String(value || "").replace(/\s+/g, " ").trim();
-    }
-
-    function primaryText(notification) {
-        var summary = root.compactText(notification.summary);
-        if (summary !== "") return summary;
-
-        var body = root.compactText(notification.body);
-        if (body !== "") return body;
-
-        return notification.appName || "Notification";
-    }
-
-    // The body, when the summary doesn't already say it.
-    function bodyText(notification) {
-        var summary = root.compactText(notification.summary);
-        var body = root.compactText(notification.body);
-        if (summary !== "" && body !== "" && body !== summary)
-            return String(notification.body).trim();
-        return "";
-    }
-
-    function iconSource(notification) {
-        return notification.appIcon ? Quickshell.iconPath(notification.appIcon, true) : "";
-    }
-
-    function isInternal(notification) {
-        return String(notification.id).indexOf("internal:") === 0;
-    }
-
     onPresentedChanged: {
         if (root.presented)
             root.now = Date.now();
@@ -144,7 +112,7 @@ Card {
                 required property int index
                 readonly property bool expanded: root.expandedNotificationId
                     === root.notificationKey(notificationRow.modelData)
-                readonly property string body: root.bodyText(notificationRow.modelData)
+                readonly property string body: NotificationService.bodyText(notificationRow.modelData)
                 // Only a row cut short has more to show.
                 readonly property bool expandable: expanded
                     || summaryText.truncated || detailLabel.truncated
@@ -162,7 +130,7 @@ Card {
                 color: notifMouse.containsMouse ? Theme.cardHover : Theme.controlFill
 
                 Accessible.role: entry || expandable ? Accessible.Button : Accessible.ListItem
-                Accessible.name: root.primaryText(notificationRow.modelData)
+                Accessible.name: NotificationService.summaryText(notificationRow.modelData)
                 Accessible.description: entry ? "Go to " + entry.name
                     : expanded ? "Collapse notification" : "Read full notification"
                 Accessible.onPressAction: root.activate(notificationRow)
@@ -179,38 +147,13 @@ Card {
                     color: Theme.error
                 }
 
-                Item {
+                NotificationIcon {
                     id: sourceIcon
-                    readonly property string source: root.iconSource(notificationRow.modelData)
+                    notification: notificationRow.modelData
                     x: Theme.spacingSmall
                     y: notificationRow.expanded
                         ? Theme.spacingSmall + 1
                         : (root.notificationRowHeight - height) / 2
-                    width: Theme.iconSizeMedium
-                    height: width
-
-                    Image {
-                        id: sourceImage
-                        anchors.fill: parent
-                        source: sourceIcon.source
-                        sourceSize: Qt.size(parent.width * 2, parent.height * 2)
-                        fillMode: Image.PreserveAspectFit
-                        visible: status === Image.Ready
-                    }
-
-                    SpeshellMark {
-                        anchors.centerIn: parent
-                        size: Theme.iconSizeMedium - 2
-                        visible: !sourceImage.visible && root.isInternal(notificationRow.modelData)
-                    }
-
-                    AppIcon {
-                        anchors.centerIn: parent
-                        name: "bell"
-                        size: Theme.iconSizeSmall
-                        iconColor: Theme.overlay
-                        visible: !sourceImage.visible && !root.isInternal(notificationRow.modelData)
-                    }
                 }
 
                 Column {
@@ -237,7 +180,7 @@ Card {
                             anchors.left: parent.left
                             anchors.right: ageText.left
                             anchors.rightMargin: Theme.spacingSmall
-                            text: root.primaryText(notificationRow.modelData)
+                            text: NotificationService.summaryText(notificationRow.modelData)
                             elide: Text.ElideRight
                             wrapMode: notificationRow.expanded ? Text.Wrap : Text.NoWrap
                         }
@@ -257,9 +200,9 @@ Card {
                         id: detailLabel
                         width: parent.width
                         text: notificationRow.body === ""
-                            ? root.compactText(notificationRow.modelData.appName)
+                            ? NotificationService.compactText(notificationRow.modelData.appName)
                             : notificationRow.expanded ? notificationRow.body
-                            : root.compactText(notificationRow.body)
+                            : NotificationService.compactText(notificationRow.body)
                         color: Theme.subtext
                         elide: notificationRow.expanded ? Text.ElideNone : Text.ElideRight
                         wrapMode: notificationRow.expanded ? Text.Wrap : Text.NoWrap
@@ -271,7 +214,7 @@ Card {
                         role: "caption"
                         width: parent.width
                         visible: notificationRow.expanded && notificationRow.body !== ""
-                        text: root.compactText(notificationRow.modelData.appName)
+                        text: NotificationService.compactText(notificationRow.modelData.appName)
                         color: Theme.overlay
                         elide: Text.ElideRight
                     }

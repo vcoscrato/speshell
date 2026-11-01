@@ -38,34 +38,13 @@ Scope {
                     text: root.userName
                 }
 
-                Field {
-                    id: password
-                    masked: true
-                    autoFocus: true
-                    iconName: "lock"
+                GatePassword {
+                    draft: LockService.draft
                     placeholder: LockService.checking ? "Checking…" : "Password"
-                    onEdited: LockService.draft = password.text
+                    message: LockService.message
+                    messageIsError: LockService.messageIsError
+                    onDraftEdited: text => LockService.draft = text
                     onAccepted: LockService.submit()
-                    onCancelled: LockService.draft = ""
-
-                    Connections {
-                        target: LockService
-
-                        function onDraftChanged() {
-                            if (password.text !== LockService.draft)
-                                password.text = LockService.draft;
-                        }
-                    }
-                }
-
-                Label {
-                    role: "caption"
-                    visible: LockService.message !== ""
-                    width: parent.width
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.Wrap
-                    text: LockService.message
-                    color: LockService.messageIsError ? Theme.error : Theme.subtext
                 }
             }
         }

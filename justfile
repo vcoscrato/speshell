@@ -127,7 +127,7 @@ check: shaders
 bench *args: shaders
     preview/bench.sh {{ args }}
 
-# Render the real bar in a theme with each panel open (all, or those named, or `launcher`, `themes`, or `wallpapers`) into ~/.cache/speshell-preview/shots/ (needs Wayland).
+# Render the real bar in a theme with each panel open (all, or those named, or `launcher`, `themes`, `wallpapers`, or `osd`) into ~/.cache/speshell-preview/shots/ (needs Wayland).
 shot theme="cosmos" *shots: shaders
     preview/shot.sh "{{ theme }}" {{ shots }}
 

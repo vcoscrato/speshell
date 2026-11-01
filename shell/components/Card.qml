@@ -9,8 +9,10 @@ Item {
     default property alias content: contentColumn.data
     property alias pinnedContent: pinnedColumn.data
     property alias headerActions: headerActionsRow.data
-    property string title: ""
-    property string iconName: ""
+    // The PanelService panel it is, which names it and gives its icon.
+    property string panel: ""
+    property string title: PanelService.has(root.panel) ? PanelService.panels[root.panel].label : ""
+    property string iconName: PanelService.has(root.panel) ? PanelService.panels[root.panel].icon : ""
 
     implicitWidth: Theme.panelWidth
     implicitHeight: container.implicitHeight

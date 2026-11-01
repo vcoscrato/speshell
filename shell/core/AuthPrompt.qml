@@ -1,9 +1,6 @@
 pragma ComponentBehavior: Bound
-// Quickshell's type info marks PanelWindow uncreatable, though QML creates it.
-// qmllint disable uncreatable-type
 import QtQuick
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Services.Polkit
 import Quickshell.Wayland
 import qs.components
@@ -36,31 +33,19 @@ Scope {
         function onAuthenticationFailed() {
             password.text = "";
             root.failures++;
-            if (Theme.motion)
-                shake.restart();
+            shake.play();
         }
     }
 
-    PanelWindow {
+    ModalWindow {
         id: window
 
+        targetScreen: root.targetScreen
         visible: agent.isActive && root.flow !== null && root.targetScreen !== null
-        screen: root.targetScreen
         color: Theme.alpha(Theme.crust, 0.6)
-        focusable: true
-        aboveWindows: true
-        exclusionMode: ExclusionMode.Ignore
+        focusGrabActive: window.visible
 
         WlrLayershell.namespace: "speshell-auth"
-        WlrLayershell.layer: WlrLayer.Overlay
-        WlrLayershell.keyboardFocus: window.visible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-
-        anchors {
-            left: true
-            right: true
-            top: true
-            bottom: true
-        }
 
         onVisibleChanged: {
             root.failures = 0;
@@ -68,106 +53,62 @@ Scope {
                 password.focusInput();
         }
 
-        HyprlandFocusGrab {
-            active: window.visible && HyprlandService.running
-            windows: [window]
-        }
-
-        Surface {
-            anchors.centerIn: parent
+        Dialog {
             width: Theme.panelWidth + Theme.spacingXL * 2
-            height: content.implicitHeight + Theme.spacingXL * 2
-            backdrop: true
-            roundTopLeft: true
-            roundTopRight: true
-            roundBottomRight: true
-            roundBottomLeft: true
-            transform: Translate { id: offset }
+            iconName: "lock"
+            title: "Authentication required"
+            detail: root.flow ? root.flow.message : ""
+            transform: Translate { id: shakeOffset }
 
-            Column {
-                id: content
-                x: Theme.spacingXL
-                y: Theme.spacingXL
-                width: parent.width - Theme.spacingXL * 2
-                spacing: Theme.spacingMedium
+            Field {
+                id: password
+                masked: !(root.flow && root.flow.responseVisible)
+                iconName: "lock"
+                // PAM's prompt, as "Password:".
+                placeholder: root.flow ? root.flow.inputPrompt.replace(/:\s*$/, "") || "Password" : ""
+                onAccepted: submit.clicked()
+                onCancelled: cancel.clicked()
+            }
 
-                Row {
-                    spacing: Theme.spacingSmall
+            Label {
+                role: "caption"
+                width: parent.width
+                wrapMode: Text.Wrap
+                visible: text !== ""
+                readonly property bool error: root.flow && (root.flow.supplementaryIsError || root.flow.supplementaryMessage === "")
+                text: root.flow && root.flow.supplementaryMessage !== "" ? root.flow.supplementaryMessage
+                    : root.failures > 0 ? "Wrong password, try again" : ""
+                color: error ? Theme.error : Theme.subtext
+            }
 
-                    AppIcon {
-                        anchors.verticalCenter: parent.verticalCenter
-                        name: "lock"
-                        size: Theme.iconSizeMedium
-                        iconColor: Theme.accent
-                    }
+            Row {
+                anchors.right: parent.right
+                spacing: Theme.spacingSmall
 
-                    Label {
-                        anchors.verticalCenter: parent.verticalCenter
-                        role: "heading"
-                        text: "Authentication required"
-                    }
+                ActionButton {
+                    id: cancel
+                    text: "Cancel"
+                    onClicked: if (root.flow) root.flow.cancelAuthenticationRequest()
                 }
 
-                Label {
-                    width: parent.width
-                    wrapMode: Text.Wrap
-                    text: root.flow ? root.flow.message : ""
-                }
-
-                Field {
-                    id: password
-                    masked: !(root.flow && root.flow.responseVisible)
-                    iconName: "lock"
-                    // PAM's prompt, as "Password:".
-                    placeholder: root.flow ? root.flow.inputPrompt.replace(/:\s*$/, "") || "Password" : ""
-                    onAccepted: submit.clicked()
-                    onCancelled: cancel.clicked()
-                }
-
-                Label {
-                    role: "caption"
-                    width: parent.width
-                    wrapMode: Text.Wrap
-                    visible: text !== ""
-                    readonly property bool error: root.flow && (root.flow.supplementaryIsError || root.flow.supplementaryMessage === "")
-                    text: root.flow && root.flow.supplementaryMessage !== "" ? root.flow.supplementaryMessage
-                        : root.failures > 0 ? "Wrong password, try again" : ""
-                    color: error ? Theme.error : Theme.subtext
-                }
-
-                Row {
-                    anchors.right: parent.right
-                    spacing: Theme.spacingSmall
-
-                    ActionButton {
-                        id: cancel
-                        text: "Cancel"
-                        onClicked: if (root.flow) root.flow.cancelAuthenticationRequest()
-                    }
-
-                    ActionButton {
-                        id: submit
-                        text: "Authenticate"
-                        kind: "primary"
-                        enabled: root.flow !== null && root.flow.isResponseRequired
-                        onClicked: {
-                            if (!root.flow || !root.flow.isResponseRequired)
-                                return;
-                            root.flow.submit(password.text);
-                            password.text = "";
-                        }
+                ActionButton {
+                    id: submit
+                    text: "Authenticate"
+                    kind: "primary"
+                    enabled: root.flow !== null && root.flow.isResponseRequired
+                    onClicked: {
+                        if (!root.flow || !root.flow.isResponseRequired)
+                            return;
+                        root.flow.submit(password.text);
+                        password.text = "";
                     }
                 }
             }
         }
 
-        SequentialAnimation {
+        Shake {
             id: shake
-
-            NumberAnimation { target: offset; property: "x"; to: -12; duration: 50 }
-            NumberAnimation { target: offset; property: "x"; to: 10; duration: 80 }
-            NumberAnimation { target: offset; property: "x"; to: -6; duration: 70 }
-            NumberAnimation { target: offset; property: "x"; to: 0; duration: 60 }
+            offset: shakeOffset
         }
     }
 }

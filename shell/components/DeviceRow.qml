@@ -38,7 +38,11 @@ Item {
         hoverEnabled: true
         enabled: root.primaryEnabled
         cursorShape: root.primaryEnabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-        onClicked: root.primaryTriggered()
+        onClicked: {
+            if (!root.current)
+                EffectsService.picked(iconDisc, rowMouse);
+            root.primaryTriggered();
+        }
     }
 
     Column {

@@ -38,11 +38,6 @@ Singleton {
     readonly property int batteryPercent: ConfigService.settings.backlight.batteryPercent
     property int pluggedPercent: -1
 
-    // Speshell's own writes don't show the OSD; the values it last saw, so it only
-    // shows for real changes.
-    property double osdSuppressedUntil: 0
-    property int osdPercent: -1
-    property int osdKeyboardLevel: -1
 
     function clampPercent(value) {
         return Math.max(root.minimumPercent, Math.min(100, Math.round(Number(value) || 0)));
@@ -76,7 +71,7 @@ Singleton {
             return;
         root.stepPercent(direction);
         root.commit();
-        OsdService.showPercent("brightness", "Brightness", root.percent);
+        OsdService.showLevel("brightness");
     }
 
     // Flushes a debounced write, e.g. when a slider is released.
@@ -90,7 +85,7 @@ Singleton {
     function write() {
         if (!root.available)
             return;
-        root.osdSuppressedUntil = Date.now() + 1000;
+        OsdService.quiet("brightness");
         if (writeProc.running) {
             root.writeQueued = true;
             return;
@@ -113,16 +108,15 @@ Singleton {
         root.percent = pct;
         if (!writeProc.running && !writeDebounce.running)
             root.pendingPercent = pct;
-        if (root.osdPercent >= 0 && pct !== root.osdPercent && Date.now() >= root.osdSuppressedUntil)
-            OsdService.showPercent("brightness", "Brightness", pct);
-        root.osdPercent = pct;
+        if (OsdService.changed("brightness", pct))
+            OsdService.showLevel("brightness");
     }
 
     function setKeyboardLevel(level) {
         if (!root.keyboardAvailable || root.keyboardMax <= 0)
             return;
         root.keyboardLevel = Math.max(0, Math.min(root.keyboardMax, Math.round(Number(level) || 0)));
-        root.osdSuppressedUntil = Date.now() + 1000;
+        OsdService.quiet("keyboard");
         if (keyboardWriteProc.running) {
             root.keyboardWriteQueued = true;
             return;
@@ -137,12 +131,7 @@ Singleton {
         if (!root.keyboardAvailable || root.keyboardMax <= 0)
             return;
         root.setKeyboardLevel(root.keyboardLevel >= root.keyboardMax ? 0 : root.keyboardLevel + 1);
-        root.showKeyboardOsd();
-    }
-
-    function showKeyboardOsd() {
-        OsdService.show("keyboard", "Keyboard backlight", root.keyboardLevel === 0 ? "Off" : root.keyboardPercent + "%",
-            root.keyboardPercent / 100);
+        OsdService.showLevel("keyboard");
     }
 
     function updateKeyboardFromFiles() {
@@ -155,10 +144,8 @@ Singleton {
         root.keyboardMax = max;
         if (!keyboardWriteProc.running)
             root.keyboardLevel = Math.max(0, Math.min(max, level));
-        if (root.osdKeyboardLevel >= 0 && root.keyboardLevel !== root.osdKeyboardLevel
-                && Date.now() >= root.osdSuppressedUntil)
-            root.showKeyboardOsd();
-        root.osdKeyboardLevel = root.keyboardLevel;
+        if (OsdService.changed("keyboard", root.keyboardLevel))
+            OsdService.showLevel("keyboard");
     }
 
     // Dims the screen to a quarter and turns the keyboard backlight off, until undim().

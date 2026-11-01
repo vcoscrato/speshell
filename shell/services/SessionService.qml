@@ -5,13 +5,16 @@ import Quickshell
 import Quickshell.Io
 
 // systemd-logind: the moment before the system sleeps, which a delay inhibitor holds
-// back until Speshell has locked; `loginctl lock-session` and `unlock-session`; and on a
-// laptop, whether the lid is closed.
+// back until Speshell has locked; `loginctl lock-session` and `unlock-session`; the
+// session's LockedHint; whether the system can hibernate; and on a laptop, whether the
+// lid is closed.
 Singleton {
     id: root
 
     readonly property bool laptop: FeatureSupport.supportsBattery
     property bool lidClosed: false
+    // A swap that fits memory, and resume set up.
+    property bool canHibernate: false
     // This session's object, as logind escapes its id: "2" is _32.
     readonly property string sessionPath: {
         const id = Quickshell.env("XDG_SESSION_ID") || "";
@@ -29,6 +32,19 @@ Singleton {
 
     function releaseSleep() {
         inhibitor.running = false;
+    }
+
+    // `gdbus call` of logind's `method` on the object at `path`.
+    function logindCall(path, method, args) {
+        return ["gdbus", "call", "--system", "--dest", "org.freedesktop.login1",
+            "--object-path", path, "--method", method].concat(args || []);
+    }
+
+    // Tells logind whether the session is locked, as its LockedHint.
+    function setLockedHint(on) {
+        if (root.sessionPath !== "")
+            Quickshell.execDetached(root.logindCall("/org/freedesktop/login1/session/auto",
+                "org.freedesktop.login1.Session.SetLockedHint", [on ? "true" : "false"]));
     }
 
     // `gdbus monitor` lines: a property change, the sleep signal, and this session's
@@ -57,11 +73,19 @@ Singleton {
 
     Process {
         running: root.laptop
-        command: ["gdbus", "call", "--system", "--dest", "org.freedesktop.login1",
-            "--object-path", "/org/freedesktop/login1", "--method", "org.freedesktop.DBus.Properties.Get",
-            "org.freedesktop.login1.Manager", "LidClosed"]
+        command: root.logindCall("/org/freedesktop/login1", "org.freedesktop.DBus.Properties.Get",
+            ["org.freedesktop.login1.Manager", "LidClosed"])
         stdout: StdioCollector {
             onStreamFinished: root.lidClosed = text.indexOf("true") >= 0
+        }
+    }
+
+    // Prints ('yes',) when hibernating works.
+    Process {
+        running: true
+        command: root.logindCall("/org/freedesktop/login1", "org.freedesktop.login1.Manager.CanHibernate")
+        stdout: StdioCollector {
+            onStreamFinished: root.canHibernate = text.indexOf("'yes'") >= 0
         }
     }
 

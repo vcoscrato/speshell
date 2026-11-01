@@ -14,10 +14,12 @@ Item {
     // text, like the bar or the launcher, shows their calm top.
     property real backdropHeight: Theme.backdropHeight
     property int radius: Theme.surfaceRadius
-    property bool roundTopLeft: false
-    property bool roundTopRight: false
-    property bool roundBottomRight: false
-    property bool roundBottomLeft: false
+    // Every corner, for a surface away from the screen's edges.
+    property bool rounded: false
+    property bool roundTopLeft: root.rounded
+    property bool roundTopRight: root.rounded
+    property bool roundBottomRight: root.rounded
+    property bool roundBottomLeft: root.rounded
     // "left", "right", or "" for none.
     property string edge: ""
     property color edgeColor: Theme.accent

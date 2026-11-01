@@ -158,6 +158,7 @@ Singleton {
             desktopEntry: "",
             appName: "Speshell",
             appIcon: "",
+            image: "",
             summary: String(summary || "Speshell notice"),
             body: String(body || ""),
             urgency: critical ? 2 : 1,
@@ -171,7 +172,6 @@ Singleton {
 
         root.pushPopup(Object.assign({}, entry, {
             popupId: root.popupCounter++,
-            image: "",
             notification: null,
             defaultAction: null,
             actions: [],
@@ -252,12 +252,41 @@ Singleton {
         root.schedulePopupExpiry();
     }
 
+    // Its text on one line, as a row shows it.
+    function compactText(value) {
+        return String(value || "").replace(/\s+/g, " ").trim();
+    }
+
+    // What a notification says first: its summary, else its body, else its app.
+    function summaryText(notification) {
+        return root.compactText(notification.summary) || root.compactText(notification.body)
+            || notification.appName || "Notification";
+    }
+
+    // Its body, when the summary doesn't already say it.
+    function bodyText(notification) {
+        const summary = root.compactText(notification.summary);
+        const body = root.compactText(notification.body);
+        return summary !== "" && body !== "" && body !== summary ? String(notification.body).trim() : "";
+    }
+
+    // Its image, as a contact's picture or a track's cover, else its app's icon.
+    function iconSource(notification) {
+        return notification.image || (notification.appIcon ? Quickshell.iconPath(notification.appIcon, true) : "");
+    }
+
+    // One of Speshell's own notices.
+    function isInternal(notification) {
+        return String(notification.id).indexOf("internal:") === 0;
+    }
+
     function historyEntry(notification, receivedAt) {
         return {
             id: notification.id,
             desktopEntry: notification.desktopEntry,
             appName: notification.appName,
             appIcon: notification.appIcon,
+            image: notification.image,
             summary: notification.summary,
             body: notification.body,
             urgency: notification.urgency,

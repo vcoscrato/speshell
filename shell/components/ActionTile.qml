@@ -120,16 +120,16 @@ Rectangle {
         onClicked: root.secondaryActivated()
     }
 
-    Rectangle {
-        anchors.left: parent.left
+    ProgressBar {
         anchors.bottom: parent.bottom
         height: 2
-        color: root.toneColor
+        color: "transparent"
+        fillColor: root.toneColor
         visible: root.active && root.countdownMs > 0
 
-        NumberAnimation on width {
+        NumberAnimation on value {
             running: root.active && root.countdownMs > 0
-            from: root.width
+            from: 1
             to: 0
             duration: root.countdownMs
         }

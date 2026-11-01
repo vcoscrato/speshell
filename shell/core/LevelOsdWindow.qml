@@ -2,24 +2,32 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell.Wayland
 import qs.components
+import qs.panels
 import qs.services
 
 // What OsdService shows at the bottom of the screen: a level, as with volume and
-// brightness keys, or a state, as with the microphone's mute.
+// brightness keys, in the same header and row as its panel, live and settable while the
+// pointer is on it; or a state, as with airplane mode.
 OsdWindow {
     id: root
 
-    property string displayedIcon: "info"
-    property string displayedTitle: ""
-    property string displayedValue: ""
-    // 0 to 1, or -1 without a bar.
-    property real displayedLevel: -1
+    // OsdService's level, or "" for a state.
+    property string level: ""
+    property string stateIcon: "info"
+    property string stateTitle: ""
+    property string stateDetail: ""
 
-    readonly property color indicatorColor: Theme.accent
+    readonly property var levels: ({
+        output: { panel: "audio", row: outputLevel },
+        input: { panel: "microphone", row: inputLevel },
+        brightness: { panel: "display", row: brightnessLevel },
+        keyboard: { title: "Keyboard", icon: "keyboard", row: keyboardLevel }
+    })
+    readonly property var shownLevel: root.levels[root.level] ?? null
 
     card: osdCard
-    implicitWidth: 316
-    implicitHeight: osdContent.implicitHeight + Theme.spacingMedium * 2
+    implicitWidth: osdBody.implicitWidth + Theme.panelPadding * 2
+    implicitHeight: osdBody.implicitHeight + Theme.panelPadding * 2
 
     anchors {
         bottom: true
@@ -37,12 +45,12 @@ OsdWindow {
     Connections {
         target: OsdService
 
-        function onRequested(iconName, title, value, level) {
+        function onRequested(level, iconName, title, detail) {
             root.targetScreen = HyprlandService.focusedScreen();
-            root.displayedIcon = iconName;
-            root.displayedTitle = title;
-            root.displayedValue = value;
-            root.displayedLevel = level;
+            root.level = level;
+            root.stateIcon = iconName;
+            root.stateTitle = title;
+            root.stateDetail = detail;
             hideTimer.restart();
             root.present();
         }
@@ -52,12 +60,64 @@ OsdWindow {
         id: hideTimer
         interval: 1200
         repeat: false
-        onTriggered: root.dismiss()
+        onTriggered: if (!hover.hovered) root.dismiss()
+    }
+
+    Component {
+        id: outputLevel
+        AudioLevel { endpoint: AudioService.output }
+    }
+
+    Component {
+        id: inputLevel
+        AudioLevel { endpoint: AudioService.input }
+    }
+
+    Component {
+        id: brightnessLevel
+        BrightnessLevel {}
+    }
+
+    // The keyboard has no panel; its row follows the brightness one.
+    Component {
+        id: keyboardLevel
+
+        LevelRow {
+            to: BrightnessService.keyboardMax
+            stepSize: 1
+            value: BrightnessService.keyboardLevel
+            valueText: BrightnessService.keyboardLevel === 0 ? "Off" : BrightnessService.keyboardPercent + "%"
+            progressColor: Theme.yellow
+            onAdjusted: nextValue => BrightnessService.setKeyboardLevel(nextValue)
+
+            Label {
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Backlight"
+            }
+        }
+    }
+
+    Component {
+        id: stateRow
+
+        DeviceRow {
+            iconName: root.stateIcon
+            title: root.stateTitle
+            subtitle: root.stateDetail
+            current: true
+            primaryEnabled: false
+        }
     }
 
     Item {
         id: osdCard
         anchors.fill: parent
+
+        // Kept up while the pointer is on it, and for a moment after it leaves.
+        HoverHandler {
+            id: hover
+            onHoveredChanged: if (!hovered) hideTimer.restart()
+        }
 
         // Bottom center of the screen: rounded toward its center.
         Surface {
@@ -67,75 +127,20 @@ OsdWindow {
             roundTopRight: true
         }
 
-        Row {
-            id: osdContent
+        Card {
+            id: osdBody
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.leftMargin: Theme.spacingLarge
-            anchors.rightMargin: Theme.spacingLarge
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: Theme.spacingMedium
+            anchors.top: parent.top
+            anchors.margins: Theme.panelPadding
+            // Its panel's header, or the keyboard's own.
+            panel: root.shownLevel?.panel ?? ""
+            title: root.shownLevel?.title ?? PanelService.panels[osdBody.panel]?.label ?? ""
+            iconName: root.shownLevel?.icon ?? PanelService.panels[osdBody.panel]?.icon ?? ""
 
-            IconDisc {
-                id: disc
-                anchors.verticalCenter: parent.verticalCenter
-                size: Theme.controlHeight * 1.5
-                iconName: root.displayedIcon
-                lit: true
-            }
-
-            Column {
-                width: parent.width - disc.width - parent.spacing
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: Theme.spacingSmall
-
-                Item {
-                    width: parent.width
-                    height: valueLabel.implicitHeight
-
-                    Label {
-                        role: "section"
-                        anchors.left: parent.left
-                        anchors.right: valueLabel.left
-                        anchors.rightMargin: Theme.spacingSmall
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: root.displayedTitle
-                        elide: Text.ElideRight
-                    }
-
-                    Label {
-                        id: valueLabel
-                        role: "heading"
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: root.displayedValue
-                        color: root.indicatorColor
-                        font.features: { "tnum": 1 }
-                    }
-                }
-
-                // As the timer's progress bar.
-                Rectangle {
-                    visible: root.displayedLevel >= 0
-                    width: parent.width
-                    height: Theme.spacingTiny
-                    radius: height / 2
-                    color: Theme.surface2
-
-                    Rectangle {
-                        width: parent.width * Math.max(0, Math.min(1, root.displayedLevel))
-                        height: parent.height
-                        radius: parent.radius
-                        color: root.indicatorColor
-
-                        Behavior on width {
-                            NumberAnimation {
-                                duration: Theme.animDurationFast
-                                easing.type: Theme.animEasing
-                            }
-                        }
-                    }
-                }
+            Loader {
+                width: parent.width
+                sourceComponent: root.shownLevel ? root.shownLevel.row : stateRow
             }
         }
     }

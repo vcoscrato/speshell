@@ -7,8 +7,7 @@ import qs.services
 // Markdown notes: tabs for each note, and the open one, shown rendered and edited in place.
 Card {
     id: root
-    title: "Notes"
-    iconName: "notes"
+    panel: "notes"
 
     property bool presented: false
     property bool syncingFromService: false
@@ -136,7 +135,7 @@ Card {
         root.exitEditMode();
         root.creatingNote = true;
         newNoteInput.text = "";
-        newNoteInput.forceActiveFocus();
+        newNoteInput.focusInput();
     }
 
     function syncFromService() {
@@ -154,7 +153,7 @@ Card {
         if (!root.presented)
             return;
         if (root.creatingNote)
-            newNoteInput.forceActiveFocus();
+            newNoteInput.focusInput();
         else if (!root.previewMode)
             notesInput.forceActiveFocus();
     }
@@ -259,106 +258,68 @@ Card {
                 }
             }
 
-            Rectangle {
+            // A tab-sized button that becomes the new note's name field.
+            Item {
                 id: newTabButton
                 height: Theme.controlHeightSmall
                 width: root.creatingNote ? 110 : Theme.controlHeightSmall
-                radius: Theme.borderRadius
-                color: root.creatingNote
-                    ? Theme.card
-                    : (newTabHover.hovered ? Theme.cardHover : Theme.controlFill)
-                border.width: Theme.borderWidth
-                border.color: root.creatingNote
-                    ? Theme.accent
-                    : "transparent"
                 enabled: NotesService.managementEnabled
                 opacity: newTabButton.enabled ? 1.0 : Theme.disabledOpacity
-
-                Accessible.role: Accessible.Button
-                Accessible.name: "Create note"
-                Accessible.onPressAction: root.beginCreatingNote()
 
                 Behavior on width {
                     NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasing }
                 }
 
-                HoverHandler {
-                    id: newTabHover
-                    enabled: !root.creatingNote
-                }
-
-                MouseArea {
+                IconButton {
                     anchors.fill: parent
                     visible: !root.creatingNote
-                    cursorShape: Qt.PointingHandCursor
+                    iconName: "plus"
+                    iconSize: Theme.iconSizeSmall
+                    iconColor: Theme.subtext
+                    color: containsMouse ? Theme.cardHover : Theme.controlFill
+                    tooltipText: "Create note"
                     onClicked: root.beginCreatingNote()
                 }
 
-                AppIcon {
-                    name: "plus"
-                    size: Theme.iconSizeSmall
-                    iconColor: Theme.subtext
-                    anchors.centerIn: parent
-                    visible: !root.creatingNote
-                }
-
-                TextInput {
+                Field {
                     id: newNoteInput
                     anchors.fill: parent
-                    anchors.leftMargin: Theme.spacingSmall
-                    anchors.rightMargin: Theme.spacingSmall
-                    verticalAlignment: TextInput.AlignVCenter
                     visible: root.creatingNote
-                    color: Theme.text
-                    selectionColor: Theme.accent
-                    selectedTextColor: Theme.onAccent
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSmall
-                    clip: true
+                    compact: true
+                    placeholder: "Note name"
                     maximumLength: 60
-                    Accessible.name: "Note name"
 
-                    onAccepted: {
-                        if (text.trim() !== "")
-                            NotesService.createNote(text.trim());
+                    function create() {
+                        if (newNoteInput.text.trim() !== "")
+                            NotesService.createNote(newNoteInput.text.trim());
                         root.creatingNote = false;
                     }
 
-                    onActiveFocusChanged: {
-                        if (!activeFocus && root.creatingNote && root.presented
-                                && root.Window && root.Window.window && root.Window.window.visible) {
-                            if (text.trim() !== "")
-                                NotesService.createNote(text.trim());
-                            root.creatingNote = false;
-                        }
-                    }
-
-                    Keys.onEscapePressed: {
+                    onAccepted: newNoteInput.create()
+                    onCancelled: {
                         root.creatingNote = false;
                         focusSink.forceActiveFocus();
+                    }
+                    // Clicking away names it too.
+                    onInputFocusedChanged: {
+                        if (!newNoteInput.inputFocused && root.creatingNote && root.presented
+                                && root.Window && root.Window.window && root.Window.window.visible)
+                            newNoteInput.create();
                     }
                 }
             }
         }
     }
 
-    Rectangle {
+    Notice {
         id: deleteUndoBar
 
         readonly property string pendingName: NotesService.pendingDeleteNote
-        property real progress: 0
 
         visible: pendingName !== ""
-        width: parent.width
-        height: visible ? Theme.controlHeight : 0
-        radius: Theme.borderRadius
-        color: Theme.alpha(Theme.warning, Theme.tintSubtle)
-        border.width: Theme.borderWidth
-        border.color: Theme.alpha(Theme.warning, Theme.tintOutline)
-        clip: true
-
-        Accessible.role: Accessible.AlertMessage
-        Accessible.name: pendingName !== "" ? pendingName + " deleted. Undo available." : ""
+        iconName: "trash"
+        detail: pendingName + " deleted"
+        progress: 0
 
         onPendingNameChanged: {
             if (pendingName !== "") {
@@ -370,59 +331,25 @@ Card {
             }
         }
 
-        Row {
-            anchors.fill: parent
-            anchors.leftMargin: Theme.spacingSmall
-            anchors.rightMargin: Theme.spacingTiny
-            spacing: Theme.spacingSmall
-
-            AppIcon {
-                name: "trash"
-                size: Theme.iconSizeSmall
-                iconColor: Theme.warning
-                anchors.verticalCenter: parent.verticalCenter
-            }
-
-            Label {
-                width: Math.max(0, deleteUndoBar.width
-                    - undoDeleteButton.width
-                    - Theme.spacingSmall * 4
-                    - Theme.iconSizeSmall)
-                text: deleteUndoBar.pendingName + " deleted"
-                elide: Text.ElideRight
-                anchors.verticalCenter: parent.verticalCenter
-            }
-
-            ActionButton {
-                id: undoDeleteButton
-                text: "Undo"
-                iconName: "back"
-                compact: true
-                anchors.verticalCenter: parent.verticalCenter
-                enabled: !NotesService.mutating
-                onClicked: {
-                    deleteCountdown.stop();
-                    NotesService.undoDelete();
-                }
+        trailing: ActionButton {
+            text: "Undo"
+            compact: true
+            iconName: "back"
+            enabled: !NotesService.mutating
+            onClicked: {
+                deleteCountdown.stop();
+                NotesService.undoDelete();
             }
         }
+    }
 
-        Rectangle {
-            anchors.left: parent.left
-            anchors.bottom: parent.bottom
-            width: parent.width * deleteUndoBar.progress
-            height: Theme.separatorThickness
-            color: Theme.warning
-        }
-
-        NumberAnimation {
-            id: deleteCountdown
-            target: deleteUndoBar
-            property: "progress"
-            from: 1
-            to: 0
-            duration: NotesService.undoMs
-        }
+    NumberAnimation {
+        id: deleteCountdown
+        target: deleteUndoBar
+        property: "progress"
+        from: 1
+        to: 0
+        duration: NotesService.undoMs
     }
 
     Rectangle {

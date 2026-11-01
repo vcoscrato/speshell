@@ -87,10 +87,12 @@ Item {
         anchors.fill: parent
     }
 
-    HoverLabel {
+    Tooltip {
         visible: root.pointerInside && !root.open && root.label !== ""
         text: root.label
-        above: root.labelAbove
+        below: !root.labelAbove
+        // At once, as the bar is glanced over.
+        delay: 0
     }
 
     MouseArea {

@@ -3,6 +3,7 @@ import QtQuick
 import qs.components
 import qs.services
 import "../services/ThemeProvider.js" as ThemeProvider
+import "../components/Format.js" as Format
 
 // What stands between the user and a session, on one screen: the theme's wallpaper,
 // dimmed, its clock face over the date, and a card holding the children, as a password
@@ -17,7 +18,7 @@ Item {
     property string footnote: ""
     default property alias content: cardColumn.data
 
-    onFailuresChanged: if (root.failures > 0 && Theme.motion) shake.restart()
+    onFailuresChanged: if (root.failures > 0) shake.play()
 
     DefaultWallpaper {
         anchors.fill: parent
@@ -56,7 +57,7 @@ Item {
             Label {
                 role: "heading"
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: Qt.formatDate(face.now, "dddd, d MMMM")
+                text: Format.date(face.now)
             }
         }
 
@@ -67,11 +68,8 @@ Item {
             width: Theme.panelWidth
             height: cardColumn.implicitHeight + Theme.spacingLarge * 2
             backdrop: true
-            roundTopLeft: true
-            roundTopRight: true
-            roundBottomRight: true
-            roundBottomLeft: true
-            transform: Translate { id: offset }
+            rounded: true
+            transform: Translate { id: shakeOffset }
 
             Column {
                 id: cardColumn
@@ -102,12 +100,8 @@ Item {
         }
     }
 
-    SequentialAnimation {
+    Shake {
         id: shake
-
-        NumberAnimation { target: offset; property: "x"; to: -12; duration: 50 }
-        NumberAnimation { target: offset; property: "x"; to: 10; duration: 80 }
-        NumberAnimation { target: offset; property: "x"; to: -6; duration: 70 }
-        NumberAnimation { target: offset; property: "x"; to: 0; duration: 60 }
+        offset: shakeOffset
     }
 }

@@ -38,56 +38,20 @@ Card {
     readonly property real weekLow: Math.min.apply(null, root.days.map(day => day.low))
     readonly property real weekHigh: Math.max.apply(null, root.days.map(day => day.high))
 
-    title: "Weather"
-    iconName: "cloud"
+    panel: "weather"
 
     headerActions: [
         // The place, which opens the location field.
-        Rectangle {
+        ActionButton {
             anchors.verticalCenter: parent.verticalCenter
-            width: placeRow.width + Theme.spacingSmall * 2
-            height: Theme.controlHeightSmall
-            radius: Theme.borderRadius
-            color: root.editingLocation ? Theme.selectedFill : (placeArea.containsMouse ? Theme.cardHover : "transparent")
-
-            Accessible.role: Accessible.Button
-            Accessible.name: "Change location"
-            Accessible.onPressAction: root.editLocation()
-
-            Row {
-                id: placeRow
-                anchors.centerIn: parent
-                spacing: Theme.spacingTiny
-
-                AppIcon {
-                    anchors.verticalCenter: parent.verticalCenter
-                    name: "location"
-                    size: Theme.iconSizeTiny
-                    iconColor: root.editingLocation ? Theme.accent : Theme.subtext
-                }
-
-                Label {
-                    role: "caption"
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: Math.min(implicitWidth, root.width * 0.5)
-                    text: WeatherService.place || WeatherService.location || "Automatic"
-                    elide: Text.ElideRight
-                    color: placeArea.containsMouse ? Theme.text : Theme.subtext
-                }
-            }
-
-            MouseArea {
-                id: placeArea
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.editingLocation ? root.editingLocation = false : root.editLocation()
-            }
-
-            Tooltip {
-                visible: placeArea.containsMouse && !root.editingLocation
-                text: "Change location"
-            }
+            width: Math.min(implicitWidth, root.width * 0.5)
+            kind: "flat"
+            compact: true
+            iconName: "location"
+            text: WeatherService.place || WeatherService.location || "Automatic"
+            checked: root.editingLocation
+            tooltipText: root.editingLocation ? "" : "Change location"
+            onClicked: root.editingLocation ? root.editingLocation = false : root.editLocation()
         },
 
         HeaderButton {

@@ -17,15 +17,13 @@ Singleton {
         const states = Object.keys(root.radios).map(index => root.radios[index]);
         return states.length > 0 && states.every(blocked => blocked);
     }
-    // Airplane mode set from a panel, which shows it already, keeps the OSD quiet.
-    property double osdSuppressedUntil: 0
-
     // `showOsd`: from a keybinding.
     function setAirplaneMode(on, showOsd) {
         if (!root.available)
             return;
+        // Set from a panel, which shows it already.
         if (!showOsd)
-            root.osdSuppressedUntil = Date.now() + 1500;
+            OsdService.quiet("airplane");
         Quickshell.execDetached(["rfkill", on ? "block" : "unblock", "all"]);
     }
 
@@ -34,15 +32,14 @@ Singleton {
         const match = String(line).match(/idx (\d+) type \d+ op (\d) soft (\d) hard (\d)/);
         if (!match)
             return;
-        const was = root.airplaneMode;
         const radios = Object.assign({}, root.radios);
         if (match[2] === "1")
             delete radios[match[1]];
         else
             radios[match[1]] = match[3] === "1" || match[4] === "1";
         root.radios = radios;
-        if (match[2] === "2" && root.airplaneMode !== was && Date.now() >= root.osdSuppressedUntil)
-            OsdService.show("airplane", root.airplaneMode ? "Airplane mode on" : "Airplane mode off", "", -1);
+        if (OsdService.changed("airplane", root.airplaneMode) && match[2] === "2")
+            OsdService.show("airplane", root.airplaneMode ? "Airplane mode on" : "Airplane mode off");
     }
 
     Process {
