@@ -87,15 +87,18 @@ Item {
             Accessible.name: root.placeholder
             onAccepted: root.accepted()
             onTextEdited: root.edited()
-            Keys.onPressed: event => root.keyPressed(event)
-            Keys.onEscapePressed: event => {
+            // One handler, so keyPressed() sees Escape too: Keys.onEscapePressed would run first.
+            Keys.onPressed: event => {
+                root.keyPressed(event);
+                if (event.accepted || event.key !== Qt.Key_Escape)
+                    return;
+                // An empty clearable field lets its Escape through.
+                event.accepted = !root.clearable || input.text !== "";
                 if (!root.clearable) {
                     root.cancelled();
                 } else if (input.text !== "") {
                     input.text = "";
                     root.edited();
-                } else {
-                    event.accepted = false;
                 }
             }
 
