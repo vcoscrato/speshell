@@ -48,7 +48,8 @@ Item {
 
         Item {
             width: parent.width
-            height: Theme.controlHeightSmall
+            // As tall as Today, which grows with the text scale, whether or not it shows.
+            height: Math.max(Theme.controlHeightSmall, todayButton.implicitHeight)
 
             Label {
                 role: "heading"
@@ -63,6 +64,7 @@ Item {
                 spacing: Theme.spacingTiny
 
                 ActionButton {
+                    id: todayButton
                     anchors.verticalCenter: parent.verticalCenter
                     visible: !root.showingToday
                     text: "Today"

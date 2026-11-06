@@ -35,7 +35,7 @@ Item {
     implicitWidth: Math.max(root.height, root.padding * 2 + (icon.visible ? icon.width : 0)
         + (icon.visible && label.visible ? content.spacing : 0) + (label.visible ? label.implicitWidth : 0))
     implicitHeight: Math.max(root.compact ? Theme.controlHeightSmall : Theme.controlHeight,
-        labelMetrics.height + Theme.spacingSmall * 2)
+        labelMetrics.height + (root.compact ? Theme.spacingTiny : Theme.spacingSmall) * 2)
     opacity: root.enabled ? 1 : Theme.disabledOpacity
     scale: root.pressed ? Theme.pressScale : 1
 
