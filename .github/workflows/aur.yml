@@ -24,7 +24,9 @@ jobs:
           git clone https://aur.archlinux.org/speshell-git.git "$aur"
           pkgver="r$(git rev-list --count HEAD).g$(git rev-parse --short=7 HEAD)"
           sed "s/^pkgver=.*/pkgver=$pkgver/" packaging/PKGBUILD > "$aur/PKGBUILD"
-          docker run --rm --user 65534:65534 --env HOME=/tmp --volume "$aur:/pkg:ro" --workdir /pkg \
+          docker run --rm --user 65534:65534 --env HOME=/tmp \
+            --env BUILDDIR=/tmp --env SRCDEST=/tmp --env PKGDEST=/tmp --env SRCPKGDEST=/tmp --env LOGDEST=/tmp \
+            --volume "$aur:/pkg:ro" --workdir /pkg \
             archlinux:latest makepkg --printsrcinfo > "$aur/.SRCINFO"
           grep -qx $'\tpkgver = '"$pkgver" "$aur/.SRCINFO"
           echo "PKGVER=$pkgver" >> "$GITHUB_ENV"
