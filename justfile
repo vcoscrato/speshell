@@ -21,7 +21,7 @@ lint:
     #!/bin/sh
     set -e
     shellcheck -x -P SCRIPTDIR shell/speshell shell/greeter/speshell-greeter shell/greeter/speshell-greeter-theme shell/tools/* preview/*.sh
-    ruff check --quiet --select E,F,W,B,UP,SIM --ignore E501 shell/system/speshell-system shell/system/speshell-ask tests/*.py
+    ruff check --quiet --select E,F,W,B,UP,SIM --ignore E501 shell/system/speshell-system tests/*.py
     # Quickshell loads the shell through a module tree it generates, in which each
     # directory is the module `qs.<dir>`; qmllint lints the same tree, built here.
     cd shell

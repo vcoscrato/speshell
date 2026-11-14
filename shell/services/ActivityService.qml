@@ -79,10 +79,6 @@ Singleton {
             detail: String(supplied.detail || "").trim(),
             iconName: String(supplied.iconName || "info").trim(),
             tone: root.normalizedTone(supplied.tone),
-            // Whether it waits on you, which the chip shows by ringing.
-            attention: supplied.attention === true,
-            // Whether the chip counts how long it has run.
-            timed: supplied.timed !== false,
             actions: root.normalizedActions(supplied.actions),
             startedAt: previous ? previous.startedAt : root.finiteNumber(supplied.startedAt, now),
             updatedAt: now,

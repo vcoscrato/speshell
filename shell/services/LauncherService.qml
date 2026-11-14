@@ -8,7 +8,8 @@ import "BangProvider.js" as BangProvider
 import "Shell.js" as Shell
 
 // The launcher's state and results: apps, open windows and apps hidden in the tray, the
-// calculator, bangs, web searches, its own commands (the theme gallery, mirroring), and
+// calculator, bangs, web searches, its own commands (the theme gallery, mirroring, applying
+// and updating the system), and
 // what activating each does. Launch counts order the apps.
 Singleton {
     id: root
@@ -135,8 +136,10 @@ Singleton {
     function commandResults() {
         var commands = [BangProvider.commandResult("theme", "Themes", "Pick a theme, then its wallpaper", "palette",
             "wallpaper background color scheme palette appearance speshell"),
-            BangProvider.commandResult("system", "System", "Packages, services, and files of this machine", "package",
-                "packages install update upgrade services dotfiles pacman paru aur config")];
+            BangProvider.commandResult("apply", "Apply system", "Bring this machine to what its modules declare", "check",
+                "speshell modules packages install services dotfiles config sync pacman paru"),
+            BangProvider.commandResult("update", "Update system", "Update every package, then apply your modules", "refresh",
+                "speshell upgrade packages pacman paru aur")];
         // Only when there is another wallpaper to pick.
         if (ThemeService.wallpaperEnabled
                 && ThemeService.wallpapers.filter(wallpaper => wallpaper.theme === ThemeService.themeId).length > 1)
@@ -244,8 +247,10 @@ Singleton {
             ThemeService.openGallery();
             return true;
         }
-        if (result.kind === "command" && payload.command === "system") {
-            SystemService.open();
+        // In a terminal, which stays for the result: `speshell system` asks as pacman and sudo do.
+        if (result.kind === "command" && (payload.command === "apply" || payload.command === "update")) {
+            const engine = Qt.resolvedUrl("../system/speshell-system").toString().replace(/^file:\/\//, "");
+            Quickshell.execDetached(Shell.terminalCommand([engine, payload.command, "--hold"]));
             return true;
         }
         if (result.kind === "command" && payload.command === "wallpaper") {

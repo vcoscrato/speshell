@@ -35,9 +35,6 @@ class Machine:
         self.installed = {name: Installed(needed_by.get(name, ())) for name in [*explicit, *dependencies]}
         self.explicit = set(explicit)
 
-    def in_repos(self, name):
-        return True
-
 
 def write(path, text):
     path = SYSTEM / path
@@ -65,7 +62,7 @@ class Reading(SystemTest):
             "file /etc/x.conf x.conf 600", "on /etc/x*: reload x", "run make it so", ""]))
         write("files/base/x.conf", "x")
         base = system.Config().require().modules["base"]
-        self.assertEqual([(p.name, p.note) for p in base.packages], [("git", "the one")])
+        self.assertEqual(base.packages, ["git"])
         self.assertEqual(base.services, [("system", "sshd"), ("user", f"theme@{system.USER}.path")])
         self.assertEqual((base.groups, base.linger, base.triggers, base.runs),
                          (["docker"], True, [("/etc/x*", "reload x")], ["make it so"]))
@@ -94,7 +91,6 @@ class Reading(SystemTest):
         write("spare.conf", "")
         config = system.Config()
         self.assertEqual(config.on, ["base", "extra", "desk", MACHINE])
-        self.assertEqual(config.order(), [MACHINE, "base", "extra", "desk", "spare"])
         self.assertEqual(config.via["extra"], "desk")
 
     def test_a_module_that_brings_itself_in_is_a_problem(self):

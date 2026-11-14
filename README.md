@@ -18,7 +18,7 @@ This is Speshell, pronounced *special*. My [Quickshell](https://quickshell.outfo
 - On a laptop: the battery's charge in the bar, low-battery warnings, dimming, locking, and sleeping on idle, hibernating, a lower brightness on battery, locking before the lid sleeps it, the laptop's display off while docked with the lid closed, and an OSD for brightness, the keyboard backlight, the microphone, the touchpad, and airplane mode (see [Laptops](#laptops))
 - Launcher: apps, open windows and apps hidden in the tray, a calculator, web searches and your own bangs
 - Theme gallery: every theme over its wallpaper, previewed full screen in its own colors with its clock face, then its wallpapers to pick from
-- System: the machine's packages, services, groups, and files declared in plain-text modules, and a window to see what differs, edit them, update, and apply (see [System](#system))
+- System: the machine's packages, services, groups, and files declared in plain-text modules, applied and updated from the launcher or a terminal (see [System](#system))
 - Lock screen, login screen (greetd), and password prompts (polkit) in the theme: its wallpaper, its clock face, and its colors (see [Lock, login, and passwords](#lock-login-and-passwords))
 - Tools: timers, dictation, copy text from the screen (OCR), screenshots, screen recording, QR codes, color picker
 - What's running, as chips in the bar: screen recording, dictation, and anything that publishes over IPC
@@ -88,7 +88,7 @@ The weather, on with `[Weather] enabled`, comes from [Open-Meteo](https://open-m
 | `!theme`, or "themes" | Open the theme gallery |
 | `!wallpaper`, or "wallpapers" | Pick another wallpaper of the current theme |
 | `!mirror` | Mirror the displays, or extend them again |
-| `!system`, or "packages" | Open the System window |
+| `!apply`, `!update` | Apply your system modules, or update the system and then apply them, in a terminal |
 
 Unknown bangs go to the search engine, so its own bangs work too.
 
@@ -164,7 +164,7 @@ service greetd
 file ~/.config/hypr
 ```
 
-The System window (`!system`, or `speshell system open`) shows it module by module. Its overview says whether the machine is in sync and when it was last applied, and the sidebar marks the modules Apply would change. You can switch a module on or off for this machine, find a package and add it, the repositories' first and the AUR's as they arrive, with the arrow keys and Enter or the pointer, and take one out. It lists what needs your decision: packages installed that no module declares, and files in your home that differ from their module's. From the AUR lists what the machine has from the AUR, or would build from it, and which module wants each, so you can swap one for a repository's package; module pages mark them too. Apply (`speshell system apply`) brings the machine to what its modules say: it installs and removes packages, places files and runs their commands, enables services, and puts you in groups, undoing each of those a module no longer asks for, then runs the one-time commands this machine hasn't. Update (`speshell system update`) updates the system first. Both run right in the window: it shows each step as it goes, asks for your password once, and shows what paru would build from the AUR for you to read before it does; anything only a terminal can answer stops the run with the terminal a click away. Close the window and the run goes on as a chip in the bar, which rings when the run asks you something and keeps its result until you look; a click brings the window back. An agent or your editor can change the modules as well; the window follows. `speshell system init` starts them from what the machine has, and [shell/system](shell/system/README.md) has the whole syntax.
+`speshell system` shows what differs on the machine and what applying would do. `speshell system apply` brings the machine to what its modules say: it installs and removes packages, places files and runs their commands, enables services, and puts you in groups, undoing each of those a module no longer asks for, then runs the one-time commands this machine hasn't. `speshell system update` updates the system first. Both ask as pacman, paru, and sudo do, so they run in a terminal: `!apply` and `!update` in the launcher open one for them, which stays for you to read the result. `speshell system init` starts them from what the machine has, and [shell/system](shell/system/README.md) has the whole syntax.
 
 ## Laptops
 
@@ -244,7 +244,7 @@ speshell lock
 speshell panel list | open NAME | toggle NAME | close
 speshell theme list | get | set ID | shuffle [ID] | rescan | open | close | toggle
 speshell wallpaper get | set PATH | open | toggle
-speshell system [status] | apply | update | open | close | toggle | help
+speshell system [status] | apply | update | add MODULE PACKAGE | remove PACKAGE | help
 speshell tool list | dictate [cancel] | ocr | screenshot [region|screen] | record [region|screen] | qr | color
 speshell timer get | start LENGTH [NAME] | add LENGTH [NAME] | pause|resume|toggle|stop [NAME]
 speshell activity set ID STATE LABEL [DETAIL] [ICON] [TONE]

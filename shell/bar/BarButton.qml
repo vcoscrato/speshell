@@ -19,8 +19,6 @@ Item {
     property string label: ""
     property string iconName: ""
     property color iconColor: root.open ? Theme.accent : (root.pointerInside ? Theme.text : Theme.subtextBright)
-    // Its fill when neither hovered nor open.
-    property color restFill: "transparent"
     property string text: ""
     property int fontSize: Theme.fontSizeSmall
     property int fontWeight: Font.Normal
@@ -52,7 +50,7 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: Theme.borderRadius
-        color: root.open ? Theme.selectedFill : (root.pointerInside ? Theme.cardHover : root.restFill)
+        color: root.open ? Theme.selectedFill : (root.pointerInside ? Theme.cardHover : "transparent")
         border.width: root.open ? Theme.borderWidth : 0
         border.color: Theme.selectedBorder
     }

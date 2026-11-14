@@ -29,7 +29,6 @@ ShellRoot {
     property var launcher: null
     property var gallery: null
     property var osd: null
-    property var system: null
     property int waits: 0
 
     function create(path, properties) {
@@ -103,13 +102,6 @@ ShellRoot {
             typing.restart();
         } else if (name === "osd") {
             shell.showOsd();
-        } else if (name.startsWith("system")) {
-            // `system`, or `system-<module>` with that module open; SHOT_QUERY is searched.
-            shell.system = shell.create("core/SystemWindow.qml", {});
-            SystemService.open();
-            if (name.startsWith("system-"))
-                shell.system.pick(name.slice(7));
-            typing.restart();
         } else if (name !== "bar") {
             const button = shell.bar.buttonFor(name);
             // The weather's button shows once the forecast arrives.
@@ -154,11 +146,6 @@ ShellRoot {
         if (name === "launcher") {
             const width = shell.launcher.paletteWidth + Theme.spacingXL * 2;
             area = Qt.rect((scene.width - width) / 2, 0, width, scene.height * 0.8);
-        } else if (shell.system) {
-            // The System window's panel: the item centered in the scene.
-            const card = scene.children.find(item => item.anchors.centerIn === scene);
-            const margin = Theme.spacingLarge;
-            area = Qt.rect(card.x - margin, card.y - margin, card.width + margin * 2, card.height + margin * 2);
         } else if (name === "osd") {
             const card = shell.osd.card;
             const margin = Theme.spacingLarge;
@@ -179,11 +166,6 @@ ShellRoot {
             if (shell.osd) {
                 shell.osd.destroy();
                 shell.osd = null;
-            }
-            if (shell.system) {
-                SystemService.close();
-                shell.system.destroy();
-                shell.system = null;
             }
             if (shell.gallery) {
                 ThemeService.closeGallery();
@@ -206,19 +188,11 @@ ShellRoot {
         return null;
     }
 
-    // Long enough for the dropdown's entrance and the panel's first data. The System
-    // window waits on its status, and on its search, for a while longer.
+    // Long enough for the dropdown's entrance and the panel's first data.
     Timer {
         id: settle
         interval: 900
-        onTriggered: {
-            if (shell.system && (SystemService.status === null || SystemService.searching) && shell.waits++ < 20) {
-                settle.restart();
-                return;
-            }
-            shell.waits = 0;
-            shell.save(shell.shots[shell.index]);
-        }
+        onTriggered: shell.save(shell.shots[shell.index])
     }
 
     // Types into the gallery's filter once it shows, as a hand would.
