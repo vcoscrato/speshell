@@ -1,13 +1,14 @@
 #!/bin/sh
-# usage: preview/shot.sh THEME [SHOT...]  (SHOT: a panel id, `launcher`, `themes`, `wallpapers`, `osd`, or `bar`;
+# usage: preview/shot.sh THEME [SHOT...]  (SHOT: a panel id, `launcher`, `themes`, `wallpapers`, `osd`,
+# `system` or `system-MODULE`, or `bar`;
 # none: every panel this machine has, the launcher, and the OSD)
 # Renders the real bar offscreen in THEME, with each panel open in turn, into
 # ~/.cache/speshell-preview/shots/THEME/<shot>.png, cropped to the panel, and a contact
 # sheet of them all in THEME-sheet.png. Uses your config.ini (SHOT_CONFIG names another)
 # with a fresh data directory, so your theme, notes, and app themes stay untouched.
-# SHOT_QUERY is typed into the launcher or the theme gallery; SHOT_MEDIA=1 shows the playing track, hidden
-# by default since its cover is someone else's art; SHOT_SAMPLES=1 fills the
-# notifications with made-up ones; SHOT_OSD picks the OSD's level (output, input,
+# SHOT_QUERY is typed into the launcher, the theme gallery, or the System window;
+# SHOT_MEDIA=1 shows the playing track, hidden by default since its cover is someone
+# else's art; SHOT_SAMPLES=1 fills the notifications with made-up ones; SHOT_OSD picks the OSD's level (output, input,
 # brightness, keyboard) or, for anything else, a state.
 set -e
 SCENES=$(cd "$(dirname "$0")/scenes" && pwd)
@@ -30,6 +31,13 @@ for binding in "shown: root.visible" "presented: root.visible"; do
 done
 sed -i -e "s/shown: root.visible/shown: true/" -e "s/presented: root.visible/presented: true/" "$WORK/tree/bar/Bar.qml"
 [ -f "$SHOT_CONFIG" ] && cp "$SHOT_CONFIG" "$WORK/config/speshell/config.ini"
+# The System window reads your modules and what the last apply left.
+# The modules are linked rather than copied, so the files in your home still resolve to
+# them and the window shows the plan you'd see.
+SYSTEM_CONFIG=$(dirname "$SHOT_CONFIG")
+[ ! -d "$SYSTEM_CONFIG/system" ] || ln -s "$(realpath "$SYSTEM_CONFIG/system")" "$WORK/config/speshell/system"
+SYSTEM_STATE=${XDG_DATA_HOME:-$HOME/.local/share}/speshell/system
+[ ! -d "$SYSTEM_STATE" ] || cp -r "$SYSTEM_STATE" "$WORK/data/speshell/"
 printf '{"theme":"%s"}\n' "$THEME" > "$WORK/data/speshell/theme.json"
 # A theme change sets the desktop's light or dark; keep it from reaching the session.
 printf '#!/bin/sh\nexit 0\n' > "$WORK/bin/gsettings" && chmod +x "$WORK/bin/gsettings"
@@ -39,7 +47,7 @@ PATH="$WORK/bin:$PATH" XDG_CONFIG_HOME="$WORK/config" XDG_DATA_HOME="$WORK/data"
     OUT="$OUT/full" QT_FORCE_STDERR_LOGGING=1 timeout 120 quickshell --no-color -p "$WORK/tree/shot.qml" >"$LOG" 2>&1 || true
 grep -E "WARN|ERROR|rror:" "$LOG" | grep -vE "window masks|Registration|notification|quickshell.dbus" || true
 
-grep -o 'crop [a-z]* [0-9]* [0-9]* [0-9]* [0-9]*' "$LOG" | while read -r _ name x y w h; do
+grep -o 'crop [a-z_-]* [0-9]* [0-9]* [0-9]* [0-9]*' "$LOG" | while read -r _ name x y w h; do
     magick "$OUT/full/$name.png" -crop "${w}x${h}+${x}+${y}" +repage "$OUT/$name.png"
 done
 ls "$OUT"/*.png >/dev/null 2>&1 || { echo "shot.sh: nothing rendered; see $LOG" >&2; exit 1; }

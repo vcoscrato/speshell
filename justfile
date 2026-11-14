@@ -21,6 +21,7 @@ lint:
     #!/bin/sh
     set -e
     shellcheck -x -P SCRIPTDIR shell/speshell shell/greeter/speshell-greeter shell/greeter/speshell-greeter-theme shell/tools/* preview/*.sh
+    ruff check --quiet --select E,F,W,B,UP,SIM --ignore E501 shell/system/speshell-system shell/system/speshell-ask tests/*.py
     # Quickshell loads the shell through a module tree it generates, in which each
     # directory is the module `qs.<dir>`; qmllint lints the same tree, built here.
     cd shell
@@ -52,6 +53,7 @@ lint:
 # Run the QML unit tests.
 test:
     QT_QPA_PLATFORM=offscreen QML_XHR_ALLOW_FILE_READ=1 {{ qmltestrunner }} -input tests
+    python3 -m unittest discover --quiet --start-directory tests --pattern 'test_*.py'
 
 # Compile the effects' shaders that changed.
 shaders:

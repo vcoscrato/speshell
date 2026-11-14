@@ -19,14 +19,15 @@ Item {
     height: root.size
     visible: root.name !== ""
 
-    onSpinningChanged: if (!root.spinning) root.rotation = 0
-
+    // Upright once stopped: an animator writes its last angle back as it stops, after
+    // anything set while it was still running.
     RotationAnimator on rotation {
         from: 0
         to: 360
         duration: Theme.spinDuration
         loops: Animation.Infinite
         running: root.spinning && root.visible && Theme.motion
+        onStopped: root.rotation = 0
     }
 
     Image {

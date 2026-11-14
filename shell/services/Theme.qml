@@ -76,6 +76,7 @@ QtObject {
 
     // ── Typography ──────────────────────────────────────────
     readonly property string fontFamily: "Inter, Segoe UI, Roboto, sans-serif"
+    readonly property string fontFamilyMono: "monospace"
     property real textScale: 1.0
     readonly property int fontSizeMicro:      Math.round(9 * root.textScale)
     readonly property int fontSizeCaption:    Math.round(10 * root.textScale)

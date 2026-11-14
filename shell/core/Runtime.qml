@@ -271,6 +271,17 @@ Scope {
         function toggle(): string { return root.openWallpapers(true); }
     }
 
+    // The System window; `speshell system` runs everything else itself. `ask` is
+    // system/speshell-ask's, for what an apply the window runs asks.
+    IpcHandler {
+        target: "system"
+
+        function open(): void { SystemService.open(); }
+        function close(): void { SystemService.close(); }
+        function toggle(): void { SystemService.toggle(); }
+        function ask(token: string, answer: string, kind: string, subject: string): void { SystemService.ask(token, answer, kind, subject); }
+    }
+
     ActivityProcessAdapter {
         id: processActivities
     }
@@ -290,6 +301,8 @@ Scope {
     LauncherOverlay {}
 
     ThemeGallery {}
+
+    SystemWindow {}
 
     LevelOsdWindow {}
 

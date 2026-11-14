@@ -11,3 +11,4 @@ config.ini
 /packaging/speshell/
 qsb/
 .claude
+__pycache__/

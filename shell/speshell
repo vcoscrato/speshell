@@ -78,7 +78,8 @@ readonly usage_text='usage: speshell [QUICKSHELL OPTIONS]
        speshell brightness [get | up | down | set PERCENT | keyboard]
        speshell awake|touchpad|airplane|nightlight [get | on | off | toggle]
        speshell theme [get | list | set ID | shuffle [ID] | rescan | open | close | toggle]
-       speshell wallpaper [get | set PATH | open | toggle]'
+       speshell wallpaper [get | set PATH | open | toggle]
+       speshell system [open | close | toggle | COMMAND...]   (speshell system help)'
 
 # The usage of the command given, and exit 2.
 usage() {
@@ -102,7 +103,7 @@ call() {
 
 # Anything but a command runs the shell itself.
 case "${1:-}" in
-  launcher|lock|panel|timer|activity|tool|brightness|awake|touchpad|airplane|nightlight|theme|wallpaper) ;;
+  launcher|lock|panel|timer|activity|tool|brightness|awake|touchpad|airplane|nightlight|theme|wallpaper|system) ;;
   *) exec /usr/bin/quickshell -p "$app_dir" "$@" ;;
 esac
 
@@ -196,6 +197,13 @@ case "$command" in
       set) takes 1; call wallpaper set "$(realpath -s -- "$1")" ;;
       open|toggle) takes 0; call wallpaper "$action" ;;
       *) usage ;;
+    esac
+    ;;
+  # The window over IPC; system/speshell-system runs every other command itself.
+  system)
+    case "$action" in
+      open|close|toggle) takes 0; call system "$action" ;;
+      *) exec "$app_dir/system/speshell-system" ${action:+"$action"} "$@" ;;
     esac
     ;;
 esac

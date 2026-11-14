@@ -6,3 +6,4 @@ PathChanged=/home/%i/.local/share/speshell/theme.json
 
 [Install]
 WantedBy=multi-user.target
+Also=speshell-greeter-theme@%i.service

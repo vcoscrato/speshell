@@ -11,7 +11,7 @@ timeout 5s quickshell --no-color -p shell
 ## Layout
 
 - `shell/` is Speshell, installed as is to `/usr/share/speshell`: the QML Quickshell loads, the scripts it runs, its two commands, its icons, and the themes and effects it ships with their shader sources. `/usr/bin/speshell` and `speshell-greeter` link into it.
-- `tests/` holds the QML unit tests, run by `just test`.
+- `tests/` holds the QML unit tests and the Python ones for `speshell-system`, both run by `just test`.
 - `preview/` renders Speshell offscreen for local work: the scenes behind `just preview`, `check`, `bench`, and `paint`, and the real bar for `just shot`. Nothing in it ships. `preview/README.md` explains the recipes.
 - `packaging/` holds the `PKGBUILD` and what it installs outside `/usr/share/speshell`: the desktop entry, the units that copy a user's theme for the login screen, and its tmpfiles.
 
@@ -27,11 +27,12 @@ Paths below are under `shell/`.
 - `panels/` holds the panels the bar opens, one `<Name>Panel.qml` each and the parts they share. There is no Settings panel: options live in config.ini, and a panel writes one only where it changes state there (weather location, night light, power mode).
 - `services/` holds singleton system integrations and shared state, `Theme` (the default palette and the geometry and typography tokens) among them. `PanelService` knows the panels and opens them. Hyprland-only services (`HyprlandService`, `WorkspaceService`, `DisplayService`) gate on `HyprlandService.running`, so everything Hyprland-only degrades on other compositors. `WindowService` matches windows and apps hidden in the tray to desktop entries and brings an app forward, for the launcher and notification clicks.
 - `components/` holds reusable QML UI primitives.
+- `system/` holds `speshell-system`, the command behind `speshell system` and `SystemService`: a Python program that reads each module's `.conf` under `~/.config/speshell/system/` (this machine is the one named after its hostname, and its `use` lines bring in the rest), reads pacman through pyalpm, plans and applies packages, services, groups, files, and commands, and makes every edit the System window (`core/SystemWindow.qml`) asks for. When the window runs an apply, `speshell-ask` brings what it asks (sudo's password, a run line's question, paru's review) to the window over IPC. `system/README.md` is the format.
 - `tools/` holds the capture and input tools `ToolsService` runs, and the `lib.sh` they share.
 - `icons/` holds the pinned Tabler SVG subset (`tabler/`, with its license) and Speshell's own icons in its style (`speshell/`); `components/Icons.js` names them.
 - `themes/` holds the shipped themes, each with the painting that renders its wallpaper (`themes/README.md` lists them and how to make one), and `effects/` their effects, with `effects/common/`, the library they share; `effects/README.md` is the effects API. Effect shaders compile with `just shaders`.
 
-QML imports its modules as `qs.<dir>` (`import qs.services`); Quickshell generates their `qmldir`s, and `just lint` builds the same tree for qmllint and runs shellcheck over the scripts. JavaScript libraries are imported by relative path.
+QML imports its modules as `qs.<dir>` (`import qs.services`); Quickshell generates their `qmldir`s, and `just lint` builds the same tree for qmllint and runs shellcheck over the shell scripts and ruff over the Python ones. JavaScript libraries are imported by relative path.
 
 Prefer deleting unused QML modules over keeping broad helper surfaces. This repo should stay small and direct.
 
@@ -46,7 +47,7 @@ Prefer deleting unused QML modules over keeping broad helper surfaces. This repo
 
 ## Packaging Notes
 
-`packaging/PKGBUILD` uses the Git repository source, so plain `makepkg -si` in `packaging/` is for normal package installs. arch-config keeps a copy as `sources/PKGBUILD-speshell`, which dcli builds; change both together. Use `just local-package-install` when pacman must install a package built from the dirty checkout. It does not restart Speshell; a running one keeps the shaders it already loaded until restarted.
+`packaging/PKGBUILD` uses the Git repository source, so plain `makepkg -si` in `packaging/` is for normal package installs. `.github/workflows/aur.yml` publishes it to the AUR as `speshell-git` whenever it changes on `main`, stamping `pkgver` with the commit's. Use `just local-package-install` when pacman must install a package built from the dirty checkout. It does not restart Speshell; a running one keeps the shaders it already loaded until restarted.
 
 The package owns `/usr/share/speshell`, installed from `shell/`, and the `/usr/bin/speshell` and `speshell-greeter` links into it. User config and data live under:
 

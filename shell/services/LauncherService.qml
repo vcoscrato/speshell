@@ -134,7 +134,9 @@ Singleton {
     // The launcher's own actions that apply right now.
     function commandResults() {
         var commands = [BangProvider.commandResult("theme", "Themes", "Pick a theme, then its wallpaper", "palette",
-            "wallpaper background color scheme palette appearance speshell")];
+            "wallpaper background color scheme palette appearance speshell"),
+            BangProvider.commandResult("system", "System", "Packages, services, and files of this machine", "package",
+                "packages install update upgrade services dotfiles pacman paru aur config")];
         // Only when there is another wallpaper to pick.
         if (ThemeService.wallpaperEnabled
                 && ThemeService.wallpapers.filter(wallpaper => wallpaper.theme === ThemeService.themeId).length > 1)
@@ -240,6 +242,10 @@ Singleton {
         }
         if (result.kind === "command" && payload.command === "theme") {
             ThemeService.openGallery();
+            return true;
+        }
+        if (result.kind === "command" && payload.command === "system") {
+            SystemService.open();
             return true;
         }
         if (result.kind === "command" && payload.command === "wallpaper") {

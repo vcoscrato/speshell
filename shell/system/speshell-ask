@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+"""Asks the person behind an apply or update: sudo's password, as its askpass; a question
+of a run line, through $SPESHELL_ASK; or, as paru's file manager, whether to build what paru
+is about to. When the System window runs the apply, SPESHELL_WINDOW holds its token and the
+window asks: this tells it over IPC and waits for its answer on a FIFO only you can open.
+Anywhere else, the terminal asks.
+"""
+
+import getpass
+import json
+import os
+import select
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+USAGE = """usage: speshell-ask PROMPT              the password sudo asks for, on stdout
+       speshell-ask --secret PROMPT     an answer typed unseen, on stdout
+       speshell-ask --text PROMPT       an answer, on stdout
+       speshell-ask --review DIR        exits 0 to build what paru put in DIR"""
+
+
+def git(directory, *args):
+    return subprocess.run(["git", "-C", str(directory), *args], capture_output=True, text=True).stdout
+
+
+def installed(name):
+    return subprocess.run(["pacman", "-Qq", "--", name], capture_output=True).returncode == 0
+
+
+def review(top):
+    """Each package paru would build, as {name, state, text}: what changed in its build
+    files since you last built it, or, for one new to this machine, the files themselves."""
+    found = []
+    for directory in sorted(path for path in Path(top).iterdir() if path.is_dir()):
+        upstream = git(directory, "rev-parse", "-q", "--verify", "@{upstream}").strip()
+        srcinfo = directory / ".SRCINFO"
+        names = [line.split("=", 1)[1].strip() for line in srcinfo.read_text().splitlines()
+                 if line.startswith("pkgname =")] if srcinfo.exists() else []
+        if upstream and upstream != git(directory, "rev-parse", "HEAD").strip():
+            found.append({"name": directory.name, "state": "changed",
+                          "text": git(directory, "diff", "--no-color", "HEAD", upstream, "--", ".", ":!.SRCINFO")})
+        elif any(installed(name) for name in names):
+            found.append({"name": directory.name, "state": "same", "text": ""})
+        else:
+            files = git(directory, "ls-files", "-z", "--", ":!.SRCINFO", ":!.gitignore").split("\0")
+            text = "".join(f"=== {name}\n{(directory / name).read_text(errors='replace')}" for name in files if name)
+            found.append({"name": directory.name, "state": "new", "text": text})
+    return found
+
+
+def main(args):
+    kind = "password"
+    if args and args[0] in ("--secret", "--text", "--review"):
+        kind = args.pop(0)[2:]
+    if len(args) != 1:
+        print(USAGE, file=sys.stderr)
+        return 2
+    subject = args[0]
+    window = os.environ.get("SPESHELL_WINDOW", "")
+
+    if not window:
+        if kind == "review":
+            return 1
+        with open("/dev/tty", "r+") as tty:
+            if kind == "text":
+                tty.write(subject + " ")
+                tty.flush()
+                answer = tty.readline().rstrip("\n")
+            else:
+                answer = getpass.getpass(subject, stream=tty)
+        print(answer)
+        return 0
+
+    shell = Path(__file__).resolve().parent.parent
+    with tempfile.TemporaryDirectory(prefix="speshell-ask.", dir=os.environ["XDG_RUNTIME_DIR"]) as asking:
+        answer_path = os.path.join(asking, "answer")
+        os.mkfifo(answer_path, 0o600)
+        if kind == "review":
+            review_path = os.path.join(asking, "review.json")
+            Path(review_path).write_text(json.dumps(review(subject)))
+            subject = review_path
+        subprocess.run(["/usr/bin/quickshell", "ipc", "--any-display", "-p", str(shell),
+                        "call", "system", "ask", window, answer_path, kind, subject],
+                       stdout=subprocess.DEVNULL, check=True)
+        # Opened both ways, so opening doesn't wait for the window. "+ANSWER" answers, and
+        # anything else, or an hour of nothing, declines.
+        fifo = os.open(answer_path, os.O_RDWR)
+        try:
+            ready, _, _ = select.select([fifo], [], [], 3600)
+            reply = b""
+            while ready and not reply.endswith(b"\n"):
+                chunk = os.read(fifo, 4096)
+                if not chunk:
+                    break
+                reply += chunk
+        finally:
+            os.close(fifo)
+    reply = reply.decode().rstrip("\n")
+    if not reply.startswith("+"):
+        return 1
+    if kind != "review":
+        print(reply[1:])
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
