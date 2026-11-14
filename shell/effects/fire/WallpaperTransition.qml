@@ -128,6 +128,7 @@ Item {
                 property real seed: 0
                 property real kind: 4
                 property real size: width
+                property real alpha: 1
                 property color cCore: Flame.core(root.theme)
                 property color cMid: Flame.mid(root.theme)
                 property color cOuter: Flame.outer(root.theme)
