@@ -5,7 +5,7 @@ function lower(value) {
 }
 
 function normalizeWords(value) {
-    var text = lower(value).replace(/[^a-z0-9]+/g, " ").trim();
+    const text = lower(value).replace(/[^a-z0-9]+/g, " ").trim();
     return text === "" ? [] : text.split(/\s+/);
 }
 
@@ -15,8 +15,8 @@ function joinList(value) {
     if (Array.isArray(value))
         return value.join(" ");
     if ("length" in value) {
-        var items = [];
-        for (var i = 0; i < value.length; i++)
+        const items = [];
+        for (let i = 0; i < value.length; i++)
             items.push(value[i]);
         return items.join(" ");
     }
@@ -26,15 +26,15 @@ function joinList(value) {
 // First letters of each name word, including camelCase parts: "vsc" for
 // "Visual Studio Code", "ghd" for "GitHub Desktop".
 function initials(name) {
-    var words = normalizeWords(String(name || "").replace(/([a-z])([A-Z])/g, "$1 $2"));
-    return words.map(function(word) { return word.charAt(0); }).join("");
+    const words = normalizeWords(String(name || "").replace(/([a-z])([A-Z])/g, "$1 $2"));
+    return words.map(word => word.charAt(0)).join("");
 }
 
 // Characters of word in order within text; lower spread scores better.
 function subsequenceSpread(text, word) {
-    var start = -1;
-    var position = -1;
-    for (var i = 0; i < word.length; i++) {
+    let start = -1;
+    let position = -1;
+    for (let i = 0; i < word.length; i++) {
         position = text.indexOf(word.charAt(i), position + 1);
         if (position < 0)
             return -1;
@@ -45,12 +45,12 @@ function subsequenceSpread(text, word) {
 }
 
 function buildIndex(entries) {
-    var result = [];
-    for (var i = 0; i < entries.length; i++) {
-        var entry = entries[i];
+    const result = [];
+    for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
         if (!entry || entry.noDisplay || !entry.name)
             continue;
-        var searchable = [
+        const searchable = [
             entry.name || "",
             entry.genericName || "",
             entry.comment || "",
@@ -78,7 +78,7 @@ function buildIndex(entries) {
 // an app as good a match, and an `id` shared with an app gets its launches. They only
 // appear for non-empty queries and activate their prebuilt result.
 function buildExtraIndex(items) {
-    return (items || []).map(function(item) {
+    return (items || []).map(item => {
         return {
             id: item.id,
             title: item.title,
@@ -94,7 +94,7 @@ function buildExtraIndex(items) {
 }
 
 function usageCount(usage, id) {
-    var value = usage && id ? usage[id] : null;
+    const value = usage && id ? usage[id] : null;
     if (typeof value === "number")
         return Math.max(0, value);
     return value && typeof value === "object" ? Math.max(0, Number(value.count) || 0) : 0;
@@ -103,10 +103,10 @@ function usageCount(usage, id) {
 function score(item, words) {
     if (words.length === 0)
         return 1000;
-    var total = 0;
-    for (var i = 0; i < words.length; i++) {
-        var word = words[i];
-        var wordScore = -1;
+    let total = 0;
+    for (let i = 0; i < words.length; i++) {
+        const word = words[i];
+        let wordScore = -1;
         if (item.nameLower === word)
             wordScore = 0;
         else if (item.nameLower.indexOf(word) === 0)
@@ -129,30 +129,30 @@ function score(item, words) {
 }
 
 function search(index, query, usage, limit) {
-    var words = normalizeWords(query);
-    var matches = [];
-    for (var i = 0; i < index.length; i++) {
+    const words = normalizeWords(query);
+    const matches = [];
+    for (let i = 0; i < index.length; i++) {
         if (index[i].requiresQuery && words.length === 0)
             continue;
-        var baseScore = score(index[i], words);
+        const baseScore = score(index[i], words);
         if (baseScore < 0)
             continue;
-        var launches = usageCount(usage, index[i].id);
-        var boostCap = words.length > 0 ? 25 : 320;
-        var boost = launches > 0 ? Math.min(boostCap, Math.log(launches + 1) * 90) : 0;
+        const launches = usageCount(usage, index[i].id);
+        const boostCap = words.length > 0 ? 25 : 320;
+        const boost = launches > 0 ? Math.min(boostCap, Math.log(launches + 1) * 90) : 0;
         matches.push({ item: index[i], score: baseScore, rankScore: baseScore - boost - (index[i].bonus || 0), launches: launches });
     }
-    matches.sort(function(a, b) {
+    matches.sort((a, b) => {
         if (a.rankScore !== b.rankScore) return a.rankScore - b.rankScore;
         if (a.launches !== b.launches) return b.launches - a.launches;
         if (a.score !== b.score) return a.score - b.score;
         return a.item.nameLower.localeCompare(b.item.nameLower);
     });
 
-    var results = [];
-    var count = Math.min(matches.length, limit || 100);
-    for (var j = 0; j < count; j++) {
-        var item = matches[j].item;
+    const results = [];
+    const count = Math.min(matches.length, limit || 100);
+    for (let j = 0; j < count; j++) {
+        const item = matches[j].item;
         if (item.result) {
             results.push(item.result);
             continue;

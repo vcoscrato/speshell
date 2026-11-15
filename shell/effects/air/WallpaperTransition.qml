@@ -28,7 +28,7 @@ Item {
 
     EffectClock {
         id: clock
-        onAdvanced: function(dt) {
+        onAdvanced: dt => {
             if (root.sweep < 1) {
                 root.sweep = Math.min(1, root.sweep + dt / root.spreadTime);
                 root.tailStart = clock.clock;

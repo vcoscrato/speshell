@@ -20,11 +20,11 @@ Item {
         || root.modelData.id
         || "System tray icon"
     readonly property string iconPath: {
-        var icon = root.modelData.icon;
+        const icon = root.modelData.icon;
         if (!icon)
             return "";
-        var s = icon.toString();
-        var pi = s.indexOf("?path=");
+        const s = icon.toString();
+        const pi = s.indexOf("?path=");
         return pi !== -1 ? s.substring(0, pi) : s;
     }
 
@@ -101,7 +101,7 @@ Item {
         onEntered: root.pointerInside = true
         onExited: root.pointerInside = false
         onCanceled: root.pointerInside = false
-        onClicked: function(mouse) {
+        onClicked: mouse => {
             if (mouse.button === Qt.LeftButton)
                 root.activate();
             else if (root.modelData.hasMenu)

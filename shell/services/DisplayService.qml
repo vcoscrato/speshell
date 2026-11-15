@@ -6,388 +6,334 @@ import Quickshell.Io
 import "Shell.js" as Shell
 
 // Hyprland's monitors for the Displays panel: a draft of modes, positions, and layout
-// that applies on request and reverts unless kept. With the lid closed and another
-// display on, the laptop's own display turns off until the lid opens.
+// that applies on request and reverts unless kept. LidService turns the laptop's own
+// display off and on with the lid.
 Singleton {
     id: root
 
-    // ── State ──────────────────────────────────────────────
+    // Each display as monitor() reads it from hyprctl: { name, description, disabled,
+    // focused, width and height in pixels, scale, x and y in logical pixels, mirrorOf
+    // (the name of the display it mirrors, or ""), mode (its mode's key, or "preferred"),
+    // and modes (the keys of the ones it has, largest first) }.
     property var monitors: []
+    // The displays as the panel edits them, until applied.
     property var draftMonitors: []
-    property bool applying: false
-    property bool confirming: false
-    property bool reverting: false
-    property bool loading: false
-    property bool hasPending: false
-    property string errorText: ""
+    // What the draft changes; "" when there is no draft.
     property string pendingSummary: ""
     property string selectedName: ""
+    // "idle"; "applying" the draft, then "confirming" it until kept or reverted;
+    // "layout", applying Mirror or Extend, which needs no confirming; "interrupted", when
+    // a display came or went while confirming, so the next read reverts; or "reverting",
+    // after either, or after a change that failed partway.
+    property string phase: "idle"
     property int confirmationSecondsRemaining: 0
+    // The displays before the change being applied or confirmed, or before a revert
+    // that failed.
     property var rollbackMonitors: []
-    property bool rollbackRetryAvailable: false
-    property string operationKind: ""
-    property bool topologyRollbackQueued: false
+    // Why the displays are being put back: the change that failed partway, shown once
+    // they are; "" when the revert is the user's or the countdown's.
+    property string revertReason: ""
+    // Until then, displays coming and going are the change being applied.
     property double topologyEventGraceUntil: 0
+    // Why the last change or revert failed, until the next; and why the last read did.
+    property string changeError: ""
+    property string readError: ""
+    readonly property string errorText: root.changeError || root.readError
+    // Set by the launcher, so the outcome shows on the OSD rather than in a closed panel.
+    property bool announceLayout: false
 
-    readonly property bool displayEditingLocked: root.applying
-        || root.loading
-        || root.confirming
-        || root.reverting
-
-    readonly property var draftActiveMonitors: root.buildActiveMonitors(root.draftMonitors)
-    readonly property string draftLayoutMode: root.detectLayoutMode(root.draftMonitors)
-    readonly property string layoutMode: root.detectLayoutMode(root.monitors)
+    readonly property bool loading: monitorsProc.running
+    readonly property bool busy: root.phase !== "idle" || root.loading
+    readonly property bool hasPending: root.pendingSummary !== ""
+    readonly property bool canRetryRevert: root.phase === "idle" && root.rollbackMonitors.length > 0
+    readonly property var draftActiveMonitors: root.draftMonitors.filter(monitor => !monitor.disabled)
+    readonly property string draftLayoutMode: root.layoutOf(root.draftMonitors)
+    readonly property string layoutMode: root.layoutOf(root.monitors)
+    readonly property var selectedMonitor: root.draftMonitors.find(monitor => monitor.name === root.selectedName) || null
     // Mirroring needs a second display, on or off.
     readonly property bool canMirror: root.monitors.length > 1
     readonly property bool mirrored: root.layoutMode === "mirror"
-    // Set by the launcher, so the outcome shows on the OSD rather than in a closed panel.
-    property bool announceLayout: false
-    // The laptop's display as it was before the closed lid turned it off, or null.
-    property var lidParkedMonitor: null
 
-    function monitorName(monitor) {
-        return monitor && monitor.name ? String(monitor.name) : "";
-    }
-
-    function monitorScale(monitor) {
-        var scale = monitor && monitor.scale !== undefined ? Number(monitor.scale) : 1;
-        return scale > 0 ? scale : 1;
-    }
-
-    function formatModeRefresh(refreshRate) {
-        var refresh = Number(refreshRate) || 0;
-        return refresh > 0 ? refresh.toFixed(2) : "";
-    }
-
-    function normalizeMode(mode) {
-        var raw = String(mode || "").trim();
-        if (raw === "")
-            return "";
-        var parsed = root.parseMode(raw);
-        if (!parsed)
-            return raw;
-        return parsed.width + "x" + parsed.height + "@" + root.formatModeRefresh(parsed.refreshRate) + "Hz";
-    }
-
-    function parseMode(mode) {
-        var match = String(mode || "").trim().match(/^([0-9]+)x([0-9]+)@([0-9.]+)\s*(Hz)?$/i);
+    // ── Modes ──────────────────────────────────────────────
+    // A mode as hyprctl writes it, "2560x1440@165.00Hz", as { width, height,
+    // refreshRate }; null when it isn't one.
+    function parseMode(text) {
+        const match = String(text).trim().match(/^(\d+)x(\d+)@([\d.]+)\s*(Hz)?$/i);
         if (!match)
             return null;
-        var width = parseInt(match[1], 10);
-        var height = parseInt(match[2], 10);
-        var refreshRate = Number(match[3]) || 0;
-        if (width <= 0 || height <= 0 || refreshRate <= 0)
-            return null;
-        return { width: width, height: height, refreshRate: refreshRate };
+        const mode = { width: Number(match[1]), height: Number(match[2]), refreshRate: Number(match[3]) };
+        return mode.width > 0 && mode.height > 0 && mode.refreshRate > 0 ? mode : null;
     }
 
-    function modeLabel(mode) {
-        var parsed = root.parseMode(mode);
-        if (!parsed)
-            return String(mode || "Preferred");
-        var rounded = Math.round(parsed.refreshRate);
-        var refresh = Math.abs(parsed.refreshRate - rounded) < 0.01
-            ? String(rounded)
-            : parsed.refreshRate.toFixed(2);
-        return parsed.width + "x" + parsed.height + "@" + refresh + "Hz";
+    // A mode's key, "2560x1440@165.00", as hyprctl takes it.
+    function modeKey(mode) {
+        return mode.width + "x" + mode.height + "@" + mode.refreshRate.toFixed(2);
     }
 
-    function modeCommand(mode) {
-        var normalized = root.normalizeMode(mode);
-        return normalized === "" ? "preferred" : normalized.replace(/Hz$/i, "");
+    // A mode key as the panel shows it, "2560x1440@165Hz", with the refresh rate's
+    // decimals only when it has them.
+    function modeLabel(key) {
+        const mode = root.parseMode(key);
+        if (!mode)
+            return "Preferred";
+        const rounded = Math.round(mode.refreshRate);
+        const refresh = Math.abs(mode.refreshRate - rounded) < 0.01 ? rounded : mode.refreshRate.toFixed(2);
+        return mode.width + "x" + mode.height + "@" + refresh + "Hz";
     }
 
-    function monitorModeString(monitor) {
-        if (monitor && monitor.mode)
-            return root.normalizeMode(monitor.mode);
-        var width = Number(monitor && monitor.width) || 0;
-        var height = Number(monitor && monitor.height) || 0;
-        var refresh = Number(monitor && monitor.refreshRate) || 0;
-        if (width <= 0 || height <= 0 || refresh <= 0)
-            return "preferred";
-        return width + "x" + height + "@" + root.formatModeRefresh(refresh) + "Hz";
-    }
-
-    function availableModesFor(monitor) {
-        var result = [];
-        var seen = {};
-        var rawModes = monitor && monitor.availableModes ? monitor.availableModes : [];
-
-        for (var i = 0; i < rawModes.length; i++) {
-            var mode = root.normalizeMode(rawModes[i]);
-            if (mode !== "" && !seen[mode]) {
-                seen[mode] = true;
-                result.push(mode);
-            }
-        }
-
-        var current = root.monitorModeString(monitor);
-        if (current !== "" && current !== "preferred" && !seen[current]) {
-            result.push(current);
-        }
-
-        result.sort(function(a, b) {
-            var left = root.parseMode(a);
-            var right = root.parseMode(b);
-            if (!left || !right) {
-                return String(a).localeCompare(String(b));
-            }
-            if (left.width !== right.width) {
-                return right.width - left.width;
-            }
-            if (left.height !== right.height) {
-                return right.height - left.height;
-            }
-            return right.refreshRate - left.refreshRate;
-        });
-        return result;
-    }
-
-    function modesEquivalent(left, right) {
-        return root.normalizeMode(left) === root.normalizeMode(right);
-    }
-
-    function logicalWidth(monitor) {
-        return Math.max(1, Math.round((Number(monitor && monitor.width) || 1) / root.monitorScale(monitor)));
-    }
-
-    function logicalHeight(monitor) {
-        return Math.max(1, Math.round((Number(monitor && monitor.height) || 1) / root.monitorScale(monitor)));
-    }
-
-    function buildActiveMonitors(source) {
-        return (source || []).filter(function(monitor) { return monitor && !monitor.disabled; });
-    }
-
-    function primaryMonitorObject(source) {
-        var active = root.buildActiveMonitors(source);
-        if (active.length === 0)
-            return source.length > 0 ? source[0] : null;
-
-        for (var i = 0; i < active.length; i++) {
-            if (active[i].focused) {
-                return active[i];
-            }
-        }
-
-        return active[0];
-    }
-
-    // Mirrored when a display mirrors another or two share a position.
-    function detectMirrored(source) {
-        var active = root.buildActiveMonitors(source);
-        var occupiedPositions = {};
-        for (var i = 0; i < active.length; i++) {
-            var mirrorOf = String(active[i].mirrorOf || "");
-            if (mirrorOf !== "" && mirrorOf !== "none")
-                return true;
-            var positionKey = Math.round(Number(active[i].x) || 0)
-                + "x" + Math.round(Number(active[i].y) || 0);
-            if (occupiedPositions[positionKey])
-                return true;
-            occupiedPositions[positionKey] = true;
-        }
-        return false;
-    }
-
-    function detectLayoutMode(source) {
-        if (root.buildActiveMonitors(source).length <= 1)
-            return "single";
-        return root.detectMirrored(source) ? "mirror" : "extend";
-    }
-
-    function cloneMonitor(monitor) {
+    // ── Displays ───────────────────────────────────────────
+    // A display from `hyprctl monitors -j`; `names` maps ids to names, since Hyprland
+    // names the display another mirrors by its id.
+    function monitor(raw, names) {
+        const current = raw.width > 0 && raw.height > 0 && raw.refreshRate > 0
+            ? { width: raw.width, height: raw.height, refreshRate: raw.refreshRate }
+            : null;
+        const modes = (raw.availableModes || []).map(root.parseMode).filter(mode => mode !== null)
+            .concat(current ? [current] : [])
+            .sort((a, b) => b.width - a.width || b.height - a.height || b.refreshRate - a.refreshRate)
+            .map(root.modeKey);
         return {
-            name: root.monitorName(monitor),
-            description: monitor && monitor.description ? String(monitor.description) : "",
-            disabled: !!(monitor && monitor.disabled),
-            focused: !!(monitor && monitor.focused),
-            width: Number(monitor && monitor.width) || 1,
-            height: Number(monitor && monitor.height) || 1,
-            refreshRate: Number(monitor && monitor.refreshRate) || 0,
-            mode: root.monitorModeString(monitor),
-            availableModes: root.availableModesFor(monitor),
-            scale: root.monitorScale(monitor),
-            x: Number(monitor && monitor.x) || 0,
-            y: Number(monitor && monitor.y) || 0,
-            mirrorOf: String((monitor && monitor.mirrorOf) || "")
+            name: String(raw.name || ""),
+            description: String(raw.description || ""),
+            disabled: !!raw.disabled,
+            focused: !!raw.focused,
+            width: Number(raw.width) || 1,
+            height: Number(raw.height) || 1,
+            scale: Number(raw.scale) > 0 ? Number(raw.scale) : 1,
+            x: Number(raw.x) || 0,
+            y: Number(raw.y) || 0,
+            mirrorOf: names[String(raw.mirrorOf)] || "",
+            mode: current ? root.modeKey(current) : "preferred",
+            modes: modes.filter((key, index) => modes.indexOf(key) === index)
         };
     }
 
-    // Hyprland names the mirrored display by its id, or "none"; the draft keeps its name.
-    function withMirrorNames(source) {
-        const names = {};
-        source.forEach(monitor => names[String(monitor.id)] = root.monitorName(monitor));
-        return source.map(monitor => Object.assign({}, monitor,
-            { mirrorOf: names[String(monitor.mirrorOf)] || "" }));
+    // The ones on first, then by name.
+    function sorted(monitors) {
+        return monitors.slice().sort((a, b) => (a.disabled - b.disabled) || a.name.localeCompare(b.name));
     }
 
-    function cloneMonitors(source) {
-        var result = [];
-        var list = source || [];
-        for (var i = 0; i < list.length; i++) {
-            result.push(root.cloneMonitor(list[i]));
-        }
-        return result;
+    function isInternal(monitor) {
+        return /^(eDP|LVDS|DSI)-/.test(monitor.name);
     }
 
-    function sortMonitors(source) {
-        var result = root.cloneMonitors(source);
-        result.sort(function(a, b) {
-            if (!!a.disabled !== !!b.disabled) {
-                return a.disabled ? 1 : -1;
-            }
-            return root.monitorName(a).localeCompare(root.monitorName(b));
-        });
-        return result;
+    function logicalWidth(monitor) {
+        return Math.max(1, Math.round(monitor.width / monitor.scale));
     }
 
-    function monitorByName(source, name) {
-        var list = source || [];
-        var targetName = String(name || "");
-        for (var i = 0; i < list.length; i++) {
-            if (root.monitorName(list[i]) === targetName) {
-                return list[i];
-            }
-        }
-        return null;
+    function logicalHeight(monitor) {
+        return Math.max(1, Math.round(monitor.height / monitor.scale));
     }
 
-    function selectedDraftMonitor() {
-        return root.monitorByName(root.draftMonitors, root.selectedName);
+    // The area `monitors` cover.
+    function boundsOf(monitors) {
+        if (monitors.length === 0)
+            return { minX: 0, minY: 0, maxX: 1, maxY: 1, width: 1, height: 1 };
+        const minX = Math.min(...monitors.map(monitor => monitor.x));
+        const minY = Math.min(...monitors.map(monitor => monitor.y));
+        const maxX = Math.max(...monitors.map(monitor => monitor.x + root.logicalWidth(monitor)));
+        const maxY = Math.max(...monitors.map(monitor => monitor.y + root.logicalHeight(monitor)));
+        return { minX: minX, minY: minY, maxX: maxX, maxY: maxY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
     }
 
+    // "single" with one display on; "mirror" when one mirrors another or two share a
+    // place; "extend" otherwise.
+    function layoutOf(monitors) {
+        const active = monitors.filter(monitor => !monitor.disabled);
+        if (active.length <= 1)
+            return "single";
+        const places = active.map(monitor => Math.round(monitor.x) + "x" + Math.round(monitor.y));
+        const shared = places.some((place, index) => places.indexOf(place) !== index);
+        return shared || active.some(monitor => monitor.mirrorOf !== "") ? "mirror" : "extend";
+    }
+
+    // The display on that the selected one is placed against, or null.
+    function anchorFor(monitor) {
+        return root.draftActiveMonitors.find(other => other.name !== monitor.name) || null;
+    }
+
+    // ── The draft ──────────────────────────────────────────
     function ensureSelected() {
-        if (root.selectedDraftMonitor())
+        if (root.selectedMonitor)
             return;
-
-        var primary = root.primaryMonitorObject(root.draftMonitors);
-        root.selectedName = primary ? root.monitorName(primary) : "";
+        const active = root.draftActiveMonitors;
+        const primary = active.find(monitor => monitor.focused) || active[0] || root.draftMonitors[0];
+        root.selectedName = primary ? primary.name : "";
     }
 
     function setSelected(name) {
-        if (root.monitorByName(root.draftMonitors, name)) {
-            root.selectedName = String(name || "");
-        }
+        if (root.draftMonitors.some(monitor => monitor.name === name))
+            root.selectedName = name;
     }
 
     function resetDraft() {
-        root.draftMonitors = root.cloneMonitors(root.monitors);
-        root.hasPending = false;
+        root.draftMonitors = root.monitors;
         root.pendingSummary = "";
         root.ensureSelected();
     }
 
-    function markPending(summary, nextDraft) {
-        root.draftMonitors = root.sortMonitors(nextDraft);
-        root.hasPending = true;
+    // Drafts `summary`: `change` gets a copy of each display, to change and return.
+    function draft(summary, change) {
+        root.draftMonitors = root.sorted(root.draftMonitors.map(monitor => change(Object.assign({}, monitor))));
         root.pendingSummary = summary;
         root.ensureSelected();
     }
 
-    // The hyprctl arguments that apply a draft monitor: an `eval` of Lua under a Lua
-    // config, else a `keyword monitor` rule.
-    function commandForDraftMonitor(monitor) {
-        const name = root.monitorName(monitor);
-        if (name === "")
-            return [];
-        const mirrorTarget = String(monitor.mirrorOf || "");
-        const mirrored = mirrorTarget !== "" && mirrorTarget !== "none";
-        const mode = root.modeCommand(root.monitorModeString(monitor));
-        const position = mirrored
-            ? "0x0"
-            : Math.round(Number(monitor.x) || 0) + "x" + Math.round(Number(monitor.y) || 0);
-        const scale = root.monitorScale(monitor);
+    function setSelectedEnabled(enabled) {
+        const selected = root.selectedMonitor;
+        if (!selected || (!enabled && root.draftActiveMonitors.length <= 1))
+            return;
+        const bounds = root.boundsOf(root.draftActiveMonitors);
+        root.draft((enabled ? "Enable " : "Turn off ") + selected.name, monitor => {
+            if (monitor.name === selected.name) {
+                monitor.disabled = !enabled;
+                monitor.mirrorOf = "";
+                if (enabled) {
+                    monitor.x = bounds.maxX;
+                    monitor.y = bounds.minY;
+                }
+            }
+            return monitor;
+        });
+    }
+
+    function setSelectedMode(key) {
+        const selected = root.selectedMonitor;
+        const mode = root.parseMode(key);
+        if (!selected || selected.disabled || !mode)
+            return;
+        root.draft("Set " + selected.name + " to " + root.modeLabel(key), monitor => {
+            if (monitor.name === selected.name) {
+                monitor.mode = root.modeKey(mode);
+                monitor.width = mode.width;
+                monitor.height = mode.height;
+            }
+            return monitor;
+        });
+    }
+
+    // Places the selected display left, right, above, or below its anchor.
+    function arrangeSelected(edge) {
+        const selected = root.selectedMonitor;
+        const anchor = selected ? root.anchorFor(selected) : null;
+        if (!anchor)
+            return;
+        const offsets = {
+            left: [-root.logicalWidth(selected), 0],
+            right: [root.logicalWidth(anchor), 0],
+            above: [0, -root.logicalHeight(selected)],
+            below: [0, root.logicalHeight(anchor)]
+        };
+        const offset = offsets[edge] || offsets.right;
+        root.draft("Place " + selected.name + " " + edge + " of " + anchor.name, monitor => {
+            if (monitor.name === anchor.name || monitor.name === selected.name) {
+                const placed = monitor.name === selected.name;
+                monitor.disabled = false;
+                monitor.mirrorOf = "";
+                monitor.x = placed ? offset[0] : 0;
+                monitor.y = placed ? offset[1] : 0;
+            }
+            return monitor;
+        });
+    }
+
+    // Drafts a layout around the selected display: "single" turns the others off,
+    // "mirror" has them mirror it, and "extend" lines them up to its right.
+    function draftLayout(mode) {
+        const selected = root.selectedMonitor;
+        if (!selected)
+            return;
+        let nextX = root.logicalWidth(selected);
+        const summaries = { single: "Use only " + selected.name, mirror: "Mirror displays", extend: "Extend displays" };
+        root.draft(summaries[mode], monitor => {
+            const own = monitor.name === selected.name;
+            monitor.disabled = mode === "single" && !own;
+            monitor.mirrorOf = mode === "mirror" && !own ? selected.name : "";
+            if (own || mode !== "extend") {
+                if (!monitor.disabled) {
+                    monitor.x = 0;
+                    monitor.y = 0;
+                }
+            } else {
+                monitor.x = nextX;
+                monitor.y = 0;
+                nextX += root.logicalWidth(monitor);
+            }
+            return monitor;
+        });
+    }
+
+    // ── Applying ───────────────────────────────────────────
+    // The hyprctl arguments that set `monitor` up: an `eval` of Lua under a Lua config,
+    // else a `keyword monitor` rule.
+    function commandFor(monitor) {
+        const mirrored = monitor.mirrorOf !== "";
+        const position = mirrored ? "0x0" : Math.round(monitor.x) + "x" + Math.round(monitor.y);
         if (!HyprlandService.usingLua) {
             const rule = monitor.disabled
-                ? [name, "disable"]
-                : [name, mode, position, scale].concat(mirrored ? ["mirror", mirrorTarget] : []);
+                ? [monitor.name, "disable"]
+                : [monitor.name, monitor.mode, position, monitor.scale].concat(mirrored ? ["mirror", monitor.mirrorOf] : []);
             return ["keyword", "monitor", rule.join(",")];
         }
         const quote = HyprlandService.luaQuote;
         if (monitor.disabled)
-            return ["eval", "hl.monitor({ output = " + quote(name) + ", disabled = true })"];
-        return ["eval", "hl.monitor({ output = " + quote(name)
-            + ", mode = " + quote(mode)
+            return ["eval", "hl.monitor({ output = " + quote(monitor.name) + ", disabled = true })"];
+        return ["eval", "hl.monitor({ output = " + quote(monitor.name)
+            + ", mode = " + quote(monitor.mode)
             + ", position = " + quote(position)
-            + ", scale = " + scale
+            + ", scale = " + monitor.scale
             // Always sent: Hyprland merges the rule into the last one, so a mirror left
             // out stays mirrored, and a display disabled before (as the lid does) stays
             // disabled.
-            + ", mirror = " + quote(mirrored ? mirrorTarget : "")
+            + ", mirror = " + quote(monitor.mirrorOf)
             + ", disabled = false"
             + " })"];
     }
 
-    // With connectedOnly, monitors unplugged since `source` was read are skipped.
-    function commandsForMonitors(source, connectedOnly) {
-        var connected = root.monitors.map(root.monitorName);
-        return (source || []).filter(function(monitor) {
-            return !connectedOnly || connected.indexOf(root.monitorName(monitor)) >= 0;
-        }).map(root.commandForDraftMonitor);
-    }
-
-    function runMonitorCommands(commands, operation) {
-        if (applyProc.running) {
+    // Sets `monitors` up, in `phase` until done. Stops at the first display Hyprland
+    // refuses, so the ones before it may have changed.
+    function run(monitors, phase) {
+        if (applyProc.running || monitors.length === 0)
             return false;
-        }
-
-        const lines = commands.filter(args => args.length > 0)
-            .map(args => "hyprctl " + args.map(Shell.quote).join(" "));
-        if (lines.length === 0)
-            return false;
-        const script = "set -e\n" + lines.join("\n") + "\n";
-
-        applyProc.command = ["sh", "-c", script];
+        const commands = monitors.reduce((args, monitor) => args.concat(root.commandFor(monitor), "--"), []);
+        applyProc.command = Shell.script("display.sh", commands);
         applyProc.running = true;
-        root.applying = true;
-        root.operationKind = operation || "apply";
-        root.errorText = "";
+        root.phase = phase;
+        root.changeError = "";
         return true;
     }
 
     function applyDraft() {
-        if (!root.hasPending || root.displayEditingLocked) {
+        if (!root.hasPending || root.busy)
             return;
-        }
-
-        root.rollbackMonitors = root.cloneMonitors(root.monitors);
-        root.rollbackRetryAvailable = false;
-        if (!root.runMonitorCommands(root.commandsForMonitors(root.draftMonitors, false), "apply")) {
+        root.rollbackMonitors = root.monitors;
+        if (!root.run(root.draftMonitors, "applying")) {
             root.rollbackMonitors = [];
             root.resetDraft();
         }
     }
 
     function keepDisplayChanges() {
-        if (!root.confirming)
+        if (root.phase !== "confirming")
             return;
         confirmationTimer.stop();
-        root.confirming = false;
-        root.confirmationSecondsRemaining = 0;
+        root.phase = "idle";
         root.rollbackMonitors = [];
-        root.rollbackRetryAvailable = false;
-        root.errorText = "";
+        root.changeError = "";
         root.refresh();
     }
 
+    // Back to rollbackMonitors, those of them still connected.
     function revertDisplayChanges() {
         if (root.rollbackMonitors.length === 0 || applyProc.running)
             return false;
-
         confirmationTimer.stop();
-        root.confirming = false;
-        root.confirmationSecondsRemaining = 0;
-        root.reverting = true;
-        root.rollbackRetryAvailable = false;
-        var commands = root.commandsForMonitors(root.rollbackMonitors, true);
-        if (!root.runMonitorCommands(commands, "rollback")) {
-            root.reverting = false;
-            root.rollbackRetryAvailable = true;
-            root.errorText = "Could not start display rollback.";
-            return false;
-        }
-        return true;
+        const connected = root.rollbackMonitors.filter(monitor => root.monitors.some(other => other.name === monitor.name));
+        if (root.run(connected, "reverting"))
+            return true;
+        root.phase = "idle";
+        root.changeError = "Could not start display rollback.";
+        return false;
     }
 
     // Mirror and Extend apply at once around the selected display, dropping any draft:
@@ -395,15 +341,17 @@ Singleton {
     // confirm. Single turns displays off, so it is drafted for Apply and Keep instead.
     function setLayout(mode) {
         if (mode === "single") {
-            root.setDraftLayoutMode(mode);
+            root.draftLayout(mode);
             return true;
         }
-        if (root.displayEditingLocked || !root.canMirror)
+        if (root.busy || !root.canMirror)
             return false;
         root.resetDraft();
-        root.setDraftLayoutMode(mode);
-        if (root.runMonitorCommands(root.commandsForMonitors(root.draftMonitors, false), "layout"))
+        root.draftLayout(mode);
+        root.rollbackMonitors = root.monitors;
+        if (root.run(root.draftMonitors, "layout"))
             return true;
+        root.rollbackMonitors = [];
         root.resetDraft();
         return false;
     }
@@ -412,307 +360,85 @@ Singleton {
     function toggleMirror() {
         root.resetDraft();
         root.setSelected(HyprlandService.focusedMonitor);
-        const mode = root.mirrored ? "extend" : "mirror";
-        root.announceLayout = root.setLayout(mode);
+        root.announceLayout = root.setLayout(root.mirrored ? "extend" : "mirror");
         if (!root.announceLayout)
-            OsdService.show("display", "Displays unchanged",
-                root.displayEditingLocked ? "Another change is in progress" : "");
+            OsdService.show("display", "Displays unchanged", root.busy ? "Another change is in progress" : "");
     }
 
-    function activeDraftCount() {
-        return root.buildActiveMonitors(root.draftMonitors).length;
-    }
-
-    function firstOtherActiveDraftMonitor(name) {
-        var active = root.buildActiveMonitors(root.draftMonitors);
-        var selected = String(name || "");
-        for (var i = 0; i < active.length; i++) {
-            if (root.monitorName(active[i]) !== selected) {
-                return active[i];
-            }
-        }
-        return null;
-    }
-
-    function setSelectedEnabled(enabled) {
-        var selected = root.selectedDraftMonitor();
-        if (!selected) {
-            return;
-        }
-        if (!enabled && root.activeDraftCount() <= 1) {
-            return;
-        }
-
-        var next = [];
-        for (var i = 0; i < root.draftMonitors.length; i++) {
-            var monitor = root.cloneMonitor(root.draftMonitors[i]);
-            if (root.monitorName(monitor) === root.monitorName(selected)) {
-                monitor.disabled = !enabled;
-                monitor.mirrorOf = "";
-                if (enabled) {
-                    var bounds = root.boundsFor(root.buildActiveMonitors(root.draftMonitors));
-                    monitor.x = bounds.maxX;
-                    monitor.y = bounds.minY;
-                }
-            }
-            next.push(monitor);
-        }
-        root.markPending((enabled ? "Enable " : "Turn off ") + root.monitorName(selected), next);
-    }
-
-    function setSelectedMode(mode) {
-        var selected = root.selectedDraftMonitor();
-        if (!selected || selected.disabled) {
-            return;
-        }
-
-        var normalized = root.normalizeMode(mode);
-        var parsed = root.parseMode(normalized);
-        if (!parsed) {
-            return;
-        }
-
-        var next = [];
-        for (var i = 0; i < root.draftMonitors.length; i++) {
-            var monitor = root.cloneMonitor(root.draftMonitors[i]);
-            if (root.monitorName(monitor) === root.monitorName(selected)) {
-                monitor.mode = normalized;
-                monitor.width = parsed.width;
-                monitor.height = parsed.height;
-                monitor.refreshRate = parsed.refreshRate;
-            }
-            next.push(monitor);
-        }
-        root.markPending("Set " + root.monitorName(selected) + " to " + root.modeLabel(normalized), next);
-    }
-
-    function arrangeSelected(edge) {
-        var selected = root.selectedDraftMonitor();
-        if (!selected) {
-            return;
-        }
-        var anchor = root.firstOtherActiveDraftMonitor(root.monitorName(selected));
-        if (!anchor) {
-            return;
-        }
-
-        var selectedName = root.monitorName(selected);
-        var anchorName = root.monitorName(anchor);
-        var next = [];
-        var selectedWidth = root.logicalWidth(selected);
-        var selectedHeight = root.logicalHeight(selected);
-        var anchorWidth = root.logicalWidth(anchor);
-        var anchorHeight = root.logicalHeight(anchor);
-
-        for (var i = 0; i < root.draftMonitors.length; i++) {
-            var monitor = root.cloneMonitor(root.draftMonitors[i]);
-            if (root.monitorName(monitor) === anchorName) {
-                monitor.disabled = false;
-                monitor.x = 0;
-                monitor.y = 0;
-                monitor.mirrorOf = "";
-            } else if (root.monitorName(monitor) === selectedName) {
-                monitor.disabled = false;
-                monitor.mirrorOf = "";
-                if (edge === "left") {
-                    monitor.x = -selectedWidth;
-                    monitor.y = 0;
-                } else if (edge === "above") {
-                    monitor.x = 0;
-                    monitor.y = -selectedHeight;
-                } else if (edge === "below") {
-                    monitor.x = 0;
-                    monitor.y = anchorHeight;
-                } else {
-                    monitor.x = anchorWidth;
-                    monitor.y = 0;
-                }
-            }
-            next.push(monitor);
-        }
-        root.markPending("Place " + selectedName + " " + edge + " of " + anchorName, next);
-    }
-
-    function useOnlySelected() {
-        var selected = root.selectedDraftMonitor();
-        if (!selected) {
-            return;
-        }
-
-        var selectedName = root.monitorName(selected);
-        var next = [];
-        for (var i = 0; i < root.draftMonitors.length; i++) {
-            var monitor = root.cloneMonitor(root.draftMonitors[i]);
-            monitor.disabled = root.monitorName(monitor) !== selectedName;
-            if (!monitor.disabled) {
-                monitor.x = 0;
-                monitor.y = 0;
-                monitor.mirrorOf = "";
-            }
-            next.push(monitor);
-        }
-        root.markPending("Use only " + selectedName, next);
-    }
-
-    function setDraftLayoutMode(mode) {
-        var selected = root.selectedDraftMonitor();
-        if (!selected) {
-            return;
-        }
-
-        var selectedName = root.monitorName(selected);
-        var nextMode = String(mode || "");
-        if (nextMode === "single") {
-            root.useOnlySelected();
-            return;
-        }
-
-        var next = [];
-        var offsetX = root.logicalWidth(selected);
-        for (var i = 0; i < root.draftMonitors.length; i++) {
-            var monitor = root.cloneMonitor(root.draftMonitors[i]);
-            var name = root.monitorName(monitor);
-            monitor.disabled = false;
-
-            if (name === selectedName) {
-                monitor.x = 0;
-                monitor.y = 0;
-                monitor.mirrorOf = "";
-            } else if (nextMode === "mirror") {
-                monitor.x = 0;
-                monitor.y = 0;
-                monitor.mirrorOf = selectedName;
+    function finishApply(exitCode, errors) {
+        const failure = exitCode !== 0 ? errors.trim() || "Display change failed." : "";
+        const phase = root.phase;
+        root.phase = "idle";
+        if (phase === "reverting") {
+            if (failure !== "") {
+                root.changeError = errors.trim() || "Display rollback failed.";
             } else {
-                monitor.x = offsetX;
-                monitor.y = 0;
-                monitor.mirrorOf = "";
-                offsetX += root.logicalWidth(monitor);
+                root.rollbackMonitors = [];
+                root.changeError = root.revertReason;
+                root.revertReason = "";
             }
-
-            next.push(monitor);
+        } else if (phase === "layout") {
+            if (root.announceLayout)
+                OsdService.show("display", failure !== "" ? "Display change failed"
+                    : root.draftLayoutMode === "mirror" ? "Displays mirrored" : "Displays extended", failure);
+            root.announceLayout = false;
+            root.pendingSummary = "";
+            if (failure !== "")
+                root.undoFailed(failure);
+            else
+                root.rollbackMonitors = [];
+        } else if (failure !== "") {
+            // The draft stays, to fix and apply again.
+            root.undoFailed(failure);
+        } else {
+            root.pendingSummary = "";
+            root.phase = "confirming";
+            root.confirmationSecondsRemaining = 15;
+            root.topologyEventGraceUntil = Date.now() + 1500;
+            confirmationTimer.restart();
         }
-
-        root.markPending(nextMode === "mirror" ? "Mirror displays" : "Extend displays", next);
+        root.refresh();
     }
 
-    function boundsFor(source) {
-        var active = root.buildActiveMonitors(source);
-        if (active.length === 0) {
-            return { minX: 0, minY: 0, maxX: 1, maxY: 1, width: 1, height: 1 };
-        }
-
-        var minX = Number(active[0].x) || 0;
-        var minY = Number(active[0].y) || 0;
-        var maxX = minX + root.logicalWidth(active[0]);
-        var maxY = minY + root.logicalHeight(active[0]);
-
-        for (var i = 1; i < active.length; i++) {
-            var monitor = active[i];
-            var x = Number(monitor.x) || 0;
-            var y = Number(monitor.y) || 0;
-            minX = Math.min(minX, x);
-            minY = Math.min(minY, y);
-            maxX = Math.max(maxX, x + root.logicalWidth(monitor));
-            maxY = Math.max(maxY, y + root.logicalHeight(monitor));
-        }
-
-        return {
-            minX: minX,
-            minY: minY,
-            maxX: maxX,
-            maxY: maxY,
-            width: Math.max(1, maxX - minX),
-            height: Math.max(1, maxY - minY)
-        };
+    // Puts every display back after a change Hyprland refused partway.
+    function undoFailed(failure) {
+        root.revertReason = failure;
+        if (!root.revertDisplayChanges())
+            root.changeError = failure;
     }
 
-    function mapRect(monitor, canvasWidth, canvasHeight) {
-        if (!monitor || monitor.disabled) {
-            return { x: 0, y: 0, width: 0, height: 0 };
-        }
-
-        var padding = 10;
-        var availableWidth = Math.max(1, canvasWidth - padding * 2);
-        var availableHeight = Math.max(1, canvasHeight - padding * 2);
-        var active = root.buildActiveMonitors(root.draftMonitors);
-
-        if (root.detectLayoutMode(root.draftMonitors) === "mirror" && active.length > 1) {
-            var index = Math.max(0, active.map(root.monitorName).indexOf(root.monitorName(monitor)));
-            var slotWidth = availableWidth / active.length;
-            var mirrorScale = Math.min(
-                Math.max(1, slotWidth - 6) / root.logicalWidth(monitor),
-                availableHeight / root.logicalHeight(monitor)
-            );
-            var mirrorWidth = Math.max(34, root.logicalWidth(monitor) * mirrorScale);
-            var mirrorHeight = Math.max(24, root.logicalHeight(monitor) * mirrorScale);
-            return {
-                x: padding + index * slotWidth + Math.max(0, (slotWidth - mirrorWidth) / 2),
-                y: padding + Math.max(0, (availableHeight - mirrorHeight) / 2),
-                width: mirrorWidth,
-                height: mirrorHeight
-            };
-        }
-
-        var bounds = root.boundsFor(root.draftMonitors);
-        var scale = Math.min(availableWidth / bounds.width, availableHeight / bounds.height);
-        var width = Math.max(34, root.logicalWidth(monitor) * scale);
-        var height = Math.max(24, root.logicalHeight(monitor) * scale);
-        return {
-            x: padding + ((Number(monitor.x) || 0) - bounds.minX) * scale,
-            y: padding + ((Number(monitor.y) || 0) - bounds.minY) * scale,
-            width: width,
-            height: height
-        };
-    }
-
-    // ── The lid ────────────────────────────────────────────
-    function isInternal(monitor) {
-        return /^(eDP|LVDS|DSI)-/.test(root.monitorName(monitor));
-    }
-
-    // Turns the laptop's display off while the lid is closed and another display is
-    // on, and back on as it was once the lid opens or the last other display goes.
-    // Waits while a change in the Displays panel awaits Keep.
-    function followLid() {
-        if (!HyprlandService.running || root.displayEditingLocked || root.hasPending)
-            return;
-        const internal = root.monitors.find(monitor => root.isInternal(monitor) && !monitor.disabled);
-        const othersOn = root.monitors.some(monitor => !root.isInternal(monitor) && !monitor.disabled);
-        if (SessionService.lidClosed && internal && othersOn && !root.lidParkedMonitor) {
-            root.lidParkedMonitor = root.cloneMonitor(internal);
-            root.runLidCommand(root.commandForDraftMonitor(Object.assign(root.cloneMonitor(internal), { disabled: true })));
-        } else if (root.lidParkedMonitor && (!SessionService.lidClosed || !othersOn)) {
-            const parked = root.lidParkedMonitor;
-            root.lidParkedMonitor = null;
-            root.runLidCommand(root.commandForDraftMonitor(parked));
-        }
-    }
-
-    function runLidCommand(args) {
-        if (args.length === 0)
-            return;
-        Quickshell.execDetached(["hyprctl"].concat(args));
-        refreshDebounce.restart();
-    }
-
-    Connections {
-        target: SessionService
-
-        function onLidClosedChanged() { root.refresh(); }
-    }
-
-    // ── Actions ────────────────────────────────────────────
+    // ── Reading ────────────────────────────────────────────
     function refresh() {
-        if (HyprlandService.running && !monitorsProc.running) {
-            root.loading = true;
+        if (HyprlandService.running && !monitorsProc.running)
             monitorsProc.running = true;
-        }
     }
 
     function queueRefresh() {
-        if (!root.hasPending && !root.applying && !root.loading) {
+        if (!root.hasPending && !root.busy)
             refreshDebounce.restart();
+    }
+
+    function finishRead(exitCode, output, errors) {
+        let raw = null;
+        try {
+            raw = JSON.parse(output || "[]");
+        } catch (error) {
+            console.warn("[Speshell] Failed to parse hyprctl monitors output:", error);
         }
+        if (Array.isArray(raw)) {
+            const names = {};
+            raw.forEach(monitor => names[String(monitor.id)] = String(monitor.name || ""));
+            root.monitors = root.sorted(raw.map(monitor => root.monitor(monitor, names)));
+            if (root.hasPending)
+                root.ensureSelected();
+            else
+                root.resetDraft();
+            root.readError = exitCode !== 0 ? errors.trim() || "Could not read displays." : "";
+        } else {
+            root.readError = "Could not read displays.";
+        }
+        if (root.phase === "interrupted")
+            Qt.callLater(root.revertDisplayChanges);
     }
 
     // Read once at start, so the launcher knows whether !mirror applies.
@@ -721,7 +447,6 @@ Singleton {
     Timer {
         id: refreshDebounce
         interval: 250
-        repeat: false
         onTriggered: root.refresh()
     }
 
@@ -740,115 +465,30 @@ Singleton {
         target: HyprlandService
 
         function onEvent(name) {
-            if (name === "monitoradded" || name === "monitoraddedv2" || name === "monitorremoved") {
-                HyprlandService.refreshMonitors();
-                if (root.confirming) {
-                    if (Date.now() < root.topologyEventGraceUntil) {
-                        root.queueRefresh();
-                        return;
-                    }
-                    confirmationTimer.stop();
-                    root.confirming = false;
-                    root.confirmationSecondsRemaining = 0;
-                    root.topologyRollbackQueued = true;
-                    if (!root.loading)
-                        root.refresh();
-                } else {
-                    root.queueRefresh();
-                }
+            if (name !== "monitoradded" && name !== "monitoraddedv2" && name !== "monitorremoved")
+                return;
+            HyprlandService.refreshMonitors();
+            if (root.phase === "confirming" && Date.now() >= root.topologyEventGraceUntil) {
+                confirmationTimer.stop();
+                root.phase = "interrupted";
+                root.refresh();
+            } else {
+                root.queueRefresh();
             }
         }
     }
 
-    // ── Processes ──────────────────────────────────────────
     Process {
         id: monitorsProc
         command: ["hyprctl", "monitors", "all", "-j"]
-        running: false
-
-        stdout: StdioCollector {
-            id: monitorsOutput
-        }
-
-        stderr: StdioCollector {
-            id: monitorsError
-        }
-
-        onExited: function(exitCode) {
-            root.loading = false;
-            try {
-                var json = JSON.parse(monitorsOutput.text || "[]");
-                if (Array.isArray(json)) {
-                    root.monitors = root.sortMonitors(root.withMirrorNames(json));
-                    if (!root.hasPending) {
-                        root.resetDraft();
-                    } else {
-                        root.ensureSelected();
-                    }
-                    if (exitCode !== 0)
-                        root.errorText = monitorsError.text || "Could not read displays.";
-                    else if (!root.rollbackRetryAvailable)
-                        root.errorText = "";
-                    if (root.topologyRollbackQueued) {
-                        root.topologyRollbackQueued = false;
-                        Qt.callLater(root.revertDisplayChanges);
-                    } else {
-                        Qt.callLater(root.followLid);
-                    }
-                }
-            } catch(e) {
-                root.errorText = "Could not read displays.";
-                console.warn("[Speshell] Failed to parse hyprctl monitors output:", e);
-                if (root.topologyRollbackQueued) {
-                    root.topologyRollbackQueued = false;
-                    Qt.callLater(root.revertDisplayChanges);
-                }
-            }
-        }
+        stdout: StdioCollector { id: monitorsOutput }
+        stderr: StdioCollector { id: monitorsErrors }
+        onExited: exitCode => root.finishRead(exitCode, monitorsOutput.text, monitorsErrors.text)
     }
 
     Process {
         id: applyProc
-        running: false
-        stderr: StdioCollector {
-            id: applyError
-        }
-        onExited: function(exitCode) {
-            var completedOperation = root.operationKind;
-            root.operationKind = "";
-            root.applying = false;
-            if (completedOperation === "rollback") {
-                root.reverting = false;
-                if (exitCode !== 0) {
-                    root.rollbackRetryAvailable = true;
-                    root.errorText = applyError.text || "Display rollback failed.";
-                } else {
-                    root.rollbackMonitors = [];
-                    root.rollbackRetryAvailable = false;
-                    root.errorText = "";
-                }
-            } else if (completedOperation === "layout") {
-                const failure = exitCode !== 0 ? applyError.text || "Display change failed." : "";
-                root.errorText = failure;
-                if (root.announceLayout)
-                    OsdService.show("display", failure !== "" ? "Display change failed"
-                        : root.draftLayoutMode === "mirror" ? "Displays mirrored" : "Displays extended",
-                        failure);
-                root.announceLayout = false;
-                root.hasPending = false;
-                root.pendingSummary = "";
-            } else if (exitCode !== 0) {
-                root.rollbackMonitors = [];
-                root.errorText = applyError.text || "Display change failed.";
-            } else {
-                root.hasPending = false;
-                root.pendingSummary = "";
-                root.confirming = true;
-                root.confirmationSecondsRemaining = 15;
-                root.topologyEventGraceUntil = Date.now() + 1500;
-                confirmationTimer.restart();
-            }
-            root.refresh();
-        }
+        stderr: StdioCollector { id: applyErrors }
+        onExited: exitCode => root.finishApply(exitCode, applyErrors.text)
     }
 }

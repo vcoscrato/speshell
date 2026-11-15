@@ -14,18 +14,12 @@ Card {
     property bool presented: false
     // With one display there is nothing to arrange, so the map and picker step aside.
     readonly property bool multiple: DisplayService.draftMonitors.length > 1
-    readonly property bool busy: DisplayService.displayEditingLocked
-    readonly property var selectedMonitor: DisplayService.monitorByName(
-        DisplayService.draftMonitors,
-        DisplayService.selectedName
-    )
+    readonly property bool busy: DisplayService.busy
+    readonly property var selectedMonitor: DisplayService.selectedMonitor
     readonly property bool selectedEnabled: root.selectedMonitor !== null && !root.selectedMonitor.disabled
-    readonly property var selectedModeOptions: root.selectedEnabled
-        ? DisplayService.availableModesFor(root.selectedMonitor)
-        : []
-    readonly property bool canPositionSelected: root.selectedEnabled
-        && DisplayService.draftLayoutMode === "extend"
-        && DisplayService.firstOtherActiveDraftMonitor(DisplayService.monitorName(root.selectedMonitor)) !== null
+    readonly property var selectedModeOptions: root.selectedEnabled ? root.selectedMonitor.modes : []
+    readonly property var selectedAnchor: root.selectedEnabled ? DisplayService.anchorFor(root.selectedMonitor) : null
+    readonly property bool canPositionSelected: root.selectedAnchor !== null && DisplayService.draftLayoutMode === "extend"
     readonly property bool canControlSelectedBrightness: root.selectedEnabled
         && BrightnessService.available
         && root.isBrightnessDisplay(root.selectedMonitor)
@@ -48,58 +42,32 @@ Card {
     onCanControlSelectedBrightnessChanged: root.requestBrightnessRefresh()
 
     function isBrightnessDisplay(monitor) {
-        if (!monitor) {
-            return false;
-        }
-
-        var name = DisplayService.monitorName(monitor).toLowerCase();
-        if (name.indexOf("edp") === 0 || name.indexOf("lvds") === 0 || name.indexOf("dsi") === 0) {
-            return true;
-        }
-
-        return DisplayService.draftActiveMonitors.length <= 1;
-    }
-
-    function modeText(monitor) {
-        if (!monitor || monitor.disabled) {
-            return "Off";
-        }
-        return DisplayService.modeLabel(DisplayService.monitorModeString(monitor));
+        return monitor !== null && (DisplayService.isInternal(monitor) || DisplayService.draftActiveMonitors.length <= 1);
     }
 
     function layoutLabel(mode) {
-        if (mode === "mirror") {
-            return "Mirror";
-        }
-        if (mode === "extend") {
-            return "Extend";
-        }
-        return "Single";
+        return { mirror: "Mirror", extend: "Extend" }[mode] || "Single";
     }
 
     // What needs attention; "" when the displays are just as reported.
     function noticeText() {
-        if (DisplayService.errorText !== "") {
+        if (DisplayService.errorText !== "")
             return DisplayService.errorText;
-        }
-        if (DisplayService.reverting) {
-            return "Restoring the previous display layout.";
-        }
-        if (DisplayService.confirming) {
-            return "Waiting for display confirmation.";
-        }
-        if (DisplayService.applying) {
-            return "Applying display changes.";
-        }
-        if (DisplayService.loading) {
+        const phases = {
+            reverting: "Restoring the previous display layout.",
+            interrupted: "Restoring the previous display layout.",
+            confirming: "Waiting for display confirmation.",
+            applying: "Applying display changes.",
+            layout: "Applying display changes."
+        };
+        if (phases[DisplayService.phase])
+            return phases[DisplayService.phase];
+        if (DisplayService.loading)
             return "Reading display state.";
-        }
-        if (DisplayService.hasPending) {
+        if (DisplayService.hasPending)
             return DisplayService.pendingSummary;
-        }
-        if (DisplayService.monitors.length === 0) {
+        if (DisplayService.monitors.length === 0)
             return "No displays reported by Hyprland.";
-        }
         return "";
     }
 
@@ -109,23 +77,46 @@ Card {
     }
 
     function positionLabel() {
-        if (!root.canPositionSelected) {
+        if (!root.canPositionSelected)
             return "Auto";
-        }
+        const anchor = root.selectedAnchor;
+        const dx = root.selectedMonitor.x - anchor.x;
+        const dy = root.selectedMonitor.y - anchor.y;
+        if (Math.abs(dx) >= Math.abs(dy))
+            return (dx < 0 ? "Left of " : "Right of ") + anchor.name;
+        return (dy < 0 ? "Above " : "Below ") + anchor.name;
+    }
 
-        var selected = root.selectedMonitor;
-        var anchor = DisplayService.firstOtherActiveDraftMonitor(DisplayService.monitorName(selected));
-        if (!anchor) {
-            return "Auto";
+    // Where `monitor` shows on the map, a `width` by `height` picture of the draft:
+    // side by side when mirrored, else as they are placed.
+    function mapRect(monitor, width, height) {
+        const padding = 10;
+        const availableWidth = Math.max(1, width - padding * 2);
+        const availableHeight = Math.max(1, height - padding * 2);
+        const active = DisplayService.draftActiveMonitors;
+        const monitorWidth = DisplayService.logicalWidth(monitor);
+        const monitorHeight = DisplayService.logicalHeight(monitor);
+        if (DisplayService.draftLayoutMode === "mirror") {
+            const index = Math.max(0, active.findIndex(other => other.name === monitor.name));
+            const slotWidth = availableWidth / active.length;
+            const scale = Math.min(Math.max(1, slotWidth - 6) / monitorWidth, availableHeight / monitorHeight);
+            const tileWidth = Math.max(34, monitorWidth * scale);
+            const tileHeight = Math.max(24, monitorHeight * scale);
+            return {
+                x: padding + index * slotWidth + Math.max(0, (slotWidth - tileWidth) / 2),
+                y: padding + Math.max(0, (availableHeight - tileHeight) / 2),
+                width: tileWidth,
+                height: tileHeight
+            };
         }
-
-        var dx = (Number(selected.x) || 0) - (Number(anchor.x) || 0);
-        var dy = (Number(selected.y) || 0) - (Number(anchor.y) || 0);
-        var anchorName = DisplayService.monitorName(anchor);
-        if (Math.abs(dx) >= Math.abs(dy)) {
-            return (dx < 0 ? "Left of " : "Right of ") + anchorName;
-        }
-        return (dy < 0 ? "Above " : "Below ") + anchorName;
+        const bounds = DisplayService.boundsOf(active);
+        const scale = Math.min(availableWidth / bounds.width, availableHeight / bounds.height);
+        return {
+            x: padding + (monitor.x - bounds.minX) * scale,
+            y: padding + (monitor.y - bounds.minY) * scale,
+            width: Math.max(34, monitorWidth * scale),
+            height: Math.max(24, monitorHeight * scale)
+        };
     }
 
     function requestBrightnessRefresh() {
@@ -141,7 +132,7 @@ Card {
             text: "Revert"
             iconName: "back"
             compact: true
-            enabled: !DisplayService.applying
+            enabled: DisplayService.phase === "idle"
             onClicked: DisplayService.resetDraft()
         }
 
@@ -156,12 +147,11 @@ Card {
         }
 
         ActionButton {
-            visible: DisplayService.rollbackRetryAvailable
+            visible: DisplayService.canRetryRevert
             text: "Retry revert"
             iconName: "back"
             kind: "danger"
             compact: true
-            enabled: !DisplayService.applying
             onClicked: DisplayService.revertDisplayChanges()
         }
 
@@ -216,24 +206,25 @@ Card {
         }
 
         Notice {
-            visible: DisplayService.confirming || DisplayService.reverting
-            heading: DisplayService.reverting
-                ? "Restoring previous display settings…"
-                : "Keep these display settings?"
-            detail: DisplayService.confirming
+            id: changeNotice
+
+            readonly property bool confirming: DisplayService.phase === "confirming"
+
+            visible: confirming || DisplayService.phase === "reverting" || DisplayService.phase === "interrupted"
+            heading: confirming ? "Keep these display settings?" : "Restoring previous display settings…"
+            detail: confirming
                 ? "Changes revert automatically in " + DisplayService.confirmationSecondsRemaining + " seconds."
                 : ""
 
             Row {
                 width: parent.width
                 spacing: Theme.spacingSmall
-                visible: DisplayService.confirming
+                visible: changeNotice.confirming
 
                 ActionButton {
                     width: (parent.width - parent.spacing) / 2
                     text: "Revert"
                     iconName: "back"
-                    enabled: !DisplayService.applying
                     onClicked: DisplayService.revertDisplayChanges()
                 }
 
@@ -242,7 +233,6 @@ Card {
                     text: "Keep changes"
                     iconName: "check"
                     kind: "primary"
-                    enabled: !DisplayService.applying
                     onClicked: DisplayService.keepDisplayChanges()
                 }
             }
@@ -273,13 +263,8 @@ Card {
                     id: displayTile
 
                     required property var modelData
-                    readonly property var rect: DisplayService.mapRect(
-                        displayTile.modelData,
-                        displayMap.width,
-                        displayMap.height
-                    )
-                    readonly property bool selected: DisplayService.monitorName(displayTile.modelData)
-                        === DisplayService.selectedName
+                    readonly property var rect: root.mapRect(displayTile.modelData, displayMap.width, displayMap.height)
+                    readonly property bool selected: displayTile.modelData.name === DisplayService.selectedName
 
                     x: rect.x
                     y: rect.y
@@ -296,14 +281,14 @@ Card {
                         : Theme.alpha(Theme.overlay, Theme.tintOutline)
 
                     Accessible.role: Accessible.Button
-                    Accessible.name: "Select " + DisplayService.monitorName(displayTile.modelData)
+                    Accessible.name: "Select " + displayTile.modelData.name
                     Accessible.onPressAction: DisplayService.setSelected(displayTile.modelData.name)
 
                     Label {
                         role: "caption"
                         anchors.centerIn: parent
                         width: Math.max(0, parent.width - Theme.spacingSmall)
-                        text: displayTile.modelData.name || "Display"
+                        text: displayTile.modelData.name
                         horizontalAlignment: Text.AlignHCenter
                         elide: Text.ElideRight
                         font.weight: Font.Bold
@@ -338,8 +323,7 @@ Card {
                     id: displayPill
 
                     required property var modelData
-                    readonly property bool selected: DisplayService.monitorName(displayPill.modelData)
-                        === DisplayService.selectedName
+                    readonly property bool selected: displayPill.modelData.name === DisplayService.selectedName
                     readonly property color pillColor: displayPill.modelData.disabled
                         ? Theme.overlay
                         : Theme.accent
@@ -355,7 +339,7 @@ Card {
                         selected ? Theme.tintOutlineStrong : Theme.tintOutline)
 
                     Accessible.role: Accessible.Button
-                    Accessible.name: "Select " + DisplayService.monitorName(displayPill.modelData)
+                    Accessible.name: "Select " + displayPill.modelData.name
                     Accessible.description: displayPill.modelData.disabled ? "Display off" : "Display on"
                     Accessible.onPressAction: DisplayService.setSelected(displayPill.modelData.name)
 
@@ -367,7 +351,7 @@ Card {
                             id: pillText
                             role: "caption"
                             width: Math.min(138, implicitWidth)
-                            text: displayPill.modelData.name || "Display"
+                            text: displayPill.modelData.name
                             font.weight: Font.Bold
                             color: displayPill.modelData.disabled ? Theme.subtext : Theme.text
                             elide: Text.ElideRight
@@ -430,7 +414,7 @@ Card {
                         Label {
                             role: "title"
                             width: parent.width
-                            text: root.selectedMonitor ? (root.selectedMonitor.name || "Display") : ""
+                            text: root.selectedMonitor ? root.selectedMonitor.name : ""
                             elide: Text.ElideRight
                         }
 
@@ -449,11 +433,9 @@ Card {
                         checked: root.selectedEnabled
                         enabled: root.selectedMonitor !== null
                             && !root.busy
-                            && (root.selectedMonitor.disabled || DisplayService.activeDraftCount() > 1)
+                            && (root.selectedMonitor.disabled || DisplayService.draftActiveMonitors.length > 1)
                         tooltipText: checked ? "Turn display off" : "Turn display on"
-                        onToggled: function(state) {
-                            DisplayService.setSelectedEnabled(state);
-                        }
+                        onToggled: state => DisplayService.setSelectedEnabled(state)
                     }
                 }
 
@@ -497,12 +479,10 @@ Card {
                     label: "Mode"
 
                     SelectMenu {
-                        readonly property string current: root.selectedMonitor
-                            ? DisplayService.monitorModeString(root.selectedMonitor) : ""
-
                         options: root.selectedModeOptions.map(mode => ({ value: mode, label: DisplayService.modeLabel(mode) }))
-                        currentValue: root.selectedModeOptions.find(mode => DisplayService.modesEquivalent(mode, current))
-                        fallbackLabel: root.selectedMonitor ? root.modeText(root.selectedMonitor) : ""
+                        currentValue: root.selectedEnabled ? root.selectedMonitor.mode : undefined
+                        fallbackLabel: !root.selectedMonitor ? "" : root.selectedMonitor.disabled ? "Off"
+                            : DisplayService.modeLabel(root.selectedMonitor.mode)
                         onValueSelected: value => DisplayService.setSelectedMode(value)
                     }
                 }
@@ -520,7 +500,7 @@ Card {
                         options: [{ value: 0, label: "As is" }, { value: 30, label: "30%" },
                             { value: 50, label: "50%" }, { value: 70, label: "70%" }]
                         currentValue: BrightnessService.batteryPercent
-                        onValueSelected: value => ConfigService.setProperty("Backlight", "batteryPercent", value)
+                        onValueSelected: value => BrightnessService.setBatteryPercent(value)
                     }
                 }
 

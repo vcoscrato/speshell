@@ -50,7 +50,7 @@ Item {
     }
 
     function change() {
-        var url = ThemeProvider.fileUrl(root.path);
+        const url = ThemeProvider.fileUrl(root.path);
         if (root.capturing)
             return;
         // Placing cuts a transition short, leaving its new image.
@@ -72,7 +72,7 @@ Item {
             root.startWhenLoaded();
             return;
         }
-        var next = root.shown === imageA ? imageB : imageA;
+        const next = root.shown === imageA ? imageB : imageA;
         if (root.shown.status === Image.Ready) {
             root.outgoing = root.shown;
         } else {
@@ -108,12 +108,12 @@ Item {
             return;
         captureTimer.stop();
         root.capturing = false;
-        var frozen = root.freezing;
+        const frozen = root.freezing;
         root.freezing = null;
         root.finishTransition();
         // The frame covers the image under it, which the next one replaces.
         root.outgoing = frozen;
-        var next = root.shown === imageA ? imageB : imageA;
+        const next = root.shown === imageA ? imageB : imageA;
         root.shown.source = "";
         root.swapIn(next, ThemeProvider.fileUrl(root.path));
     }
@@ -140,7 +140,7 @@ Item {
         safetyTimer.stop();
         // Detached first: clearing the source reports a status change, which
         // re-enters startWhenLoaded().
-        var old = root.outgoing;
+        const old = root.outgoing;
         root.outgoing = null;
         root.transitionRunning = false;
         if (old === freezeA || old === freezeB)

@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.components
 import qs.services
+import "../components/Format.js" as Format
 
 // A month of days, starting on the locale's first day of the week, with today marked.
 // The arrows or the wheel change the month; Today comes back to this one.
@@ -55,7 +56,7 @@ Item {
                 role: "heading"
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                text: Qt.formatDate(root.month, "MMMM yyyy")
+                text: Format.month(root.month)
             }
 
             Row {
@@ -108,7 +109,7 @@ Item {
 
                     width: parent.width / 7
                     // Named as the rest of the shell's dates are; 4 January 1970 was a Sunday.
-                    text: Qt.formatDate(new Date(1970, 0, 4 + (root.firstWeekday + index) % 7), "ddd").substring(0, 2)
+                    text: Format.weekday(new Date(1970, 0, 4 + (root.firstWeekday + index) % 7)).substring(0, 2)
                     horizontalAlignment: Text.AlignHCenter
                     role: "caption"
                     font.weight: Font.DemiBold

@@ -12,10 +12,6 @@ import qs.services
 Scope {
     id: root
 
-    readonly property string user: Quickshell.env("USER") || ""
-    // The account's full name from its GECOS field, or the user name.
-    property string userName: root.user
-
     WlSessionLock {
         id: sessionLock
 
@@ -35,7 +31,7 @@ Scope {
                     width: parent.width
                     horizontalAlignment: Text.AlignHCenter
                     elide: Text.ElideRight
-                    text: root.userName
+                    text: LockService.userName
                 }
 
                 GatePassword {
@@ -66,18 +62,6 @@ Scope {
             PanelService.dismiss();
             LauncherService.close();
             ThemeService.closeGallery();
-        }
-    }
-
-    Process {
-        running: root.user !== ""
-        command: ["getent", "passwd", root.user]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const name = (text.split(":")[4] || "").split(",")[0].trim();
-                if (name !== "")
-                    root.userName = name;
-            }
         }
     }
 

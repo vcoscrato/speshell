@@ -19,13 +19,19 @@ wallpaper=$(jq -r '.wallpaper // ""' <<<"$state")
 ext=${wallpaper##*.}
 ext=${ext,,}
 shown=""
+# Only a regular file, read no further than the limit and for no longer than a minute,
+# so a wallpaper path at a pipe or a device can't keep root writing.
+limit=$((64 * 1024 * 1024))
 case "$ext" in
     jpg|jpeg|png|webp)
-        if [ "$(as_user stat -L -c %s -- "$wallpaper")" -le $((64 * 1024 * 1024)) ]; then
-            as_user cat -- "$wallpaper" > "$tmp/wallpaper.$ext"
+        if as_user test -f "$wallpaper" \
+            && timeout 60 setpriv --reuid="$user" --regid="$(id -g "$user")" --init-groups -- \
+                head -c $((limit + 1)) -- "$wallpaper" > "$tmp/wallpaper.$ext" \
+            && [ "$(stat -c %s -- "$tmp/wallpaper.$ext")" -le "$limit" ]; then
             shown=$out/wallpaper.$ext
         else
-            echo "speshell-greeter-theme: wallpaper over 64 MiB, left out" >&2
+            rm -f -- "$tmp/wallpaper.$ext"
+            echo "speshell-greeter-theme: wallpaper not a file of at most 64 MiB, left out" >&2
         fi
         ;;
 esac

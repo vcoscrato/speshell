@@ -18,7 +18,7 @@ Singleton {
     signal actionRequested(string provider, string activityId, string actionId)
 
     function normalizedState(value) {
-        var state = String(value || "").trim().toLowerCase();
+        const state = String(value || "").trim().toLowerCase();
         if (root.activeStates.indexOf(state) >= 0)
             return state;
         if (root.inactiveStates.indexOf(state) >= 0)
@@ -27,12 +27,12 @@ Singleton {
     }
 
     function normalizedTone(value) {
-        var tone = String(value || "neutral").trim().toLowerCase();
+        const tone = String(value || "neutral").trim().toLowerCase();
         return root.tones.indexOf(tone) >= 0 ? tone : "neutral";
     }
 
     function normalizedId(value) {
-        var id = String(value || "").trim().toLowerCase();
+        const id = String(value || "").trim().toLowerCase();
         return /^[a-z0-9][a-z0-9._-]*$/.test(id) ? id : "";
     }
 
@@ -41,18 +41,18 @@ Singleton {
     }
 
     function finiteNumber(value, fallback) {
-        var number = Number(value);
+        const number = Number(value);
         return isFinite(number) ? number : fallback;
     }
 
     function normalizedActions(value) {
         if (!Array.isArray(value))
             return [];
-        var result = [];
-        var seen = Object.create(null);
-        for (var i = 0; i < value.length; i++) {
-            var supplied = value[i] || ({});
-            var id = root.normalizedId(supplied.id);
+        const result = [];
+        const seen = Object.create(null);
+        for (let i = 0; i < value.length; i++) {
+            const supplied = value[i] || ({});
+            const id = root.normalizedId(supplied.id);
             if (id === "" || seen[id])
                 continue;
             seen[id] = true;
@@ -64,9 +64,9 @@ Singleton {
     // A published activity as the bar reads it, or null when it is invalid or over.
     // An activity that was already running keeps its start time.
     function normalizeEntry(provider, suppliedValue, previous, now) {
-        var supplied = suppliedValue || ({});
-        var state = root.normalizedState(supplied.state);
-        var id = root.normalizedId(supplied.id);
+        const supplied = suppliedValue || ({});
+        const state = root.normalizedState(supplied.state);
+        const id = root.normalizedId(supplied.id);
         if (id === "" || state === "" || state === "inactive")
             return null;
 
@@ -90,12 +90,12 @@ Singleton {
     // One entry per activity id across providers: the highest priority wins, then the
     // latest update. Sorted by sortOrder, then start time.
     function rebuild() {
-        var winners = Object.create(null);
-        Object.keys(root.providerActivities).forEach(function(provider) {
-            var entries = root.providerActivities[provider];
-            Object.keys(entries).forEach(function(id) {
-                var candidate = entries[id];
-                var current = winners[id];
+        const winners = Object.create(null);
+        Object.keys(root.providerActivities).forEach(provider => {
+            const entries = root.providerActivities[provider];
+            Object.keys(entries).forEach(id => {
+                const candidate = entries[id];
+                const current = winners[id];
                 if (!current
                         || candidate.priority > current.priority
                         || (candidate.priority === current.priority
@@ -104,8 +104,8 @@ Singleton {
             });
         });
 
-        var result = Object.keys(winners).map(function(id) { return winners[id]; });
-        result.sort(function(left, right) {
+        const result = Object.keys(winners).map(id => winners[id]);
+        result.sort((left, right) => {
             if (left.sortOrder !== right.sortOrder)
                 return left.sortOrder - right.sortOrder;
             if (left.startedAt !== right.startedAt)
@@ -116,16 +116,16 @@ Singleton {
     }
 
     function publish(providerValue, suppliedValue) {
-        var provider = root.normalizedProvider(providerValue);
-        var supplied = suppliedValue || ({});
-        var id = root.normalizedId(supplied.id);
-        var state = root.normalizedState(supplied.state);
+        const provider = root.normalizedProvider(providerValue);
+        const supplied = suppliedValue || ({});
+        const id = root.normalizedId(supplied.id);
+        const state = root.normalizedState(supplied.state);
         if (id === "" || state === "")
             return false;
 
-        var providers = Object.assign({}, root.providerActivities);
-        var entries = Object.assign({}, providers[provider] || ({}));
-        var entry = root.normalizeEntry(provider, supplied, entries[id], Date.now());
+        const providers = Object.assign({}, root.providerActivities);
+        const entries = Object.assign({}, providers[provider] || ({}));
+        const entry = root.normalizeEntry(provider, supplied, entries[id], Date.now());
         if (entry)
             entries[id] = entry;
         else
@@ -138,17 +138,17 @@ Singleton {
     }
 
     function replaceProvider(providerValue, suppliedEntries) {
-        var provider = root.normalizedProvider(providerValue);
-        var providers = Object.assign({}, root.providerActivities);
-        var previous = providers[provider] || ({});
-        var next = ({});
-        var source = Array.isArray(suppliedEntries) ? suppliedEntries : [];
-        var now = Date.now();
+        const provider = root.normalizedProvider(providerValue);
+        const providers = Object.assign({}, root.providerActivities);
+        const previous = providers[provider] || ({});
+        const next = ({});
+        const source = Array.isArray(suppliedEntries) ? suppliedEntries : [];
+        const now = Date.now();
 
-        for (var i = 0; i < source.length; i++) {
-            var supplied = source[i] || ({});
-            var id = root.normalizedId(supplied.id);
-            var entry = root.normalizeEntry(provider, supplied, previous[id], now);
+        for (let i = 0; i < source.length; i++) {
+            const supplied = source[i] || ({});
+            const id = root.normalizedId(supplied.id);
+            const entry = root.normalizeEntry(provider, supplied, previous[id], now);
             if (entry)
                 next[id] = entry;
         }
@@ -159,10 +159,10 @@ Singleton {
     }
 
     function clear(providerValue, activityIdValue) {
-        var provider = root.normalizedProvider(providerValue);
-        var activityId = root.normalizedId(activityIdValue);
-        var providers = Object.assign({}, root.providerActivities);
-        var entries = Object.assign({}, providers[provider] || ({}));
+        const provider = root.normalizedProvider(providerValue);
+        const activityId = root.normalizedId(activityIdValue);
+        const providers = Object.assign({}, root.providerActivities);
+        const entries = Object.assign({}, providers[provider] || ({}));
         if (!Object.prototype.hasOwnProperty.call(entries, activityId))
             return false;
 
@@ -174,25 +174,25 @@ Singleton {
     }
 
     function clearProvider(providerValue) {
-        var provider = root.normalizedProvider(providerValue);
+        const provider = root.normalizedProvider(providerValue);
         if (!Object.prototype.hasOwnProperty.call(root.providerActivities, provider))
             return;
-        var providers = Object.assign({}, root.providerActivities);
+        const providers = Object.assign({}, root.providerActivities);
         delete providers[provider];
         root.providerActivities = providers;
         root.rebuild();
     }
 
     function requestAction(providerValue, activityIdValue, actionIdValue) {
-        var provider = root.normalizedProvider(providerValue);
-        var activityId = root.normalizedId(activityIdValue);
-        var actionId = root.normalizedId(actionIdValue);
-        var entries = root.providerActivities[provider] || ({});
-        var entry = entries[activityId];
+        const provider = root.normalizedProvider(providerValue);
+        const activityId = root.normalizedId(activityIdValue);
+        const actionId = root.normalizedId(actionIdValue);
+        const entries = root.providerActivities[provider] || ({});
+        const entry = entries[activityId];
         if (!entry)
             return false;
 
-        for (var i = 0; i < entry.actions.length; i++) {
+        for (let i = 0; i < entry.actions.length; i++) {
             if (entry.actions[i].id === actionId) {
                 root.actionRequested(provider, activityId, actionId);
                 return true;

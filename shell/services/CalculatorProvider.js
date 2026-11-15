@@ -1,28 +1,28 @@
 .pragma library
 
 function tokenize(source) {
-    var tokens = [];
-    var index = 0;
+    const tokens = [];
+    let index = 0;
     while (index < source.length) {
-        var rest = source.substring(index);
-        var whitespace = rest.match(/^\s+/);
+        const rest = source.substring(index);
+        const whitespace = rest.match(/^\s+/);
         if (whitespace) {
             index += whitespace[0].length;
             continue;
         }
-        var number = rest.match(/^(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?/i);
+        const number = rest.match(/^(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?/i);
         if (number) {
             tokens.push({ type: "number", value: Number(number[0]) });
             index += number[0].length;
             continue;
         }
-        var identifier = rest.match(/^[a-z][a-z0-9_]*/i);
+        const identifier = rest.match(/^[a-z][a-z0-9_]*/i);
         if (identifier) {
             tokens.push({ type: "identifier", value: identifier[0].toLowerCase() });
             index += identifier[0].length;
             continue;
         }
-        var ch = source[index];
+        const ch = source[index];
         if ("+-*/%^(),".indexOf(ch) >= 0) {
             tokens.push({ type: ch, value: ch });
             index++;
@@ -45,7 +45,7 @@ function take(state, type) {
 }
 
 function expect(state, type, label) {
-    var token = take(state, type);
+    const token = take(state, type);
     if (!token)
         throw new Error("Expected " + (label || type) + ".");
     return token;
@@ -68,20 +68,20 @@ function applyFunction(name, args) {
 }
 
 function parsePrimary(state) {
-    var number = take(state, "number");
+    const number = take(state, "number");
     if (number)
         return number.value;
     if (take(state, "(")) {
-        var grouped = parseExpression(state);
+        const grouped = parseExpression(state);
         expect(state, ")", "')'");
         return grouped;
     }
-    var identifier = take(state, "identifier");
+    const identifier = take(state, "identifier");
     if (identifier) {
         if (identifier.value === "pi") return Math.PI;
         if (identifier.value === "e") return Math.E;
         expect(state, "(", "'(' after " + identifier.value);
-        var args = [];
+        const args = [];
         if (peek(state).type !== ")") {
             args.push(parseExpression(state));
             while (take(state, ","))
@@ -100,23 +100,23 @@ function parseUnary(state) {
 }
 
 function parsePower(state) {
-    var value = parseUnary(state);
+    let value = parseUnary(state);
     if (take(state, "^"))
         value = Math.pow(value, parsePower(state));
     return value;
 }
 
 function parseTerm(state) {
-    var value = parsePower(state);
+    let value = parsePower(state);
     while (true) {
         if (take(state, "*")) {
             value *= parsePower(state);
         } else if (take(state, "/")) {
-            var divisor = parsePower(state);
+            const divisor = parsePower(state);
             if (divisor === 0) throw new Error("Division by zero.");
             value /= divisor;
         } else if (take(state, "%")) {
-            var modulus = parsePower(state);
+            const modulus = parsePower(state);
             if (modulus === 0) throw new Error("Modulo by zero.");
             value %= modulus;
         } else {
@@ -126,7 +126,7 @@ function parseTerm(state) {
 }
 
 function parseExpression(state) {
-    var value = parseTerm(state);
+    let value = parseTerm(state);
     while (true) {
         if (take(state, "+")) value += parseTerm(state);
         else if (take(state, "-")) value -= parseTerm(state);
@@ -143,7 +143,7 @@ function format(value) {
 }
 
 function isCandidate(query) {
-    var value = String(query || "").trim();
+    const value = String(query || "").trim();
     if (value.indexOf("=") === 0)
         return true;
     if (!/[0-9]/.test(value))
@@ -154,16 +154,16 @@ function isCandidate(query) {
 }
 
 function evaluate(query) {
-    var raw = String(query || "").trim();
-    var explicit = raw.indexOf("=") === 0;
-    var expression = explicit ? raw.substring(1).trim() : raw;
+    const raw = String(query || "").trim();
+    const explicit = raw.indexOf("=") === 0;
+    const expression = explicit ? raw.substring(1).trim() : raw;
     if (!isCandidate(raw))
         return { candidate: false, ok: false, expression: expression, result: "", error: "" };
     if (expression === "")
         return { candidate: true, ok: false, expression: expression, result: "", error: "Enter an expression after '='." };
     try {
-        var state = { tokens: tokenize(expression), index: 0 };
-        var value = parseExpression(state);
+        const state = { tokens: tokenize(expression), index: 0 };
+        const value = parseExpression(state);
         expect(state, "end", "the end of the expression");
         if (!isFinite(value) || isNaN(value))
             throw new Error("The expression has no finite result.");

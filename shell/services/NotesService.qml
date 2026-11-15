@@ -4,248 +4,195 @@ import QtQuick
 import Qt.labs.folderlistmodel
 import Quickshell
 import Quickshell.Io
+import "Shell.js" as Shell
 
 // Notes as text files under <dataDir>/notes: the list, the open note, saving as you
 // type, edits made outside Speshell, and creating and deleting notes with an undo.
 Singleton {
     id: root
 
+    // "" until read() first runs, "preparing" the folder, "listing" its notes the first
+    // time, "loading" the open note, "ready" with it open, or "unreadable" when it
+    // could not be read.
+    property string phase: ""
+    // The file operation running, or null: { kind: "create", "delete", "restore", or
+    // "purge"; note; next, the note that opens after a create or delete; and index,
+    // where a deleted note was in the list }.
+    property var operation: null
+    // The write in flight, or null: { note, text }.
+    property var writing: null
     property var noteList: []
     property string currentNote: ""
     property string text: ""
+    // The open note's text as last read or written.
     property string savedText: ""
-    property string writeText: ""
-    property string writeNote: ""
-    property string loadTarget: ""
     property string errorText: ""
-    property bool initialized: false
-    property bool initializing: false
-    property bool bootstrapped: false
-    property bool loaded: false
-    property bool loading: false
-    property bool dirty: false
-    property bool saving: false
-    property bool saveQueued: false
-    property bool mutating: false
-    property string mutationKind: ""
-    property string mutationTarget: ""
-    property string mutationNextNote: ""
-    property var mutationNextList: []
-    property int mutationOriginalIndex: -1
     // A deleted note waits in the trash this long, for Undo, before it goes.
     readonly property int undoMs: 5000
     property string pendingDeleteNote: ""
     property int pendingDeleteIndex: -1
-    property string bootstrapDataDir: ""
-    property bool externalReload: false
 
-    readonly property string notesDir: ConfigService.dataDir !== ""
-        ? ConfigService.dataDir + "/notes"
-        : ""
-    readonly property string activeNotePath: root.notesDir !== ""
-        ? root.notesDir + "/.active"
-        : ""
-    readonly property string trashDir: root.notesDir !== ""
-        ? root.notesDir + "/.trash"
-        : ""
-    readonly property string notesPath: root.resolveNotePath(root.currentNote)
-    readonly property bool managementEnabled: root.initialized
-        && root.loaded
-        && !root.loading
-        && !root.mutating
+    readonly property string notesDir: ConfigService.dataDir !== "" ? ConfigService.dataDir + "/notes" : ""
+    readonly property string activeNotePath: root.notesDir !== "" ? root.notesDir + "/.active" : ""
+    readonly property string trashDir: root.notesDir !== "" ? root.notesDir + "/.trash" : ""
+    readonly property string notesPath: root.notePath(root.currentNote)
+    readonly property bool loaded: root.phase === "ready"
+    readonly property bool dirty: root.text !== root.savedText
+    readonly property bool mutating: root.operation !== null
+    // Notes can be switched, made, and deleted, also away from a note that can't be read.
+    readonly property bool managementEnabled: (root.loaded || root.phase === "unreadable") && !root.mutating
 
-    function resolveNotePath(name) {
-        if (root.notesDir === "" || name === "")
-            return "";
-        return root.notesDir + "/" + String(name) + ".txt";
+    function notePath(name) {
+        return root.notesDir !== "" && name !== "" ? root.notesDir + "/" + name + ".txt" : "";
     }
 
-    function resolveTrashPath(name) {
-        if (root.trashDir === "" || name === "")
-            return "";
-        return root.trashDir + "/" + String(name) + ".txt";
+    function trashPath(name) {
+        return root.trashDir !== "" && name !== "" ? root.trashDir + "/" + name + ".txt" : "";
     }
 
     function canonicalNoteName(rawName) {
-        var name = String(rawName || "")
+        const name = String(rawName || "")
             .replace(/[\u0000-\u001f\u007f\/]/g, "_")
             .replace(/\s+/g, " ")
             .trim();
-        if (name === "")
-            name = "Note";
-        return name.substring(0, 60).trim();
+        return (name || "Note").substring(0, 60).trim();
     }
 
     function uniqueNoteName(rawName) {
-        var baseName = root.canonicalNoteName(rawName);
-        var name = baseName;
-        var counter = 1;
-        while (root.noteList.indexOf(name) !== -1 || root.pendingDeleteNote === name) {
-            var suffix = " (" + counter + ")";
+        const baseName = root.canonicalNoteName(rawName);
+        let name = baseName;
+        for (let counter = 1; root.noteList.includes(name) || root.pendingDeleteNote === name; counter++) {
+            const suffix = " (" + counter + ")";
             name = baseName.substring(0, 60 - suffix.length).trim() + suffix;
-            counter++;
         }
         return name;
     }
 
     function read() {
-        if (ConfigService.dataDir === ""
-                || root.initialized
-                || root.initializing
-                || bootstrapProc.running)
+        if (root.phase !== "" || root.notesDir === "" || prepareProc.running)
             return;
-
-        root.initializing = true;
-        root.loaded = false;
+        root.phase = "preparing";
         root.errorText = "";
-        root.bootstrapDataDir = ConfigService.dataDir;
-        bootstrapProc.command = [
-            "sh", "-c",
-            "set -eu; "
-                + "notes_dir=$1; scratchpad_file=$2; trash_dir=$3; "
-                + "umask 077; "
-                + "mkdir -p -- \"$notes_dir\" \"$trash_dir\"; "
-                + "for discarded in \"$trash_dir\"/*.txt \"$trash_dir\"/.*.txt; do "
-                + "  if [ -f \"$discarded\" ]; then rm -f -- \"$discarded\"; fi; "
-                + "done; "
-                + "has_notes=false; "
-                + "for candidate in \"$notes_dir\"/*.txt \"$notes_dir\"/.*.txt; do "
-                + "  if [ -f \"$candidate\" ]; then has_notes=true; break; fi; "
-                + "done; "
-                + "if [ \"$has_notes\" = false ]; then : > \"$scratchpad_file\"; fi",
-            "speshell-notes-bootstrap",
-            root.notesDir,
-            root.resolveNotePath("Scratchpad"),
-            root.trashDir
-        ];
-        bootstrapProc.running = true;
+        prepareProc.command = Shell.script("notes.sh", [root.notesDir, root.notePath("Scratchpad"), root.trashDir]);
+        prepareProc.running = true;
     }
 
-    function resetForDataDir() {
+    function finishPrepare(exitCode, errorText) {
+        // The data folder changed meanwhile.
+        if (root.phase !== "preparing") {
+            root.read();
+            return;
+        }
+        if (exitCode !== 0) {
+            root.phase = "";
+            const detail = errorText.trim();
+            root.errorText = "Could not prepare the notes directory." + (detail !== "" ? " " + detail : "");
+            return;
+        }
+        root.phase = "listing";
+        catalogRefreshTimer.restart();
+    }
+
+    function reset() {
         saveTimer.stop();
         catalogRefreshTimer.stop();
         deleteCommitTimer.stop();
+        root.phase = "";
+        root.operation = null;
+        root.writing = null;
         root.noteList = [];
         root.currentNote = "";
         root.text = "";
         root.savedText = "";
-        root.writeText = "";
-        root.writeNote = "";
-        root.loadTarget = "";
-        notesFile.path = "";
-        root.initialized = false;
-        root.initializing = false;
-        root.bootstrapped = false;
-        root.loaded = false;
-        root.loading = false;
-        root.dirty = false;
-        root.saving = false;
-        root.saveQueued = false;
-        root.mutating = false;
-        root.mutationKind = "";
-        root.mutationTarget = "";
-        root.mutationNextNote = "";
-        root.mutationNextList = [];
-        root.mutationOriginalIndex = -1;
         root.pendingDeleteNote = "";
         root.pendingDeleteIndex = -1;
-        root.externalReload = false;
         root.errorText = "";
+        notesFile.path = "";
     }
 
     function catalogNames() {
-        var list = [];
-        for (var i = 0; i < catalogModel.count; i++) {
-            var fileName = String(catalogModel.get(i, "fileName") || "");
-            if (fileName.length <= 4 || fileName.substring(fileName.length - 4) !== ".txt")
-                continue;
-            var name = fileName.substring(0, fileName.length - 4);
-            if (name !== "" && list.indexOf(name) === -1)
-                list.push(name);
+        const names = [];
+        for (let i = 0; i < catalogModel.count; i++) {
+            const fileName = String(catalogModel.get(i, "fileName") || "");
+            const name = fileName.endsWith(".txt") ? fileName.slice(0, -4) : "";
+            if (name !== "" && !names.includes(name))
+                names.push(name);
         }
-        return list;
+        return names;
     }
 
     function refreshCatalog() {
-        if (!root.bootstrapped || catalogModel.status !== FolderListModel.Ready)
+        if (root.phase === "" || root.phase === "preparing" || catalogModel.status !== FolderListModel.Ready)
             return;
+        const list = root.catalogNames();
+        root.noteList = list.length > 0 ? list : ["Scratchpad"];
 
-        var list = root.catalogNames();
-        if (list.length === 0)
-            list = ["Scratchpad"];
-        root.noteList = list;
-
-        if (!root.initialized) {
-            var preferred = String(activeNoteFile.text() || "").trim();
-            if (list.indexOf(preferred) === -1)
-                preferred = list[0];
-
-            root.initialized = true;
-            root.initializing = false;
-            root.loadNote(preferred, false);
-            if (String(activeNoteFile.text() || "").trim() !== preferred)
-                root.persistActiveNote(preferred);
+        if (root.phase === "listing") {
+            const remembered = activeNoteFile.text().trim();
+            const preferred = root.noteList.includes(remembered) ? remembered : root.noteList[0];
+            root.loadNote(preferred, preferred !== remembered);
             return;
         }
-
-        if (!root.mutating && list.indexOf(root.currentNote) === -1) {
-            if (root.dirty || root.saving) {
-                root.errorText = "The active note was removed outside Speshell; your unsaved text is still open.";
-                return;
-            }
-            root.loadNote(list[0], true);
+        if (root.mutating || root.noteList.includes(root.currentNote))
+            return;
+        if (root.dirty || root.writing) {
+            root.errorText = "The active note was removed outside Speshell; your unsaved text is still open.";
+            return;
         }
+        root.loadNote(root.noteList[0], true);
     }
 
-    function loadNote(name, persistSelection) {
-        root.loaded = false;
-        root.loading = true;
-        root.dirty = false;
-        root.externalReload = false;
+    // Callers save the open note first; what is left unsaved is dropped.
+    function loadNote(name, remember) {
+        root.phase = "loading";
         root.currentNote = name;
-        root.loadTarget = name;
+        root.savedText = root.text;
         root.errorText = "";
-        if (persistSelection)
-            root.persistActiveNote(name);
-        var nextPath = root.resolveNotePath(name);
-        if (notesFile.path === nextPath)
+        if (remember)
+            root.rememberActiveNote(name);
+        const path = root.notePath(name);
+        if (notesFile.path === path)
             notesFile.reload();
         else
-            notesFile.path = nextPath;
+            notesFile.path = path;
     }
 
-    function finishLoad(initialText) {
-        if (!root.loading || root.loadTarget !== root.currentNote)
+    function finishLoad(loadedText) {
+        if (notesFile.path !== root.notesPath)
             return;
-        root.text = String(initialText);
-        root.savedText = root.text;
-        root.loaded = true;
-        root.loading = false;
-        root.dirty = false;
+        if (root.phase === "loading") {
+            root.text = loadedText;
+            root.savedText = loadedText;
+            root.phase = "ready";
+        } else if (root.phase === "ready") {
+            root.applyExternalText(loadedText);
+        }
     }
 
     function failLoad() {
-        if (!root.loading || root.loadTarget !== root.currentNote)
+        if (root.phase !== "loading" || notesFile.path !== root.notesPath)
             return;
-        root.loading = false;
-        root.loaded = false;
+        root.phase = "unreadable";
+        // Not the last note's text under this one's name.
+        root.text = "";
+        root.savedText = "";
         root.errorText = "Could not read " + root.currentNote + ". Your other notes were not changed.";
         catalogRefreshTimer.restart();
     }
 
-    // Another program changed the open note. Speshell's own saves are ignored
-    // because the reloaded text matches savedText.
+    // Another program changed the open note; Speshell's own writes read back as they are.
     function handleExternalChange() {
-        if (!root.loaded || root.loading || root.saving)
-            return;
-        root.externalReload = true;
-        notesFile.reload();
+        if (root.phase === "ready" && !root.writing)
+            notesFile.reload();
     }
 
-    function applyExternalText(nextText) {
-        var next = String(nextText);
+    function applyExternalText(next) {
         if (next === root.savedText)
             return;
+        if (next === root.text) {
+            root.savedText = next;
+            return;
+        }
         if (root.dirty) {
             root.errorText = root.currentNote + " changed outside Speshell. Your unsaved text is still open and will replace that change when saved.";
             return;
@@ -256,7 +203,7 @@ Singleton {
         root.errorText = "";
     }
 
-    function persistActiveNote(name) {
+    function rememberActiveNote(name) {
         if (root.activeNotePath === "")
             return;
         activeNoteFile.blockWrites = true;
@@ -264,95 +211,59 @@ Singleton {
         activeNoteFile.blockWrites = false;
     }
 
-    function selectNote(targetName) {
-        if (!root.managementEnabled
-                || targetName === ""
-                || targetName === root.currentNote
-                || root.noteList.indexOf(targetName) === -1)
+    function selectNote(name) {
+        // The open note again only to retry reading it.
+        const again = name === root.currentNote && root.phase !== "unreadable";
+        if (!root.managementEnabled || name === "" || again || !root.noteList.includes(name))
             return false;
         if (!root.flush(true))
             return false;
-        root.loadNote(targetName, true);
+        root.loadNote(name, true);
         return true;
     }
 
     function createNote(rawName) {
-        if (!root.managementEnabled || mutationProc.running)
+        if (!root.managementEnabled || !root.flush(true))
             return false;
-        if (!root.flush(true))
-            return false;
-
-        var name = root.uniqueNoteName(rawName);
-        root.mutating = true;
-        root.mutationKind = "create";
-        root.mutationTarget = name;
-        root.mutationNextNote = name;
-        root.mutationNextList = [];
-        root.errorText = "";
-        mutationProc.command = ["touch", "--", root.resolveNotePath(name)];
-        mutationProc.running = true;
+        const name = root.uniqueNoteName(rawName);
+        root.run({ kind: "create", note: name, next: name }, ["touch", "--", root.notePath(name)]);
         return true;
     }
 
-    function deleteNote(targetName) {
-        var index = root.noteList.indexOf(targetName);
-        if (!root.managementEnabled
-                || mutationProc.running
-                || root.pendingDeleteNote !== ""
-                || root.noteList.length <= 1
-                || index === -1)
+    function deleteNote(name) {
+        const index = root.noteList.indexOf(name);
+        if (!root.managementEnabled || root.pendingDeleteNote !== "" || root.noteList.length <= 1 || index === -1)
             return false;
-        if (targetName === root.currentNote && !root.flush(true))
+        if (name === root.currentNote && !root.flush(true))
             return false;
-
-        var nextList = root.noteList.slice();
-        nextList.splice(index, 1);
-        var nextNote = root.currentNote;
-        if (targetName === root.currentNote)
-            nextNote = nextList[Math.min(index, nextList.length - 1)];
-
-        root.mutating = true;
-        root.mutationKind = "delete";
-        root.mutationTarget = targetName;
-        root.mutationNextNote = nextNote;
-        root.mutationNextList = nextList;
-        root.mutationOriginalIndex = index;
-        root.errorText = "";
-        mutationProc.command = [
-            "mv", "--",
-            root.resolveNotePath(targetName),
-            root.resolveTrashPath(targetName)
-        ];
-        mutationProc.running = true;
+        const rest = root.noteList.filter(note => note !== name);
+        const next = name === root.currentNote ? rest[Math.min(index, rest.length - 1)] : root.currentNote;
+        root.run({ kind: "delete", note: name, next: next, index: index },
+            ["mv", "--", root.notePath(name), root.trashPath(name)]);
         return true;
     }
 
     function undoDelete() {
-        if (root.pendingDeleteNote === "" || root.mutating || mutationProc.running)
+        if (root.pendingDeleteNote === "" || root.mutating)
             return false;
         deleteCommitTimer.stop();
-        root.mutating = true;
-        root.mutationKind = "restore";
-        root.mutationTarget = root.pendingDeleteNote;
-        root.errorText = "";
-        mutationProc.command = [
-            "mv", "--",
-            root.resolveTrashPath(root.pendingDeleteNote),
-            root.resolveNotePath(root.pendingDeleteNote)
-        ];
-        mutationProc.running = true;
+        const name = root.pendingDeleteNote;
+        root.run({ kind: "restore", note: name }, ["mv", "--", root.trashPath(name), root.notePath(name)]);
         return true;
     }
 
     function commitPendingDelete() {
-        if (root.pendingDeleteNote === "" || root.mutating || mutationProc.running)
+        if (root.pendingDeleteNote === "" || root.mutating)
             return;
-        root.mutating = true;
-        root.mutationKind = "purge";
-        root.mutationTarget = root.pendingDeleteNote;
+        const name = root.pendingDeleteNote;
+        root.run({ kind: "purge", note: name }, ["rm", "-f", "--", root.trashPath(name)]);
+    }
+
+    function run(operation, command) {
+        root.operation = operation;
         root.errorText = "";
-        mutationProc.command = ["rm", "-f", "--", root.resolveTrashPath(root.pendingDeleteNote)];
-        mutationProc.running = true;
+        operationProc.command = command;
+        operationProc.running = true;
     }
 
     function clearPendingDelete() {
@@ -361,63 +272,44 @@ Singleton {
         root.pendingDeleteIndex = -1;
     }
 
-    function finishMutation(succeeded, detail) {
-        var kind = root.mutationKind;
-        var target = root.mutationTarget;
-        var nextNote = root.mutationNextNote;
-        var nextList = root.mutationNextList;
-        var originalIndex = root.mutationOriginalIndex;
-        root.mutating = false;
-        root.mutationKind = "";
-        root.mutationTarget = "";
-        root.mutationNextNote = "";
-        root.mutationNextList = [];
-        root.mutationOriginalIndex = -1;
-
+    function finishOperation(succeeded, detail) {
+        const operation = root.operation;
+        // Gone when the data folder changed meanwhile.
+        if (!operation)
+            return;
+        root.operation = null;
+        catalogRefreshTimer.restart();
         if (!succeeded) {
-            if (kind === "purge")
-                root.errorText = "Could not finish deleting " + target + ". You can still undo the deletion.";
-            else
-                root.errorText = "Could not " + kind + " " + target + "."
-                    + (detail !== "" ? " " + detail : "");
-            catalogRefreshTimer.restart();
+            root.errorText = operation.kind === "purge"
+                ? "Could not finish deleting " + operation.note + ". You can still undo the deletion."
+                : "Could not " + operation.kind + " " + operation.note + "." + (detail !== "" ? " " + detail : "");
             return;
         }
-
-        if (kind === "create") {
-            var createdList = root.noteList.slice();
-            if (createdList.indexOf(target) === -1)
-                createdList.push(target);
-            root.noteList = createdList;
-            root.loadNote(nextNote, true);
-        } else if (kind === "delete") {
-            root.noteList = nextList;
-            root.pendingDeleteNote = target;
-            root.pendingDeleteIndex = originalIndex;
+        if (operation.kind === "create") {
+            if (!root.noteList.includes(operation.note))
+                root.noteList = root.noteList.concat([operation.note]);
+            root.loadNote(operation.next, true);
+        } else if (operation.kind === "delete") {
+            root.noteList = root.noteList.filter(note => note !== operation.note);
+            root.pendingDeleteNote = operation.note;
+            root.pendingDeleteIndex = operation.index;
             deleteCommitTimer.restart();
-            if (target === root.currentNote)
-                root.loadNote(nextNote, true);
-        } else if (kind === "restore") {
-            var restoredList = root.noteList.filter(function(name) { return name !== target; });
-            var insertAt = Math.min(Math.max(0, root.pendingDeleteIndex), restoredList.length);
-            restoredList.splice(insertAt, 0, target);
-            root.noteList = restoredList;
+            if (operation.note === root.currentNote)
+                root.loadNote(operation.next, true);
+        } else if (operation.kind === "restore") {
+            const restored = root.noteList.filter(note => note !== operation.note);
+            restored.splice(Math.min(Math.max(0, root.pendingDeleteIndex), restored.length), 0, operation.note);
+            root.noteList = restored;
             root.clearPendingDelete();
-        } else if (kind === "purge") {
+        } else {
             root.clearPendingDelete();
         }
-        catalogRefreshTimer.restart();
     }
 
-    function setText(nextText) {
-        if (!root.loaded || root.loading)
+    function setText(next) {
+        if (root.phase !== "ready" || next === root.text)
             return;
-        var next = String(nextText);
-        if (next === root.text)
-            return;
-
         root.text = next;
-        root.dirty = root.text !== root.savedText;
         if (root.dirty)
             saveTimer.restart();
         else
@@ -425,105 +317,69 @@ Singleton {
     }
 
     function save() {
-        if (!root.loaded || root.loading || root.notesPath === "")
+        if (root.phase !== "ready" || root.writing || !root.dirty)
             return;
-        if (root.saving) {
-            root.saveQueued = true;
-            return;
-        }
-        if (root.text === root.savedText) {
-            root.dirty = false;
-            return;
-        }
-
-        root.writeText = root.text;
-        root.writeNote = root.currentNote;
-        root.saving = true;
-        root.dirty = false;
+        root.writing = { note: root.currentNote, text: root.text };
         root.errorText = "";
-        notesFile.setText(root.writeText);
+        notesFile.setText(root.text);
     }
 
-    function finishSave(succeeded) {
-        var writtenText = root.writeText;
-        var writtenNote = root.writeNote;
-        var queued = root.saveQueued;
-        root.writeText = "";
-        root.writeNote = "";
-        root.saveQueued = false;
-        root.saving = false;
-
-        if (succeeded && writtenNote === root.currentNote) {
-            root.savedText = writtenText;
-            root.errorText = "";
-        } else if (!succeeded) {
-            root.errorText = "Could not save " + writtenNote + ". Your text remains open.";
+    function finishWrite(succeeded) {
+        const written = root.writing;
+        if (!written)
+            return;
+        root.writing = null;
+        if (!succeeded) {
+            root.errorText = "Could not save " + written.note + ". Your text remains open.";
+            return;
         }
-
-        root.dirty = root.text !== root.savedText;
-        if (root.dirty && queued && succeeded)
-            root.save();
+        if (written.note !== root.currentNote)
+            return;
+        root.savedText = written.text;
+        root.errorText = "";
+        // What was typed during the write.
+        root.save();
     }
 
+    // Saves the open note: at once, or with `synchronous`, before returning whether
+    // everything is saved.
     function flush(synchronous) {
         saveTimer.stop();
         if (!synchronous) {
             root.save();
             return true;
         }
-        if (!root.loaded)
-            return !root.dirty && !root.saving;
-
-        notesFile.blockWrites = true;
-        if (root.saving)
-            notesFile.waitForJob();
-        if (!root.saving && root.text !== root.savedText)
+        if (root.phase === "ready") {
+            notesFile.blockWrites = true;
+            if (root.writing)
+                notesFile.waitForJob();
             root.save();
-        if (root.saving)
-            notesFile.waitForJob();
-        notesFile.blockWrites = false;
-
-        root.dirty = root.text !== root.savedText;
-        return !root.saving && !root.dirty;
+            if (root.writing)
+                notesFile.waitForJob();
+            notesFile.blockWrites = false;
+        }
+        return !root.writing && !root.dirty;
     }
 
     Connections {
         target: ConfigService
+
         function onDataDirChanged() {
-            if (root.loaded)
-                root.flush(true);
-            root.resetForDataDir();
+            root.flush(true);
+            root.reset();
             root.read();
         }
     }
 
     Process {
-        id: bootstrapProc
-        running: false
-        stderr: StdioCollector { id: bootstrapError }
-        onExited: function(exitCode) {
-            if (root.bootstrapDataDir !== ConfigService.dataDir) {
-                root.resetForDataDir();
-                root.read();
-                return;
-            }
-            if (exitCode !== 0) {
-                root.initializing = false;
-                var detail = String(bootstrapError.text || "").trim();
-                root.errorText = "Could not prepare the notes directory."
-                    + (detail !== "" ? " " + detail : "");
-                return;
-            }
-            root.bootstrapped = true;
-            catalogRefreshTimer.restart();
-        }
+        id: prepareProc
+        stderr: StdioCollector { id: prepareErrors }
+        onExited: exitCode => root.finishPrepare(exitCode, prepareErrors.text)
     }
 
     FolderListModel {
         id: catalogModel
-        folder: root.bootstrapped && root.notesDir !== ""
-            ? "file://" + root.notesDir
-            : ""
+        folder: root.phase !== "" && root.phase !== "preparing" && root.notesDir !== "" ? "file://" + root.notesDir : ""
         nameFilters: ["*.txt"]
         showFiles: true
         showDirs: false
@@ -537,7 +393,6 @@ Singleton {
     Timer {
         id: catalogRefreshTimer
         interval: 80
-        repeat: false
         onTriggered: root.refreshCatalog()
     }
 
@@ -551,52 +406,32 @@ Singleton {
     }
 
     Process {
-        id: mutationProc
-        running: false
-        stderr: StdioCollector { id: mutationError }
-        onExited: function(exitCode) {
-            root.finishMutation(exitCode === 0, String(mutationError.text || "").trim());
-        }
+        id: operationProc
+        stderr: StdioCollector { id: operationErrors }
+        onExited: exitCode => root.finishOperation(exitCode === 0, operationErrors.text.trim())
     }
 
     FileView {
         id: notesFile
-        path: ""
         atomicWrites: true
-        blockWrites: false
         printErrors: false
         watchChanges: true
-
         onFileChanged: root.handleExternalChange()
-        onLoaded: {
-            if (root.externalReload) {
-                root.externalReload = false;
-                root.applyExternalText(notesFile.text());
-            } else {
-                root.finishLoad(notesFile.text());
-            }
-        }
-        onLoadFailed: {
-            if (root.externalReload)
-                root.externalReload = false;
-            else
-                root.failLoad();
-        }
-        onSaved: root.finishSave(true)
-        onSaveFailed: root.finishSave(false)
+        onLoaded: root.finishLoad(notesFile.text())
+        onLoadFailed: root.failLoad()
+        onSaved: root.finishWrite(true)
+        onSaveFailed: root.finishWrite(false)
     }
 
     Timer {
         id: saveTimer
         interval: 700
-        repeat: false
         onTriggered: root.save()
     }
 
     Timer {
         id: deleteCommitTimer
         interval: root.undoMs
-        repeat: false
         onTriggered: root.commitPendingDelete()
     }
 }

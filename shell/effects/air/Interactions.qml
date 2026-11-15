@@ -46,7 +46,7 @@ Item {
     // A gust from behind blows the knob along: the one blowing its way takes the
     // travel, and the other, if a drag turned back, dies away.
     function slide(at, dx) {
-        var g = dx > 0 ? gustRight : gustLeft;
+        const g = dx > 0 ? gustRight : gustLeft;
         // Starting from still, or on another slider: the gust starts afresh.
         if (g.speed === 0 || Math.abs(g.at.y - at.y) > 4 || Math.abs(g.at.x - at.x) > 80) {
             g.speed = 0;
@@ -56,8 +56,8 @@ Item {
         g.at = at;
         g.lead = Math.min(Math.abs(dx), 40);
         g.push += Math.abs(dx);
-        var dir = g.dir;
-        var s = g.strength;
+        const dir = g.dir;
+        const s = g.strength;
         // Specks and the odd leaf carried in it, by travel but never faster than a few a second.
         root.speckOwed += Math.abs(dx);
         if (root.speckOwed >= 40 && root.sinceSpeck > 0.08) {
@@ -83,8 +83,8 @@ Item {
     }
 
     function pick(area, at) {
-        var cx = at.x, cy = at.y;
-        var size = Math.max(44, Math.min(96, Math.max(area.width, area.height) * 2));
+        const cx = at.x, cy = at.y;
+        const size = Math.max(44, Math.min(96, Math.max(area.width, area.height) * 2));
         root.curl(cx, cy, size);
         root.leaf(cx + size * 0.3, cy - size * 0.2, rnd(40, 100), -rnd(80, 140));
         root.wisp(cx - size * 0.4, cy + size * 0.15, 30, -60, 34);
@@ -92,13 +92,13 @@ Item {
     }
 
     function toggle(area, on) {
-        var x = on ? area.x + area.width - area.height / 2 : area.x + area.height / 2;
-        var cy = area.y + area.height / 2;
+        const x = on ? area.x + area.width - area.height / 2 : area.x + area.height / 2;
+        const cy = area.y + area.height / 2;
         if (on) {
             root.curl(x, cy, 36);
             root.leaf(x, cy - 6, rnd(40, 110), -rnd(90, 150));
         } else {
-            for (var i = 0; i < 3; i++)
+            for (let i = 0; i < 3; i++)
                 root.speck(x + rnd(-6, 6), cy - rnd(0, 8));
         }
     }
@@ -119,7 +119,7 @@ Item {
 
         // `rival`: the other gust is blowing, so the drag turned back and this one dies fast.
         function step(dt, rival) {
-            var target = Math.min(push / Math.max(dt, 0.004), 1500);
+            const target = Math.min(push / Math.max(dt, 0.004), 1500);
             push = 0;
             speed += (target - speed) * (1 - Math.exp(-dt * (target > speed ? 14 : rival ? 12 : 4.5)));
             if (speed < 4)
@@ -155,10 +155,10 @@ Item {
         active: gustRight.blowing || gustLeft.blowing
         sourceComponent: Component {
             EffectClock {
-                onAdvanced: function(dt) {
+                onAdvanced: dt => {
                     root.sinceSpeck += dt;
                     root.sinceLeaf += dt;
-                    var right = gustRight.push > 0, left = gustLeft.push > 0;
+                    const right = gustRight.push > 0, left = gustLeft.push > 0;
                     gustRight.step(dt, left);
                     gustLeft.step(dt, right);
                 }

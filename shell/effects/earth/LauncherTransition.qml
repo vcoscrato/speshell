@@ -38,7 +38,7 @@ Item {
 
     function span(x, a, b) { return Math.max(0, Math.min(1, (x - a) / (b - a))); }
     // Overshoots slightly before settling, like a slab punched up.
-    function backOut(x) { var c = 1.9; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); }
+    function backOut(x) { const c = 1.9; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); }
 
     // Entrance: the ground cracks (0-0.1), the slab punches up and overshoots
     // (0.08-0.37), lands with a jolt that cracks it (0.37-0.5), and its shell breaks
@@ -71,7 +71,7 @@ Item {
 
     EffectClock {
         id: clock
-        onAdvanced: function(dt) {
+        onAdvanced: dt => {
             if (root.active) {
                 if (root.leave > 0) {
                     root.leave = Math.max(0, root.leave - dt / root.exitTime);

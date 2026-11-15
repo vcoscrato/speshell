@@ -47,9 +47,9 @@ PopupMenu {
 
         delegate: Slot {}
 
-        onObjectAdded: function(index, object) {
-            var slot = object as Slot;
-            var entry = slot.modelData;
+        onObjectAdded: (index, object) => {
+            const slot = object as Slot;
+            const entry = slot.modelData;
             slot.submenu = entry.hasChildren;
             if (slot.submenu) {
                 slot.built = Qt.createComponent("TrayMenu.qml").createObject(null, { handle: entry, title: entry.text });
@@ -63,8 +63,8 @@ PopupMenu {
         }
 
         // Removing also destroys them.
-        onObjectRemoved: function(index, object) {
-            var slot = object as Slot;
+        onObjectRemoved: (index, object) => {
+            const slot = object as Slot;
             if (slot.submenu)
                 root.removeMenu(slot.built);
             else

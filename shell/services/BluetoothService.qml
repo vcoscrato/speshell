@@ -35,9 +35,16 @@ Singleton {
         discoveryTimeout.stop();
     }
 
+    function connectDevice(device, on) {
+        if (on)
+            device.connect();
+        else
+            device.disconnect();
+    }
+
     // BlueZ names a device's class with a freedesktop icon name; map it to ours.
     function deviceIcon(device) {
-        var icon = String(device && device.icon || "");
+        const icon = String(device && device.icon || "");
         if (icon.indexOf("audio-head") === 0)
             return "device-headphones";
         if (icon.indexOf("audio") === 0)

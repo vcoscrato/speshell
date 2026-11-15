@@ -104,12 +104,12 @@ Item {
         onEntered: root.pointerInside = true
         onExited: root.pointerInside = false
         onCanceled: root.pointerInside = false
-        onClicked: function(event) {
+        onClicked: event => {
             if (event.button === Qt.RightButton)
                 root.rightClicked();
             else
                 root.clicked(mouse);
         }
-        onWheel: function(event) { root.wheeled(event.angleDelta.y); }
+        onWheel: event => root.wheeled(event.angleDelta.y)
     }
 }

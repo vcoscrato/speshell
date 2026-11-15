@@ -125,8 +125,7 @@ Card {
     function saveLocation() {
         const location = locationField.text.trim();
         root.editingLocation = false;
-        if (location !== WeatherService.location)
-            ConfigService.setProperty("Weather", "location", location);
+        WeatherService.setLocation(location);
     }
 
     onPresentedChanged: {
@@ -327,7 +326,7 @@ Card {
                     id: dayName
                     anchors.verticalCenter: parent.verticalCenter
                     width: 48
-                    text: day.index === 0 ? "Today" : Qt.formatDate(day.modelData.date, "ddd")
+                    text: day.index === 0 ? "Today" : Format.weekday(day.modelData.date)
                     font.weight: day.index === 0 ? Font.DemiBold : Font.Normal
                     color: day.index === 0 ? Theme.accent : Theme.text
                 }

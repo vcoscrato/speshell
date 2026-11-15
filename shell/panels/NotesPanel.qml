@@ -67,12 +67,12 @@ Card {
     }
 
     function updateRenderedMarkdown() {
-        var src = notesInput.text;
+        const src = notesInput.text;
         if (!src || src.trim() === "") {
             root.renderedMarkdown = "";
             return;
         }
-        var str = root.spaceParagraphs(String(src));
+        let str = root.spaceParagraphs(String(src));
 
         // Subscripts: $X_1$ or $X_{12}$
         str = str.replace(/\$([a-zA-Z0-9]+)_\{?([a-zA-Z0-9+\-=]+)\}?\$/g, "$1<sub>$2</sub>");
@@ -115,10 +115,10 @@ Card {
     }
 
     function beginEditMode(clickX, clickY) {
-        if (!NotesService.managementEnabled)
+        if (!NotesService.loaded || NotesService.mutating)
             return;
         root.previewMode = false;
-        Qt.callLater(function() {
+        Qt.callLater(() => {
             notesInput.forceActiveFocus();
             if (typeof clickX === "number" && typeof clickY === "number") {
                 const position = notesInput.positionAt(clickX, clickY);
@@ -401,7 +401,7 @@ Card {
                 placeholderTextColor: Theme.subtext
                 font.pixelSize: Theme.fontSizeSmall
                 font.family: Theme.fontFamily
-                enabled: NotesService.managementEnabled
+                enabled: NotesService.loaded && !NotesService.mutating
 
                 onTextChanged: {
                     if (!root.syncingFromService)
@@ -469,7 +469,7 @@ Card {
                         ? Qt.PointingHandCursor
                         : Qt.IBeamCursor
                     onClicked: (mouse) => {
-                        var link = markdownText.linkAt(mouse.x, mouse.y);
+                        const link = markdownText.linkAt(mouse.x, mouse.y);
                         if (link !== "") {
                             Qt.openUrlExternally(link);
                             return;

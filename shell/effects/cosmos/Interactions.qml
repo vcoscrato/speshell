@@ -34,20 +34,20 @@ Item {
     // Stars strung out from (x, y) one by one; `room` px above it to lean into, and
     // `area` (if any) the control to keep off.
     function constellation(x, y, size, life, room, area) {
-        var keepOff = area ? Qt.vector4d(area.x - x, area.y - y, area.width, area.height) : Qt.vector4d(0, 0, 0, 0);
+        const keepOff = area ? Qt.vector4d(area.x - x, area.y - y, area.width, area.height) : Qt.vector4d(0, 0, 0, 0);
         bits.spawn({ x: x, y: y, life: life, size: size, props: { kind: 2, seed: Math.random(), room: room, keepOff: keepOff, z: 1 } });
     }
 
     function burst(x, y, count, speed) {
-        for (var i = 0; i < count; i++) {
-            var a = (i + Math.random() * 0.8) / count * 2 * Math.PI;
-            var v = rnd(0.5, 1) * speed;
+        for (let i = 0; i < count; i++) {
+            const a = (i + Math.random() * 0.8) / count * 2 * Math.PI;
+            const v = rnd(0.5, 1) * speed;
             root.mote(x, y, Math.cos(a) * v, Math.sin(a) * v);
         }
     }
 
     function slide(at, dx) {
-        var back = dx > 0 ? -1 : 1;
+        const back = dx > 0 ? -1 : 1;
         root.dustOwed = Math.min(root.dustOwed + Math.abs(dx), 30);
         while (root.dustOwed >= 5) {
             root.dustOwed -= 5;
@@ -71,8 +71,8 @@ Item {
     }
 
     function toggle(area, on) {
-        var x = on ? area.x + area.width - area.height / 2 : area.x + area.height / 2;
-        var cy = area.y + area.height / 2;
+        const x = on ? area.x + area.width - area.height / 2 : area.x + area.height / 2;
+        const cy = area.y + area.height / 2;
         if (on) {
             root.glint(x, cy, 26);
             root.constellation(x, cy, 76, 0.8, cy);

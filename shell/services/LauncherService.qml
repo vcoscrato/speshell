@@ -8,9 +8,9 @@ import "BangProvider.js" as BangProvider
 import "Shell.js" as Shell
 
 // The launcher's state and results: apps, open windows and apps hidden in the tray, the
-// calculator, bangs, web searches, its own commands (the theme gallery, mirroring, applying
-// and updating the system), and
-// what activating each does. Launch counts order the apps.
+// calculator, bangs, web searches, its own commands (the theme gallery, mirroring,
+// applying and updating the system), and what activating each does. Launch counts order
+// the apps.
 Singleton {
     id: root
 
@@ -20,9 +20,11 @@ Singleton {
     property var results: []
     property var appIndex: []
     property var usage: ({})
+    // The usage file: "" before it is read, "loading", "ready", or "saving"; and whether
+    // another save waits for this one.
+    property string usagePhase: ""
     property bool saveQueued: false
-    property bool usageLoaded: false
-    property bool savingUsage: false
+    readonly property bool usageLoaded: root.usagePhase === "ready" || root.usagePhase === "saving"
     property var pendingLaunches: ({})
     property string activationError: ""
     readonly property string usagePath: ConfigService.dataDir !== ""
@@ -87,7 +89,7 @@ Singleton {
     }
 
     function setQuery(value) {
-        var next = String(value || "");
+        const next = String(value || "");
         if (root.query === next)
             return;
         root.query = next;
@@ -96,7 +98,7 @@ Singleton {
     }
 
     function rebuildAppIndex() {
-        var entries = DesktopEntries.applications && DesktopEntries.applications.values
+        const entries = DesktopEntries.applications && DesktopEntries.applications.values
             ? DesktopEntries.applications.values
             : [];
         root.appIndex = AppProvider.buildIndex(entries);
@@ -134,7 +136,7 @@ Singleton {
 
     // The launcher's own actions that apply right now.
     function commandResults() {
-        var commands = [BangProvider.commandResult("theme", "Themes", "Pick a theme, then its wallpaper", "palette",
+        const commands = [BangProvider.commandResult("theme", "Themes", "Pick a theme, then its wallpaper", "palette",
             "wallpaper background color scheme palette appearance speshell"),
             BangProvider.commandResult("apply", "Apply system", "Bring this machine to what its modules declare", "check",
                 "speshell modules packages install services dotfiles config sync pacman paru"),
@@ -153,7 +155,7 @@ Singleton {
     }
 
     function rebuild() {
-        var trimmed = root.query.trim();
+        const trimmed = root.query.trim();
         if (trimmed.indexOf("!") === 0) {
             root.results = BangProvider.bangResults(trimmed, root.launcherConfig, root.commandResults());
             return;
@@ -163,15 +165,15 @@ Singleton {
             return;
         }
 
-        var calculation = CalculatorProvider.evaluate(trimmed);
+        const calculation = CalculatorProvider.evaluate(trimmed);
         if (calculation.candidate) {
             root.results = root.calculatorResults(calculation);
             return;
         }
-        var extras = root.commandResults().map(function(command) {
+        const extras = root.commandResults().map(command => {
             return { id: command.id, title: command.title, keywords: command.bang + " " + command.keywords, result: command };
         });
-        var apps = AppProvider.search(root.appIndex.concat(AppProvider.buildExtraIndex(extras.concat(root.windowItems()))),
+        const apps = AppProvider.search(root.appIndex.concat(AppProvider.buildExtraIndex(extras.concat(root.windowItems()))),
             trimmed, root.usage, 100);
         root.results = apps.length === 0 && trimmed !== ""
             ? BangProvider.searchResult("?" + trimmed, root.launcherConfig)
@@ -187,7 +189,7 @@ Singleton {
             root.pendingLaunches = pending;
         }
 
-        var next = Object.assign({}, root.usage);
+        const next = Object.assign({}, root.usage);
         next[appId] = { count: AppProvider.usageCount(next, appId) + 1, lastUsed: new Date().toISOString() };
         root.usage = next;
         root.saveUsage();
@@ -195,15 +197,15 @@ Singleton {
 
     // DesktopEntry.execute() ignores Terminal=true, so wrap those commands.
     function launchEntry(entry) {
-        var command = [];
-        var source = entry.command || [];
+        const command = [];
+        const source = entry.command || [];
         for (let i = 0; i < source.length; i++)
             command.push(String(source[i]));
         if (!entry.runInTerminal || command.length === 0) {
             entry.execute();
             return;
         }
-        var context = { command: Shell.terminalCommand(command) };
+        const context = { command: Shell.terminalCommand(command) };
         if (entry.workingDirectory)
             context.workingDirectory = entry.workingDirectory;
         Quickshell.execDetached(context);
@@ -222,7 +224,7 @@ Singleton {
             root.complete(result);
             return false;
         }
-        var payload = result.payload || ({});
+        const payload = result.payload || ({});
         if (result.kind === "app" && payload.entry) {
             root.recordLaunch(payload.appId);
             root.launchEntry(payload.entry);
@@ -249,7 +251,7 @@ Singleton {
         }
         // In a terminal, which stays for the result: `speshell system` asks as pacman and sudo do.
         if (result.kind === "command" && (payload.command === "apply" || payload.command === "update")) {
-            const engine = Qt.resolvedUrl("../system/speshell-system").toString().replace(/^file:\/\//, "");
+            const engine = Shell.localPath(Qt.resolvedUrl("../system/speshell-system"));
             Quickshell.execDetached(Shell.terminalCommand([engine, payload.command, "--hold"]));
             return true;
         }
@@ -266,7 +268,7 @@ Singleton {
     }
 
     function emptyMessage() {
-        var trimmed = root.query.trim();
+        const trimmed = root.query.trim();
         if (trimmed.indexOf("?") === 0)
             return "Type a web search after ?";
         if (trimmed.indexOf("!") === 0)
@@ -275,33 +277,47 @@ Singleton {
     }
 
     function readUsage() {
-        if (root.usagePath === "" || root.usageLoaded)
+        if (root.usagePath === "" || root.usagePhase !== "")
             return;
+        root.usagePhase = "loading";
         usageFile.reload();
     }
 
     function saveUsage() {
         if (root.usagePath === "")
             return;
-        if (!root.usageLoaded || root.savingUsage) {
+        if (root.usagePhase !== "ready") {
             root.saveQueued = true;
             return;
         }
-        root.savingUsage = true;
+        root.usagePhase = "saving";
         usageFile.setText(JSON.stringify(root.usage || ({})));
     }
 
-    function finishUsageLoad(text) {
-        if (root.usageLoaded)
+    function saveQueuedUsage() {
+        if (!root.saveQueued)
             return;
-        var parsed = ({});
+        root.saveQueued = false;
+        root.saveUsage();
+    }
+
+    function finishSave() {
+        if (root.usagePhase === "saving")
+            root.usagePhase = "ready";
+        root.saveQueuedUsage();
+    }
+
+    function finishUsageLoad(text) {
+        if (root.usagePhase !== "loading")
+            return;
+        let parsed = ({});
         try {
             parsed = JSON.parse(text || "{}");
         } catch (usageError) {
             parsed = ({});
         }
-        var loadedUsage = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : ({});
-        var pendingIds = Object.keys(root.pendingLaunches);
+        const loadedUsage = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : ({});
+        const pendingIds = Object.keys(root.pendingLaunches);
         for (let i = 0; i < pendingIds.length; i++) {
             const id = pendingIds[i];
             loadedUsage[id] = {
@@ -311,11 +327,9 @@ Singleton {
         }
         root.pendingLaunches = ({});
         root.usage = loadedUsage;
-        root.usageLoaded = true;
-        if (root.saveQueued) {
-            root.saveQueued = false;
-            root.saveUsage();
-        }
+        root.usagePhase = "ready";
+        // Later: FileView drops the saved signal of a write started in onLoaded.
+        Qt.callLater(root.saveQueuedUsage);
     }
 
     FileView {
@@ -325,14 +339,8 @@ Singleton {
         printErrors: false
         onLoaded: root.finishUsageLoad(usageFile.text())
         onLoadFailed: root.finishUsageLoad("{}")
-        onSaved: {
-            root.savingUsage = false;
-            if (root.saveQueued) {
-                root.saveQueued = false;
-                root.saveUsage();
-            }
-        }
-        onSaveFailed: root.savingUsage = false
+        onSaved: root.finishSave()
+        onSaveFailed: root.finishSave()
     }
 
     Component.onCompleted: {
@@ -341,7 +349,7 @@ Singleton {
     }
 
     onUsagePathChanged: {
-        root.usageLoaded = false;
+        root.usagePhase = "";
         root.readUsage();
     }
     onUsageChanged: root.rebuild()

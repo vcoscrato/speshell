@@ -88,7 +88,7 @@ ModalWindow {
                     selectionColor: Theme.accent
                     selectedTextColor: Theme.onAccent
                     font.family: "monospace"
-                    font.pixelSize: Theme.fontSizeSupporting
+                    font.pixelSize: Theme.fontSizeSmall
                 }
             }
         }

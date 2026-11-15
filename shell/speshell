@@ -5,31 +5,33 @@ set -euo pipefail
 # checkout's; SPESHELL_QML_DIR runs another copy.
 script_dir="$(cd -- "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")" && pwd)"
 readonly app_dir="${SPESHELL_QML_DIR:-$script_dir}"
-readonly config_root="${XDG_CONFIG_HOME:-$HOME/.config}"
-readonly data_root="${XDG_DATA_HOME:-$HOME/.local/share}"
-readonly config_dir="$config_root/speshell"
-readonly data_dir="$data_root/speshell"
-readonly config_file="$config_dir/config.ini"
+readonly config_file="${XDG_CONFIG_HOME:-$HOME/.config}/speshell/config.ini"
 
 if [[ ! -r "$app_dir/shell.qml" ]]; then
   printf 'speshell: shell.qml not found in %s\n' "$app_dir" >&2
   exit 1
 fi
 
-install -d -m755 "$config_root" "$data_root" "$config_dir" "$data_dir"
-
-if [[ ! -e "$config_file" && ! -L "$config_file" ]]; then
-  install -m644 "$app_dir/config.example.ini" "$config_file"
-fi
-
 # Prints the call's output. A frozen instance still accepts IPC connections but never
-# answers, so give up after a few seconds; that exits with status 124.
+# answers, so give up after a few seconds; that exits with status 124. An instance
+# without the target, as before its config loads, says so and exits 0; that is 3 here.
 ipc_try() {
   local output
   output="$(timeout 3 /usr/bin/quickshell ipc --any-display -p "$app_dir" call -- "$@" 2>/dev/null)" || return
+  if [[ "$output" == "Target not found." ]]; then
+    return 3
+  fi
   if [[ -n "$output" ]]; then
     printf '%s\n' "$output"
   fi
+}
+
+# Says so when the running instance has stopped on an invalid config.ini.
+config_invalid() {
+  if [[ "$(ipc_try config status)" != invalid ]]; then
+    return 1
+  fi
+  printf 'speshell: config.ini is invalid, so Speshell is stopped until it is fixed: %s\n' "$config_file" >&2
 }
 
 stop_frozen_instances() {
@@ -53,9 +55,12 @@ ipc_call() {
   fi
   if (( status == 124 )); then
     stop_frozen_instances
+  elif config_invalid; then
+    return 1
   fi
 
-  /usr/bin/quickshell -p "$app_dir" --no-duplicate --daemonize
+  # It saves its own log; its output would end up in the reply.
+  /usr/bin/quickshell -p "$app_dir" --no-duplicate --daemonize >/dev/null 2>&1
 
   for _ in $(seq 1 30); do
     if ipc_try "$@"; then
@@ -64,7 +69,7 @@ ipc_call() {
     sleep 0.05
   done
 
-  printf 'speshell: failed to contact IPC target %s\n' "${1:-unknown}" >&2
+  config_invalid || printf 'speshell: failed to contact IPC target %s\n' "${1:-unknown}" >&2
   return 1
 }
 
@@ -83,11 +88,11 @@ readonly usage_text='usage: speshell [QUICKSHELL OPTIONS]
 
 # The usage of the command given, and exit 2.
 usage() {
-  printf '%s\n' "$usage_text" | grep -E "speshell ([a-z]+\|)*$command( |\$)" | sed -E 's/^ *(usage: )?/usage: /' >&2
+  printf '%s\n' "$usage_text" | grep -E "speshell ([a-z]+\|)*$command(\|[a-z]+)*( |\$)" | sed -E 's/^ *(usage: )?/usage: /' >&2
   exit 2
 }
 
-# Calls an IPC target of core/Runtime.qml and prints its reply. The targets check
+# Calls an IPC target of core/Runtime.qml or core/Daemon.qml and prints its reply. The targets check
 # what the arguments name; a reply of "error: WHY" fails with WHY.
 call() {
   local reply

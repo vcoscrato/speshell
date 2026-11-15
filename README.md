@@ -197,7 +197,7 @@ hl.bind("XF86RFKill", hl.dsp.exec_cmd("speshell airplane toggle"), { locked = tr
 hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"), { locked = true })
 ```
 
-On battery, Balanced also runs the theme's effects at 30 fps and looks for recordings started outside Speshell once a minute.
+On battery, Balanced also runs the theme's effects at 30 fps.
 
 ## Themes
 
@@ -261,6 +261,6 @@ just shaders   # compile effect shaders; needed once in a checkout
 just shot fire # the bar in a theme with each panel open, offscreen, and a contact sheet
 ```
 
-`just lint` needs `shellcheck` and `ruff` besides Qt's tools. `shell/speshell` runs the checkout it sits in. Making themes is in [shell/themes](shell/themes/README.md), the effects API in [shell/effects](shell/effects/README.md), and the offscreen previews in [preview/](preview/README.md); agent notes are in [AGENTS.md](AGENTS.md).
+`just lint` needs `shellcheck` and `ruff` besides Qt's tools, and `just format` formats the Python as it expects. `shell/speshell` runs the checkout it sits in. Making themes is in [shell/themes](shell/themes/README.md), the effects API in [shell/effects](shell/effects/README.md), and the offscreen previews in [preview/](preview/README.md); agent notes are in [AGENTS.md](AGENTS.md).
 
 Icons are a subset of [Tabler Icons](https://github.com/tabler/tabler-icons) (MIT), in `shell/icons/tabler/`, and a few of Speshell's own in their style, in `shell/icons/speshell/`.

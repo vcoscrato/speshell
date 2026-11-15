@@ -23,7 +23,7 @@ Item {
             Loader {
                 id: inner
                 source: Quickshell.env("INNER")
-                onLoaded: item.previewTime = Qt.binding(function() { return root.previewTime; })
+                onLoaded: item.previewTime = Qt.binding(() => root.previewTime)
             }
         }
     }

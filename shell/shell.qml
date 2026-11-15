@@ -10,10 +10,10 @@ ShellRoot {
     id: root
 
     // Services that act on their own, created first rather than when the bar first
-    // reads them: idling, the battery's warnings, the lid, the radios and touchpad that
-    // keys switch, and the night light. They run with the defaults
-    // while config.ini is invalid, so the session still locks.
-    readonly property var autonomousServices: [IdleService, BatteryService, BrightnessService, DisplayService,
+    // reads them: idling, the battery's warnings, the backlight, the lid, the radios and
+    // touchpad that keys switch, and the night light. They run with the defaults while
+    // config.ini is invalid, so the session still locks.
+    readonly property var autonomousServices: [IdleService, BatteryService, BrightnessService, LidService,
         RadioService, InputService, NightLightService]
 
     Binding {
@@ -45,7 +45,10 @@ ShellRoot {
         active: ConfigService.invalid
     }
 
-    // The session lock and the polkit agent work while config.ini is invalid, too.
+    // The notification server, the laptop's keys, the session lock, and the polkit agent
+    // work while config.ini is invalid, too.
+    Daemon {}
+
     LockScreen {}
 
     AuthPrompt {}

@@ -1,42 +1,24 @@
 .pragma library
 
-// Single-quotes a value for safe use inside an sh -c script.
-function quote(value) {
-    return "'" + String(value).replace(/'/g, "'\"'\"'") + "'";
+// The local path of a file:// URL.
+function localPath(url) {
+    return decodeURIComponent(String(url).replace(/^file:\/\//, ""));
 }
 
-// Shell function that runs "$@" in the user's terminal emulator. Returns 127
-// when no terminal is found so callers can fall back.
-var shellFunction = "speshell_terminal() { "
-    + "if [ -n \"${TERMINAL:-}\" ] && command -v \"${TERMINAL%% *}\" >/dev/null 2>&1; then "
-    + "exec $TERMINAL -e \"$@\"; fi; "
-    + "if command -v xdg-terminal-exec >/dev/null 2>&1; then exec xdg-terminal-exec \"$@\"; fi; "
-    + "for term in kitty foot ghostty alacritty wezterm konsole gnome-terminal xterm; do "
-    + "command -v \"$term\" >/dev/null 2>&1 || continue; "
-    + "case \"$term\" in "
-    + "kitty|foot) exec \"$term\" \"$@\" ;; "
-    + "wezterm) exec wezterm start -- \"$@\" ;; "
-    + "gnome-terminal) exec gnome-terminal -- \"$@\" ;; "
-    + "*) exec \"$term\" -e \"$@\" ;; "
-    + "esac; done; "
-    + "echo 'No terminal emulator found. Set $TERMINAL.' >&2; return 127; }; ";
+// The command that runs the script `name` beside this file (one of the services'
+// *.sh) with `args`.
+function script(name, args) {
+    return [localPath(Qt.resolvedUrl(name))].concat(args || []);
+}
 
+// The command that runs `argv` in the user's terminal emulator; it exits 127 when
+// there is none.
 function terminalCommand(argv) {
-    return ["sh", "-c", shellFunction + "speshell_terminal \"$@\"", "speshell-terminal"]
-        .concat(argv || []);
+    return script("terminal.sh", argv);
 }
 
-// Opens a file in $VISUAL or $EDITOR inside a terminal, falling back to the
-// desktop's default application when no editor or terminal is available.
+// The command that opens `path` in $VISUAL or $EDITOR inside a terminal, or in the
+// desktop's default application without an editor or terminal.
 function editFileCommand(path) {
-    return [
-        "sh", "-c",
-        shellFunction
-            + "SPESHELL_EDITOR=\"${VISUAL:-${EDITOR:-}}\"; export SPESHELL_EDITOR; "
-            + "if [ -n \"$SPESHELL_EDITOR\" ]; then "
-            + "speshell_terminal sh -c 'exec $SPESHELL_EDITOR \"$1\"' speshell-editor \"$1\"; fi; "
-            + "exec xdg-open \"$1\"",
-        "speshell-open-config",
-        String(path || "")
-    ];
+    return script("terminal.sh", ["--edit", String(path || "")]);
 }

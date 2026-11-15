@@ -57,30 +57,66 @@ class SystemTest(unittest.TestCase):
 
 class Reading(SystemTest):
     def test_every_kind_of_line(self):
-        write("base.conf", "\n".join([
-            "git  # the one", "", "service sshd", "user-service theme@%u.path", "group docker", "linger",
-            "file /etc/x.conf x.conf 600", "on /etc/x*: reload x", "run make it so", ""]))
+        write(
+            "base.conf",
+            "\n".join(
+                [
+                    "git  # the one",
+                    "file",
+                    "",
+                    "service sshd",
+                    "user-service theme@%u.path",
+                    "group docker",
+                    "linger",
+                    "file /etc/x.conf x.conf 600",
+                    "on /etc/x*: reload x",
+                    "run make it so",
+                    "",
+                ]
+            ),
+        )
         write("files/base/x.conf", "x")
         base = system.Config().require().modules["base"]
-        self.assertEqual(base.packages, ["git"])
+        self.assertEqual(base.packages, ["git", "file"])
         self.assertEqual(base.services, [("system", "sshd"), ("user", f"theme@{system.USER}.path")])
-        self.assertEqual((base.groups, base.linger, base.triggers, base.runs),
-                         (["docker"], True, [("/etc/x*", "reload x")], ["make it so"]))
-        self.assertEqual(base.files, [("/etc/x.conf", base.dir / "x.conf", "600", 7)])
+        self.assertEqual(
+            (base.groups, base.linger, base.triggers, base.runs),
+            (["docker"], True, [("/etc/x*", "reload x")], ["make it so"]),
+        )
+        self.assertEqual(base.files, [("/etc/x.conf", base.dir / "x.conf", "600", 8)])
 
     def test_file_lines_name_their_file_or_take_the_path_s(self):
         write("base.conf", "file ~/.bashrc\nfile ~/.config/app\nfile /etc/one.conf shared\nfile /etc/two.conf shared\n")
         for name in ("bashrc", "app/a", "app/sub/b", "shared"):
             write(f"files/base/{name}", name)
         base = system.Config().require().modules["base"]
-        self.assertEqual([(target, str(source.relative_to(base.dir))) for target, source, _, _ in base.files], [
-            (str(HOME / ".bashrc"), "bashrc"), (str(HOME / ".config/app/a"), "app/a"),
-            (str(HOME / ".config/app/sub/b"), "app/sub/b"), ("/etc/one.conf", "shared"), ("/etc/two.conf", "shared")])
+        self.assertEqual(
+            [(target, str(source.relative_to(base.dir))) for target, source, _, _ in base.files],
+            [
+                (str(HOME / ".bashrc"), "bashrc"),
+                (str(HOME / ".config/app/a"), "app/a"),
+                (str(HOME / ".config/app/sub/b"), "app/sub/b"),
+                ("/etc/one.conf", "shared"),
+                ("/etc/two.conf", "shared"),
+            ],
+        )
 
     def test_problems_name_their_file_and_line(self):
-        write("base.conf", "\n".join([
-            "git", "service", "file ~/.missing", f"file {HOME}/.bashrc", "file ~/.bashrc 600", "file /etc/x ../desk.conf",
-            "use gone", ""]))
+        write(
+            "base.conf",
+            "\n".join(
+                [
+                    "git",
+                    "service two units",
+                    "file ~/.missing",
+                    f"file {HOME}/.bashrc",
+                    "file ~/.bashrc 600",
+                    "file /etc/x ../desk.conf",
+                    "use gone",
+                    "",
+                ]
+            ),
+        )
         write("files/base/bashrc", "")
         problems = sorted((p.file, p.line) for p in system.Config().problems)
         self.assertEqual(problems, [("base.conf", line) for line in (2, 3, 4, 5, 6, 7)])
@@ -143,9 +179,13 @@ class Planning(SystemTest):
 
     def test_packages(self):
         write("base.conf", "git\nvim\nnew\n")
-        machine = Machine(explicit=["git", "gone", "kept", "loose"], dependencies=["vim"], needed_by={"kept": ["other"]})
+        machine = Machine(
+            explicit=["git", "gone", "kept", "loose"], dependencies=["vim"], needed_by={"kept": ["other"]}
+        )
         plan = self.plan(machine, {"packages": ["git", "gone", "kept"]})
-        self.assertEqual(self.kinds(plan), [("demote", "kept"), ("remove", "gone"), ("install", "new"), ("explicit", "vim")])
+        self.assertEqual(
+            self.kinds(plan), [("demote", "kept"), ("remove", "gone"), ("install", "new"), ("explicit", "vim")]
+        )
         self.assertEqual(plan.undeclared, ["loose"])
 
     def test_home_files(self):
@@ -157,7 +197,10 @@ class Planning(SystemTest):
         (HOME / "linked").symlink_to(SYSTEM / "files/base/linked")
         (HOME / "left").symlink_to(SYSTEM / "files/base/gone")
         plan = self.plan(Machine(), {"files": {str(HOME / "left"): {"module": "base", "kind": "link"}}})
-        self.assertEqual(self.kinds(plan), [("link", str(HOME / "new")), ("link", str(HOME / "same")), ("unlink", str(HOME / "left"))])
+        self.assertEqual(
+            self.kinds(plan),
+            [("link", str(HOME / "new")), ("link", str(HOME / "same")), ("unlink", str(HOME / "left"))],
+        )
         self.assertEqual([step.detail for step in plan.steps[:2]], ["new", "same"])
         self.assertEqual(plan.drift, [("base", str(HOME / "differs"), "changed")])
 
@@ -167,14 +210,18 @@ class Planning(SystemTest):
         write("files/base/a", "a")
         write("files/desk/b", "b")
         plan = self.plan(Machine())
-        self.assertEqual([(s.kind, s.subject, s.detail) for s in plan.steps if s.kind == "trigger"], [("trigger", "reload", "user")])
+        self.assertEqual(
+            [(s.kind, s.subject, s.detail) for s in plan.steps if s.kind == "trigger"], [("trigger", "reload", "user")]
+        )
 
     def test_a_file_from_two_modules_is_a_problem(self):
         for id in ("base", "desk"):
             write(f"{id}.conf", "file ~/twice\n")
             write(f"files/{id}/twice", id)
         plan = self.plan(Machine())
-        self.assertEqual([(p.file, p.line, p.message) for p in plan.problems], [("desk.conf", 1, "~/twice is placed by base too")])
+        self.assertEqual(
+            [(p.file, p.line, p.message) for p in plan.problems], [("desk.conf", 1, "~/twice is placed by base too")]
+        )
 
     def test_a_run_line_runs_once_and_again_when_it_changes(self):
         write("base.conf", "run make it\n")

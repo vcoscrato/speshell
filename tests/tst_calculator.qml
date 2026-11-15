@@ -21,11 +21,11 @@ TestCase {
     }
 
     function test_explainsInvalidExpressions() {
-        var division = Calculator.evaluate("1 / 0");
+        const division = Calculator.evaluate("1 / 0");
         verify(division.candidate && !division.ok);
         verify(division.error.indexOf("Division by zero") >= 0, division.error);
 
-        var incomplete = Calculator.evaluate("=");
+        const incomplete = Calculator.evaluate("=");
         verify(incomplete.candidate && !incomplete.ok);
         verify(incomplete.error.indexOf("after '='") >= 0, incomplete.error);
     }

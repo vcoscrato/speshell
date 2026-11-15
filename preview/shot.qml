@@ -29,6 +29,8 @@ ShellRoot {
     property var launcher: null
     property var gallery: null
     property var osd: null
+    // The OSD's card, moved into the scene.
+    property Item osdCard: null
     property int waits: 0
 
     function create(path, properties) {
@@ -124,13 +126,15 @@ ShellRoot {
 
     // The OSD where it shows on a screen: centered, above the bottom edge.
     function showOsd() {
-        shell.osd = shell.create("core/LevelOsdWindow.qml", {});
+        const before = scene.children.length;
+        shell.osd = shell.create("core/OsdWindow.qml", {});
+        shell.osdCard = scene.children.slice(before).find(item => shell.find(item, child => "pinnedContent" in child));
         const level = Quickshell.env("SHOT_OSD") || "output";
         if (["output", "input", "brightness", "keyboard"].includes(level))
             OsdService.showLevel(level);
         else
             OsdService.show("airplane", "Airplane mode on", "");
-        const card = shell.osd.card;
+        const card = shell.osdCard;
         const body = shell.find(card, item => "pinnedContent" in item);
         card.anchors.fill = undefined;
         card.width = Qt.binding(() => body.implicitWidth + Theme.panelPadding * 2);
@@ -147,7 +151,7 @@ ShellRoot {
             const width = shell.launcher.paletteWidth + Theme.spacingXL * 2;
             area = Qt.rect((scene.width - width) / 2, 0, width, scene.height * 0.8);
         } else if (name === "osd") {
-            const card = shell.osd.card;
+            const card = shell.osdCard;
             const margin = Theme.spacingLarge;
             area = Qt.rect(card.x - margin, card.y - margin, card.width + margin * 2, card.height + margin * 2);
         } else if (dropdown && dropdown.visible) {
@@ -166,6 +170,7 @@ ShellRoot {
             if (shell.osd) {
                 shell.osd.destroy();
                 shell.osd = null;
+                shell.osdCard = null;
             }
             if (shell.gallery) {
                 ThemeService.closeGallery();

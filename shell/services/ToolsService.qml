@@ -39,8 +39,8 @@ Singleton {
     property var pendingRun: null
 
     function activity(id) {
-        var activities = ActivityService.activities;
-        for (var i = 0; i < activities.length; i++) {
+        const activities = ActivityService.activities;
+        for (let i = 0; i < activities.length; i++) {
             if (activities[i].id === id)
                 return activities[i];
         }
@@ -48,7 +48,7 @@ Singleton {
     }
 
     function tool(id) {
-        for (var i = 0; i < root.catalog.length; i++) {
+        for (let i = 0; i < root.catalog.length; i++) {
             if (root.catalog[i].id === id)
                 return root.catalog[i];
         }
@@ -58,17 +58,17 @@ Singleton {
     // slurp's #rrggbbaa.
     function selectionColor(color, alpha) {
         function hex(value) {
-            var digits = Math.round(value * 255).toString(16);
+            const digits = Math.round(value * 255).toString(16);
             return digits.length < 2 ? "0" + digits : digits;
         }
         return "#" + hex(color.r) + hex(color.g) + hex(color.b) + hex(alpha);
     }
 
     function environment() {
-        var theme = Theme;
-        var screen = HyprlandService.focusedScreen();
-        var environment = {
-            SPESHELL_QML_DIR: SystemState.appDir.replace(/\/$/, ""),
+        const theme = Theme;
+        const screen = HyprlandService.focusedScreen();
+        const environment = {
+            SPESHELL_QML_DIR: SystemState.appDir,
             SPESHELL_OUTPUT: screen ? screen.name : "",
             SPESHELL_SELECT_SHADE: root.selectionColor(theme.crust, 0.45),
             SPESHELL_SELECT_BORDER: root.selectionColor(theme.accent, 1),
@@ -95,20 +95,20 @@ Singleton {
             root.pendingRun = { id: id, mode: mode, closePanels: closePanels };
             return root.tool(id) !== null;
         }
-        var tool = root.tool(id);
+        const tool = root.tool(id);
         if (!tool)
             return false;
         if (root.tools.indexOf(tool) < 0) {
-            var missing = tool.requires.filter(command => !FeatureSupport.hasCommand(command));
+            const missing = tool.requires.filter(command => !FeatureSupport.hasCommand(command));
             NotificationService.addInternalNotification("tool-" + id, tool.label + " unavailable",
                 "Install " + missing.join(", ") + " to use it.", true);
             return false;
         }
 
-        var command = [SystemState.appDir + "/tools/" + id];
+        const command = [SystemState.appDir + "/tools/" + id];
         if (mode)
             command.push(mode);
-        var context = { command: command, environment: root.environment() };
+        const context = { command: command, environment: root.environment() };
         if ((closePanels || id === "dictate") && PanelService.dismiss()) {
             launchTimer.context = context;
             launchTimer.restart();

@@ -35,8 +35,8 @@ Item {
     function toggle(area, on) {
         if (!on)
             return;
-        var cy = area.y + area.height * 0.35;
-        for (var i = 0; i < 2; i++)
+        const cy = area.y + area.height * 0.35;
+        for (let i = 0; i < 2; i++)
             bits.emit(bits.sparkle, { x: area.x + area.width * (0.22 + i * 0.25), y: cy + i * 2, life: 0.4, size: 8 + i, delay: 0.12 + i * 0.1 });
     }
 

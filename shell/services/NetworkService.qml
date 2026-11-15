@@ -6,6 +6,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Networking
 import "../components/Format.js" as Format
+import "Shell.js" as Shell
 
 // Wi-Fi and wired networking through NetworkManager. Quickshell follows the devices, the
 // connected network, and the saved ones. The networks nearby come from NetworkManager's
@@ -41,8 +42,8 @@ Singleton {
     readonly property bool wifiOn: Networking.wifiEnabled
     readonly property var wifiDevice: root.findWifiDevice()
     readonly property var wiredDevice: root.findWiredDevice()
-    readonly property var connectedWifi: root.wifiNetworks(function(network) { return network.connected; })[0] || null
-    readonly property var connectingNetwork: root.wifiNetworks(function(network) {
+    readonly property var connectedWifi: root.wifiNetworks(network => network.connected)[0] || null
+    readonly property var connectingNetwork: root.wifiNetworks(network => {
         return network.state === ConnectionState.Connecting;
     })[0] || null
     readonly property var displayedNetworks: root.buildDisplayedNetworks()
@@ -51,17 +52,22 @@ Singleton {
         Networking.wifiEnabled = on;
     }
 
+    function disconnectWifi() {
+        if (root.connectedWifi)
+            root.connectedWifi.disconnect();
+    }
+
     function findWifiDevice() {
-        for (var i = 0; i < Networking.devices.values.length; i++) {
-            var dev = Networking.devices.values[i];
+        for (let i = 0; i < Networking.devices.values.length; i++) {
+            const dev = Networking.devices.values[i];
             if (dev.type === DeviceType.Wifi) return dev;
         }
         return null;
     }
 
     function findWiredDevice() {
-        for (var i = 0; i < Networking.devices.values.length; i++) {
-            var dev = Networking.devices.values[i];
+        for (let i = 0; i < Networking.devices.values.length; i++) {
+            const dev = Networking.devices.values[i];
             if (dev.type === DeviceType.Wired && dev.connected) return dev;
         }
         return null;
@@ -70,9 +76,9 @@ Singleton {
     // The networks Quickshell lists that pass `test`: without its scanner, the saved
     // ones and the connected one.
     function wifiNetworks(test) {
-        var result = [];
-        var networks = root.wifiDevice ? root.wifiDevice.networks.values : [];
-        for (var i = 0; i < networks.length; i++) {
+        const result = [];
+        const networks = root.wifiDevice ? root.wifiDevice.networks.values : [];
+        for (let i = 0; i < networks.length; i++) {
             if (test(networks[i]))
                 result.push(networks[i]);
         }
@@ -93,14 +99,14 @@ Singleton {
     // nmcli -t lines of SIGNAL:SECURITY:SSID; it escapes ':' and '\' in the SSID, which
     // comes last. Hidden networks have no name and stay out.
     function parseList(text, now) {
-        var byName = {};
-        var lines = String(text || "").split("\n");
-        for (var i = 0; i < lines.length; i++) {
-            var fields = lines[i].split(":");
+        const byName = {};
+        const lines = String(text || "").split("\n");
+        for (let i = 0; i < lines.length; i++) {
+            const fields = lines[i].split(":");
             if (fields.length < 3)
                 continue;
-            var name = fields.slice(2).join(":").replace(/\\(.)/g, "$1");
-            var level = Number(fields[0]) || 0;
+            const name = fields.slice(2).join(":").replace(/\\(.)/g, "$1");
+            const level = Number(fields[0]) || 0;
             if (name !== "" && (!byName[name] || level > byName[name].signalLevel))
                 byName[name] = { name: name, signalLevel: level, security: fields[1], seenMs: now };
         }
@@ -108,8 +114,8 @@ Singleton {
     }
 
     function listOf(byName) {
-        var result = [];
-        for (var name in byName)
+        const result = [];
+        for (const name in byName)
             result.push(byName[name]);
         return result;
     }
@@ -117,11 +123,11 @@ Singleton {
     // A scan's list replaces what was there; a look at NetworkManager's list adds to it,
     // since NetworkManager forgets networks a few minutes after a scan.
     function takeList(text, scanned) {
-        var now = Date.now();
-        var found = root.parseList(text, now);
+        const now = Date.now();
+        const found = root.parseList(text, now);
         if (!scanned) {
-            for (var i = 0; i < root.accessPoints.length; i++) {
-                var known = root.accessPoints[i];
+            for (let i = 0; i < root.accessPoints.length; i++) {
+                const known = root.accessPoints[i];
                 if (!found[known.name] && now - known.seenMs <= root.listMaxAgeMs)
                     found[known.name] = known;
             }
@@ -144,24 +150,24 @@ Singleton {
     }
 
     function listCommand(rescan) {
-        var command = ["nmcli", "-t", "-f", "SIGNAL,SECURITY,SSID", "device", "wifi", "list"];
+        const command = ["nmcli", "-t", "-f", "SIGNAL,SECURITY,SSID", "device", "wifi", "list"];
         if (root.wifiDevice && root.wifiDevice.name)
             command.push("ifname", root.wifiDevice.name);
         return command.concat(["--rescan", rescan ? "yes" : "no"]);
     }
 
     function savedNetwork(name) {
-        return root.wifiNetworks(function(network) { return network.known && network.name === name; })[0] || null;
+        return root.wifiNetworks(network => network.known && network.name === name)[0] || null;
     }
 
     function buildDisplayedNetworks() {
-        var connectedName = root.connectedWifi ? root.connectedWifi.name : "";
-        var result = [];
-        for (var i = 0; i < root.accessPoints.length; i++) {
-            var point = root.accessPoints[i];
+        const connectedName = root.connectedWifi ? root.connectedWifi.name : "";
+        const result = [];
+        for (let i = 0; i < root.accessPoints.length; i++) {
+            const point = root.accessPoints[i];
             if (point.name === connectedName || root.nowMs - point.seenMs > root.listMaxAgeMs)
                 continue;
-            var saved = root.savedNetwork(point.name);
+            const saved = root.savedNetwork(point.name);
             result.push({
                 name: point.name,
                 signalLevel: point.signalLevel,
@@ -170,7 +176,7 @@ Singleton {
                 stateChanging: (saved !== null && saved.stateChanging) || root.joiningName === point.name
             });
         }
-        return result.sort(function(a, b) {
+        return result.sort((a, b) => {
             if ((a.network !== null) !== (b.network !== null))
                 return a.network !== null ? -1 : 1;
             if (a.signalLevel !== b.signalLevel)
@@ -209,8 +215,8 @@ Singleton {
     function networkSubtitle(item) {
         if (item.stateChanging)
             return "Connecting…";
-        var kind = root.joinKind(item.security);
-        var parts = [];
+        const kind = root.joinKind(item.security);
+        const parts = [];
         if (item.network)
             parts.push("Saved");
         parts.push(kind === "open" || kind === "owe" ? "Open" : "Secured");
@@ -219,7 +225,7 @@ Singleton {
     }
 
     function connectedSubtitle() {
-        var network = root.connectedWifi;
+        const network = root.connectedWifi;
         if (!network)
             return "";
         return ["Connected", root.isOpenSecurity(network.security) ? "Open" : "Secured",
@@ -236,7 +242,7 @@ Singleton {
                 root.beginConnection(item.network, "");
             return;
         }
-        var kind = root.joinKind(item.security);
+        const kind = root.joinKind(item.security);
         if (kind === "open" || kind === "owe") {
             root.join(item.name, kind, "");
             return;
@@ -247,15 +253,15 @@ Singleton {
             root.connectError = "This network needs settings that Speshell cannot request. Configure it in NetworkManager first.";
             return;
         }
-        var opening = root.passwordRowName !== item.name;
+        const opening = root.passwordRowName !== item.name;
         root.cancelPasswordPrompt();
         if (opening)
             root.passwordRowName = item.name;
     }
 
     function connectWithPassword(item, psk) {
-        var password = String(psk || "");
-        var sae = item.network ? item.network.security === WifiSecurityType.Sae : root.joinKind(item.security) === "sae";
+        const password = String(psk || "");
+        const sae = item.network ? item.network.security === WifiSecurityType.Sae : root.joinKind(item.security) === "sae";
         if (item.network && !root.supportsPsk(item.network.security)) {
             root.connectErrorName = item.name;
             root.connectError = "Password entry is not supported for this network type.";
@@ -304,7 +310,7 @@ Singleton {
         joinProc.ssid = ssid;
         joinProc.secured = psk !== "";
         joinProc.psk = psk;
-        joinProc.command = ["bash", "-c", root.joinScript, "speshell-wifi", ssid, kind];
+        joinProc.command = Shell.script("network.sh", ["join", ssid, kind]);
         joinProc.running = true;
     }
 
@@ -315,8 +321,8 @@ Singleton {
             return "The network is no longer in range. Scan again and retry.";
         if (/[Tt]imeout/.test(output))
             return "The network didn't answer in time.";
-        var lines = String(output || "").trim().split("\n");
-        var last = lines[lines.length - 1].replace(/^Error: /, "").trim();
+        const lines = String(output || "").trim().split("\n");
+        const last = lines[lines.length - 1].replace(/^Error: /, "").trim();
         return last !== "" ? last : "Could not connect to the network.";
     }
 
@@ -331,7 +337,7 @@ Singleton {
     }
 
     function connectionFailureText(reason) {
-        var reasonName = ConnectionFailReason.toString(reason);
+        const reasonName = ConnectionFailReason.toString(reason);
         if (reason === ConnectionFailReason.NoSecrets)
             return "A password is required or the saved password was rejected.";
         if (reason === ConnectionFailReason.WifiAuthTimeout || reason === ConnectionFailReason.WifiClientFailed)
@@ -350,21 +356,6 @@ Singleton {
             root.passwordRowName = root.pendingNetworkName;
         root.pendingNetwork = null;
     }
-
-    // Args: ssid kind; stdin's first line is the password, for wpa-psk and sae.
-    readonly property string joinScript: "exec 2>&1\n"
-        + "ssid=$1 kind=$2\n"
-        + "uuid=$(cat /proc/sys/kernel/random/uuid)\n"
-        + "set -- type wifi con-name \"$ssid\" connection.uuid \"$uuid\" ssid \"$ssid\"\n"
-        + "[ \"$kind\" = open ] || set -- \"$@\" wifi-sec.key-mgmt \"$kind\"\n"
-        + "nmcli connection add \"$@\" >/dev/null || exit 1\n"
-        + "if [ \"$kind\" = wpa-psk ] || [ \"$kind\" = sae ]; then\n"
-        + "  IFS= read -r psk\n"
-        + "  printf 'set 802-11-wireless-security.psk %s\\nsave persistent\\nquit\\n' \"$psk\" | nmcli connection edit uuid \"$uuid\" >/dev/null\n"
-        + "fi\n"
-        + "nmcli -w 45 connection up uuid \"$uuid\" && exit 0\n"
-        + "nmcli connection delete uuid \"$uuid\" >/dev/null\n"
-        + "exit 1\n"
 
     onWifiOnChanged: {
         if (!root.wifiOn) {
@@ -427,7 +418,7 @@ Singleton {
             joinProc.psk = "";
             joinProc.stdinEnabled = false;
         }
-        onExited: function(exitCode) {
+        onExited: exitCode => {
             joinProc.stdinEnabled = true;
             root.finishJoin(exitCode, joinOutput.text);
         }

@@ -46,7 +46,7 @@ Item {
     }
 
     function slide(at, dx) {
-        var back = dx > 0 ? -1 : 1;
+        const back = dx > 0 ? -1 : 1;
         root.chipOwed = Math.min(root.chipOwed + Math.abs(dx), 40);
         while (root.chipOwed >= 9) {
             root.chipOwed -= 9;
@@ -68,30 +68,30 @@ Item {
     }
 
     function pick(area, at) {
-        var cx = at.x, cy = at.y;
-        var floor = area.y + area.height + 6;
-        var side = Math.random() < 0.5 ? -1 : 1;
+        const cx = at.x, cy = at.y;
+        const floor = area.y + area.height + 6;
+        const side = Math.random() < 0.5 ? -1 : 1;
         root.puff(cx, cy, 0, 26);
         root.pebble(cx + side * 3, cy, side * rnd(30, 90), -rnd(300, 360), floor);
         root.pebble(cx - side * 3, cy, -side * rnd(60, 130), -rnd(220, 280), floor);
-        for (var i = 0; i < 5; i++) {
-            var s = i % 2 ? side : -side;
+        for (let i = 0; i < 5; i++) {
+            const s = i % 2 ? side : -side;
             root.chip(cx + rnd(-6, 6), cy, s * rnd(70, 200), -rnd(160, 320), floor);
         }
-        for (var j = 0; j < 8; j++)
+        for (let j = 0; j < 8; j++)
             root.grit(cx + rnd(-5, 5), cy, rnd(-240, 240), -rnd(120, 380), floor);
         root.puff(cx - 14, floor - 6, -35, 18);
         root.puff(cx + 14, floor - 6, 35, 18);
     }
 
     function toggle(area, on) {
-        var x = on ? area.x + area.width - area.height / 2 : area.x + area.height / 2;
-        var cy = area.y + area.height / 2, floor = area.y + area.height + 6;
+        const x = on ? area.x + area.width - area.height / 2 : area.x + area.height / 2;
+        const cy = area.y + area.height / 2, floor = area.y + area.height + 6;
         if (on) {
             root.pebble(x, cy, rnd(20, 90), -rnd(260, 320), floor);
-            for (var i = 0; i < 3; i++)
+            for (let i = 0; i < 3; i++)
                 root.chip(x, cy, rnd(-40, 160), -rnd(180, 300), floor);
-            for (var j = 0; j < 5; j++)
+            for (let j = 0; j < 5; j++)
                 root.grit(x, cy, rnd(-80, 200), -rnd(120, 320), floor);
         } else {
             root.puff(x - 5, floor - 6, -30, 18);

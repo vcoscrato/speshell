@@ -3,39 +3,36 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Detects wf-recorder and the dictation tool (tools/dictate). Polling only runs
-// when one of them is installed, and slows down while nothing is active, as the
-// power mode saves more, and on battery. Speshell's tools run `speshell activity refresh` as they
-// start and stop, which probes right away, so polling only catches the rest.
+// Detects wf-recorder and the dictation tool (tools/dictate) from the process list:
+// once at start, for a recording a Relaunch finds, and then whenever Speshell's tools
+// run `speshell activity refresh`, as they do at each start, step, and stop.
 Scope {
     id: root
 
-    property bool toolsAvailable: false
     property string lastSignature: ""
-    property bool anyActive: false
     property bool refreshQueued: false
     readonly property var shellNames: ["sh", "bash", "dash", "zsh"]
 
     function commandName(value) {
-        var path = String(value || "");
+        const path = String(value || "");
         return path.substring(path.lastIndexOf("/") + 1);
     }
 
     // Reads `ps -e -o args=` output. Matching on argv[0] (or the script run by a
     // shell) avoids false positives from editors or pagers that mention a tool.
     function detect(psOutput) {
-        var recording = false;
-        var dictationToggle = false;
-        var dictationRecording = false;
-        var dictationTranscribing = false;
-        var lines = String(psOutput || "").split("\n");
+        let recording = false;
+        let dictationToggle = false;
+        let dictationRecording = false;
+        let dictationTranscribing = false;
+        const lines = String(psOutput || "").split("\n");
 
-        for (var i = 0; i < lines.length; i++) {
-            var args = lines[i].trim().split(/\s+/);
-            var name = root.commandName(args[0]);
+        for (let i = 0; i < lines.length; i++) {
+            const args = lines[i].trim().split(/\s+/);
+            let name = root.commandName(args[0]);
             if (root.shellNames.indexOf(name) >= 0 && /(^|\/)tools\/dictate$/.test(args[1] || ""))
                 name = "dictate";
-            var dictationFile = lines[i].indexOf("dictate.wav") >= 0;
+            const dictationFile = lines[i].indexOf("dictate.wav") >= 0;
 
             if (name === "wf-recorder")
                 recording = true;
@@ -47,7 +44,7 @@ Scope {
                 dictationTranscribing = true;
         }
 
-        var entries = [];
+        const entries = [];
         if (recording) {
             entries.push({
                 id: "screen-recording",
@@ -88,9 +85,8 @@ Scope {
     }
 
     function applyProbeOutput(value) {
-        var entries = root.detect(value);
-        var signature = entries.map(function(entry) { return entry.id + ":" + entry.state; }).join(",");
-        root.anyActive = entries.length > 0;
+        const entries = root.detect(value);
+        const signature = entries.map(entry => entry.id + ":" + entry.state).join(",");
         if (signature === root.lastSignature)
             return;
         root.lastSignature = signature;
@@ -100,40 +96,14 @@ Scope {
     // A request during a probe runs another one after it, since that probe may
     // have listed processes before the change the caller is reporting.
     function refresh() {
-        if (!root.toolsAvailable)
-            return;
         if (probeProc.running)
             root.refreshQueued = true;
         else
             probeProc.running = true;
     }
 
+    Component.onCompleted: root.refresh()
     Component.onDestruction: ActivityService.clearProvider("process")
-
-    Process {
-        running: true
-        command: [
-            "sh", "-c",
-            "command -v wf-recorder >/dev/null 2>&1 || command -v whisper-cli >/dev/null 2>&1"
-        ]
-        onExited: function(exitCode) {
-            root.toolsAvailable = exitCode === 0;
-            root.refresh();
-        }
-    }
-
-    // Seconds between probes, while something is active and while nothing is. On
-    // battery, balanced probes as seldom as saver.
-    readonly property string pollMode: PowerService.onBattery && PowerService.mode === "balanced" ? "saver" : PowerService.mode
-    readonly property var pollSeconds: ({ maximum: [1, 2], balanced: [2, 10], saver: [10, 60] })[root.pollMode]
-        || [2, 10]
-
-    Timer {
-        interval: 1000 * root.pollSeconds[root.anyActive ? 0 : 1]
-        repeat: true
-        running: root.toolsAvailable
-        onTriggered: root.refresh()
-    }
 
     Process {
         id: probeProc

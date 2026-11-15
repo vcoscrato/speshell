@@ -49,7 +49,7 @@ Rectangle {
     }
 
     function flip() {
-        var next = !root.on;
+        const next = !root.on;
         root.requested = next;
         root.pending = next !== root.checked;
         if (root.pending)
@@ -114,7 +114,7 @@ Rectangle {
         hoverEnabled: true
         cursorShape: root.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
         onClicked: root.flip()
-        onPositionChanged: function(mouse) { EffectsService.pointKnob(knob.item, this, mouse); }
+        onPositionChanged: mouse => EffectsService.pointKnob(knob.item, switchMouse, mouse)
     }
 
     Tooltip {

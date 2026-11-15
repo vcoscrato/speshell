@@ -14,10 +14,10 @@ Card {
 
     readonly property var history: ClipboardService.history
     readonly property var shownHistory: {
-        var needle = root.query.trim().toLowerCase();
+        const needle = root.query.trim().toLowerCase();
         if (needle === "")
             return root.history;
-        return root.history.filter(function(entry) {
+        return root.history.filter(entry => {
             return entry.preview.toLowerCase().indexOf(needle) >= 0;
         });
     }

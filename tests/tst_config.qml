@@ -6,21 +6,21 @@ TestCase {
     name: "Config"
 
     function messages(result) {
-        return result.errors.map(function(error) { return error.message; }).join("\n");
+        return result.errors.map(error => error.message).join("\n");
     }
 
     // The package installs this file as a new user's config.ini.
     function test_exampleConfigIsValid() {
-        var request = new XMLHttpRequest();
+        const request = new XMLHttpRequest();
         request.open("GET", Qt.resolvedUrl("../shell/config.example.ini"), false);
         request.send();
         verify(request.responseText.length > 0, "config.example.ini not read");
-        var result = Config.parseAndValidate(request.responseText);
+        const result = Config.parseAndValidate(request.responseText);
         verify(result.ok, messages(result));
     }
 
     function test_listSectionsKeepOrderAndCommas() {
-        var result = Config.parseAndValidate("[Audio.QuickSwitch]\n1 = Speakers\n2 = Display, HDMI\n");
+        const result = Config.parseAndValidate("[Audio.QuickSwitch]\n1 = Speakers\n2 = Display, HDMI\n");
         verify(result.ok, messages(result));
         compare(result.config.audio.quickSwitch, ["Speakers", "Display, HDMI"]);
     }
@@ -46,7 +46,7 @@ TestCase {
     // no night light, and idling, on battery only, that dims, locks, turns the screen
     // off, and sleeps.
     function test_laptopDefaults() {
-        var config = Config.defaults();
+        const config = Config.defaults();
         compare(config.battery.lowLevel, 20);
         compare(config.battery.criticalLevel, 10);
         compare(config.backlight.batteryPercent, 0);
@@ -55,7 +55,7 @@ TestCase {
     }
 
     function test_idleTakesFractionsAndZero() {
-        var result = Config.parseAndValidate("[Idle]\ndimAfter = 0.5\nsleepAfter = 0\n");
+        const result = Config.parseAndValidate("[Idle]\ndimAfter = 0.5\nsleepAfter = 0\n");
         verify(result.ok, messages(result));
         compare(result.config.idle.dimAfter, 0.5);
         compare(result.config.idle.sleepAfter, 0);
@@ -63,29 +63,29 @@ TestCase {
 
     // The tools take Tesseract's "eng+por" and a list of Whisper codes, however they're separated.
     function test_toolLanguagesAcceptAnySeparator() {
-        var result = Config.parseAndValidate("[Tools]\nocrLanguages = eng, por\ndictationLanguages = en pt\n");
+        const result = Config.parseAndValidate("[Tools]\nocrLanguages = eng, por\ndictationLanguages = en pt\n");
         verify(result.ok, messages(result));
         compare(result.config.tools.ocrLanguages, "eng+por");
         compare(result.config.tools.dictationLanguages, "en,pt");
     }
 
     function test_rejectsInvalidValues(data) {
-        var result = Config.parseAndValidate(data.text);
+        const result = Config.parseAndValidate(data.text);
         verify(!result.ok);
         verify(messages(result).indexOf(data.message) >= 0, messages(result));
     }
 
     // Panels write single keys into the user's file; the rest must survive.
     function test_settingsEditKeepsTheRestOfTheFile() {
-        var source = "# mine\n[Appearance]\ntextScale = 1.0\n\n[Weather]\nenabled = false\n";
+        const source = "# mine\n[Appearance]\ntextScale = 1.0\n\n[Weather]\nenabled = false\n";
 
-        var replaced = Config.setIniProperty(source, "Appearance", "textScale", 1.2);
+        const replaced = Config.setIniProperty(source, "Appearance", "textScale", 1.2);
         compare(replaced, "# mine\n[Appearance]\ntextScale = 1.2\n\n[Weather]\nenabled = false\n");
 
-        var inserted = Config.setIniProperty(replaced, "Weather", "location", "São Paulo");
+        const inserted = Config.setIniProperty(replaced, "Weather", "location", "São Paulo");
         compare(inserted, "# mine\n[Appearance]\ntextScale = 1.2\n\n[Weather]\nenabled = false\nlocation = São Paulo\n");
 
-        var appended = Config.setIniProperty(inserted, "Notifications", "maxVisible", 5);
+        const appended = Config.setIniProperty(inserted, "Notifications", "maxVisible", 5);
         verify(appended.indexOf(inserted.trim()) === 0, appended);
         verify(appended.indexOf("[Notifications]\nmaxVisible = 5") >= 0, appended);
         verify(Config.parseAndValidate(appended).ok);

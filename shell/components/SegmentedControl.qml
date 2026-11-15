@@ -14,7 +14,7 @@ Rectangle {
 
     readonly property int inset: Theme.spacingMicro
     readonly property int currentIndex: {
-        for (var i = 0; i < root.options.length; i++) {
+        for (let i = 0; i < root.options.length; i++) {
             if (root.options[i].value === root.currentValue)
                 return i;
         }
@@ -22,8 +22,8 @@ Rectangle {
     }
     readonly property real naturalSegmentWidth: {
         // Reading the font keeps this current when the text scale changes.
-        var widest = segmentMetrics.font.pixelSize * 0;
-        for (var i = 0; i < root.options.length; i++)
+        let widest = segmentMetrics.font.pixelSize * 0;
+        for (let i = 0; i < root.options.length; i++)
             widest = Math.max(widest, segmentMetrics.advanceWidth(String(root.options[i].label)));
         return Math.ceil(widest) + Theme.spacingSmall * 2;
     }

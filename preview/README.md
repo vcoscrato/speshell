@@ -17,7 +17,7 @@ just check                               # every effect in every scene but picks
 just bench fire                          # GPU time per frame at 1080p, phase by phase
 just bench -a HEAD earth                 # the same, against the last commit
 just shot fire                           # the real bar with each panel open, and a contact sheet
-just shot earth network settings         # only those panels (or `launcher`, `osd`)
+just shot earth network notes            # only those panels (or `launcher`, `osd`)
 ```
 
 Scenes drive `EffectClock` with virtual time, 1/60 s per frame, so captures match real playback, and every scene draws in the colors of the theme named like the effect. The wallpaper scene hosts this checkout's `shell/core/WallpaperView.qml`. The clock scene shows the face over the backdrop, at the clock panel's size and at twice it, ticking from 10:09:30 and keeping still from 3 s, as in power saver. The controls scene plays a script on mock controls in those colors: a slider dragged and let go twice, another stepped by the wheel, an audio device and a segment picked, a switch turned on and off, and a square button picked. Env knobs:

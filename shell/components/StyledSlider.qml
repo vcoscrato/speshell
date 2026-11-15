@@ -36,17 +36,18 @@ Controls.Slider {
     focusPolicy: Qt.ClickFocus
 
     MouseArea {
+        id: hoverMouse
         anchors.fill: parent
         acceptedButtons: Qt.NoButton
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onPositionChanged: function(mouse) { EffectsService.pointKnob(knob.item, this, mouse); }
-        onWheel: function(wheel) {
+        onPositionChanged: mouse => EffectsService.pointKnob(knob.item, hoverMouse, mouse)
+        onWheel: wheel => {
             if (wheel.angleDelta.y === 0)
                 return;
-            var step = root.stepSize > 0 ? root.stepSize : 5;
-            var delta = wheel.angleDelta.y > 0 ? step : -step;
-            var newVal = Math.max(root.from, Math.min(root.to, root.value + delta));
+            const step = root.stepSize > 0 ? root.stepSize : 5;
+            const delta = wheel.angleDelta.y > 0 ? step : -step;
+            const newVal = Math.max(root.from, Math.min(root.to, root.value + delta));
             if (newVal !== root.value) {
                 root.reportKnob((newVal - root.value) / (root.to - root.from) * (root.availableWidth - root.handle.width));
                 root.wheelAdjusted(newVal);
@@ -119,7 +120,7 @@ Controls.Slider {
             anchors.fill: parent
             hoverEnabled: true
             acceptedButtons: Qt.NoButton
-            onPositionChanged: function(mouse) { EffectsService.pointKnob(knob.item, this, mouse); }
+            onPositionChanged: mouse => EffectsService.pointKnob(knob.item, sliderMouse, mouse)
         }
     }
 }

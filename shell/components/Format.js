@@ -4,21 +4,21 @@
 
 // "4:05", or "1:02:03" past an hour: a countdown, an elapsed time, a track's position.
 function clock(seconds) {
-    var total = Math.max(0, Math.floor(Number(seconds) || 0));
-    var hours = Math.floor(total / 3600);
-    var minutes = Math.floor(total % 3600 / 60);
-    var rest = total % 60;
-    var pad = function(value) { return (value < 10 ? "0" : "") + value; };
+    const total = Math.max(0, Math.floor(Number(seconds) || 0));
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor(total % 3600 / 60);
+    const rest = total % 60;
+    const pad = value => (value < 10 ? "0" : "") + value;
     return (hours > 0 ? hours + ":" + pad(minutes) : String(minutes)) + ":" + pad(rest);
 }
 
 // "1 h 30 min", "25 min", "45 s": a length of time in words.
 function duration(seconds) {
-    var total = Math.max(0, Math.round(Number(seconds) || 0));
-    var hours = Math.floor(total / 3600);
-    var minutes = Math.floor(total % 3600 / 60);
-    var rest = total % 60;
-    var parts = [];
+    const total = Math.max(0, Math.round(Number(seconds) || 0));
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor(total % 3600 / 60);
+    const rest = total % 60;
+    const parts = [];
     if (hours > 0)
         parts.push(hours + " h");
     if (minutes > 0)
@@ -38,6 +38,16 @@ function date(day) {
     return Qt.formatDate(day, "dddd, d MMMM");
 }
 
+// "October 2026": a month.
+function month(day) {
+    return Qt.formatDate(day, "MMMM yyyy");
+}
+
+// "Fri": a day of the week.
+function weekday(day) {
+    return Qt.formatDate(day, "ddd");
+}
+
 // "Fri 31 Oct": a day, where room is short.
 function shortDate(day) {
     return Qt.formatDate(day, "ddd d MMM");
@@ -46,7 +56,7 @@ function shortDate(day) {
 // "just now", "5 min ago", "3 h ago", "2 d ago": how long before `nowMs` the time
 // `then` (a Date or ms) was.
 function ago(then, nowMs) {
-    var seconds = Math.floor((nowMs - Number(then)) / 1000);
+    const seconds = Math.floor((nowMs - Number(then)) / 1000);
     if (seconds < 60)
         return "just now";
     if (seconds < 3600)

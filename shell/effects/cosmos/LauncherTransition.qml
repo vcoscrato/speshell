@@ -71,9 +71,9 @@ Item {
     }
 
     function follow(dt) {
-        var mx = panelRect.x + panelRect.width / 2;
-        var my = panelRect.y + panelRect.height / 2;
-        var k = halfWidth === 0 ? 1 : 1 - Math.exp(-dt * 10);
+        const mx = panelRect.x + panelRect.width / 2;
+        const my = panelRect.y + panelRect.height / 2;
+        const k = halfWidth === 0 ? 1 : 1 - Math.exp(-dt * 10);
         cx += (mx - cx) * k;
         cy += (my - cy) * k;
         halfWidth += (panelRect.width / 2 - halfWidth) * k;
@@ -81,8 +81,8 @@ Item {
 
     // Kepler-ish: tighter orbits turn faster, so planets swirl in and out.
     function orbit(dt) {
-        var boost = Math.min(10, Math.pow(0.12 + 0.88 * spread, -1.5));
-        var w = 2 * Math.PI * dt * boost;
+        const boost = Math.min(10, Math.pow(0.12 + 0.88 * spread, -1.5));
+        const w = 2 * Math.PI * dt * boost;
         a0 += w / periods[0];
         a1 += w / periods[1];
         a2 += w / periods[2];
@@ -92,7 +92,7 @@ Item {
     }
 
     EffectClock {
-        onAdvanced: function(dt) {
+        onAdvanced: dt => {
             root.follow(dt);
             root.orbit(dt);
             if (root.active) {

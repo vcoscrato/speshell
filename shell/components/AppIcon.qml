@@ -24,7 +24,8 @@ Item {
     RotationAnimator on rotation {
         from: 0
         to: 360
-        duration: Theme.spinDuration
+        // A turn a second.
+        duration: 1000
         loops: Animation.Infinite
         running: root.spinning && root.visible && Theme.motion
         onStopped: root.rotation = 0

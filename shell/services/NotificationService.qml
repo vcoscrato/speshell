@@ -36,10 +36,10 @@ Singleton {
     }
 
     function pushPopup(popup) {
-        var popups = root.activePopups.slice();
+        const popups = root.activePopups.slice();
         popups.push(popup);
         while (root.maxVisible > 0 && popups.length > root.maxVisible) {
-            var evicted = popups.shift();
+            const evicted = popups.shift();
             if (evicted.notification && evicted.notification.tracked)
                 evicted.notification.expire();
         }
@@ -65,7 +65,7 @@ Singleton {
     }
 
     function popupById(popupId) {
-        for (var i = 0; i < root.activePopups.length; i++) {
+        for (let i = 0; i < root.activePopups.length; i++) {
             if (root.activePopups[i].popupId === popupId)
                 return root.activePopups[i];
         }
@@ -73,8 +73,8 @@ Singleton {
     }
 
     function removePopup(popupId) {
-        var current = root.activePopups.slice();
-        for (var i = 0; i < current.length; i++) {
+        const current = root.activePopups.slice();
+        for (let i = 0; i < current.length; i++) {
             if (current[i].popupId === popupId) {
                 current.splice(i, 1);
                 break;
@@ -88,7 +88,7 @@ Singleton {
     }
 
     function dismissPopup(popupId) {
-        var popup = root.popupById(popupId);
+        const popup = root.popupById(popupId);
         if (!popup)
             return;
         root.removePopup(popupId);
@@ -97,7 +97,7 @@ Singleton {
     }
 
     function expirePopup(popupId) {
-        var popup = root.popupById(popupId);
+        const popup = root.popupById(popupId);
         if (!popup)
             return;
         root.removePopup(popupId);
@@ -116,7 +116,7 @@ Singleton {
     // A click runs the default action, then brings the app's window forward, from the
     // tray too, since apps rarely raise themselves; without an action, it opens the app.
     function activatePopup(popupId) {
-        var popup = root.popupById(popupId);
+        const popup = root.popupById(popupId);
         if (!popup)
             return;
         if (popup.defaultAction)
@@ -129,7 +129,7 @@ Singleton {
     }
 
     function invokePopupAction(popupId, action) {
-        var popup = root.popupById(popupId);
+        const popup = root.popupById(popupId);
         if (!popup || !action)
             return;
         action.invoke();
@@ -143,7 +143,7 @@ Singleton {
 
     // Puts `entry` first in the history, replacing an older one with its id.
     function prependHistory(entry) {
-        var history = root.notificationHistory.filter(function(item) { return item.id !== entry.id; });
+        const history = root.notificationHistory.filter(item => item.id !== entry.id);
         history.unshift(entry);
         root.notificationHistory = history.slice(0, 50);
     }
@@ -152,8 +152,8 @@ Singleton {
     // A critical one (urgency 2), like a nearly empty battery, stays until dismissed.
     // A notice replaces the one shown with its id.
     function addInternalNotification(id, summary, body, alwaysShow, urgency) {
-        var critical = urgency === 2;
-        var entry = {
+        const critical = urgency === 2;
+        const entry = {
             id: "internal:" + String(id || "notice"),
             desktopEntry: "",
             appName: "Speshell",
@@ -183,13 +183,13 @@ Singleton {
 
     // Takes Speshell's notice `id` off the screen, as when what it warned of is over.
     function dismissInternal(id) {
-        var internalId = "internal:" + String(id || "notice");
-        root.activePopups.filter(function(popup) { return popup.id === internalId; })
-            .forEach(function(popup) { root.removePopup(popup.popupId); });
+        const internalId = "internal:" + String(id || "notice");
+        root.activePopups.filter(popup => popup.id === internalId)
+            .forEach(popup => root.removePopup(popup.popupId));
     }
 
     function removeHistoryAt(index) {
-        var current = root.notificationHistory.slice();
+        const current = root.notificationHistory.slice();
         if (index >= 0 && index < current.length) {
             current.splice(index, 1);
             root.notificationHistory = current;
@@ -197,7 +197,7 @@ Singleton {
     }
 
     function timeoutForNotification(notification) {
-        var requestedMilliseconds = Number(notification.expireTimeout);
+        const requestedMilliseconds = Number(notification.expireTimeout);
         if (requestedMilliseconds === 0)
             return -1;
         if (isFinite(requestedMilliseconds) && requestedMilliseconds > 0)
@@ -210,10 +210,10 @@ Singleton {
     }
 
     function notificationActions(notification) {
-        var result = [];
-        var defaultAction = null;
-        var actions = notification.actions || [];
-        for (var i = 0; i < actions.length; i++) {
+        const result = [];
+        let defaultAction = null;
+        const actions = notification.actions || [];
+        for (let i = 0; i < actions.length; i++) {
             if (actions[i].identifier === "default")
                 defaultAction = actions[i];
             else
@@ -226,10 +226,10 @@ Singleton {
         popupExpiryTimer.stop();
         if (root.popupsHeld)
             return;
-        var now = Date.now();
-        var earliest = -1;
-        for (var i = 0; i < root.activePopups.length; i++) {
-            var expiresAt = Number(root.activePopups[i].expiresAt);
+        const now = Date.now();
+        let earliest = -1;
+        for (let i = 0; i < root.activePopups.length; i++) {
+            const expiresAt = Number(root.activePopups[i].expiresAt);
             if (expiresAt >= 0 && (earliest < 0 || expiresAt < earliest))
                 earliest = expiresAt;
         }
@@ -240,14 +240,14 @@ Singleton {
     }
 
     function expireDuePopups() {
-        var now = Date.now();
-        var due = [];
-        for (var i = 0; i < root.activePopups.length; i++) {
-            var popup = root.activePopups[i];
+        const now = Date.now();
+        const due = [];
+        for (let i = 0; i < root.activePopups.length; i++) {
+            const popup = root.activePopups[i];
             if (popup.expiresAt >= 0 && popup.expiresAt <= now)
                 due.push(popup.popupId);
         }
-        for (var j = 0; j < due.length; j++)
+        for (let j = 0; j < due.length; j++)
             root.expirePopup(due[j]);
         root.schedulePopupExpiry();
     }
@@ -299,19 +299,19 @@ Singleton {
     function updateNotification(notification) {
         if (!notification || !notification.tracked)
             return;
-        var receivedAt = new Date();
-        var history = root.notificationHistory.slice();
-        for (var i = 0; i < history.length; i++) {
+        const receivedAt = new Date();
+        const history = root.notificationHistory.slice();
+        for (let i = 0; i < history.length; i++) {
             if (history[i].id === notification.id) {
                 history[i] = root.historyEntry(notification, receivedAt);
                 root.notificationHistory = history;
                 break;
             }
         }
-        for (var j = 0; j < root.activePopups.length; j++) {
-            var popup = root.activePopups[j];
+        for (let j = 0; j < root.activePopups.length; j++) {
+            const popup = root.activePopups[j];
             if (popup.notification === notification) {
-                var timeout = root.timeoutForNotification(notification);
+                const timeout = root.timeoutForNotification(notification);
                 popup.duration = timeout;
                 popup.expiresAt = timeout < 0 ? -1 : Date.now() + timeout;
                 root.schedulePopupExpiry();
@@ -324,8 +324,8 @@ Singleton {
         if (!notification)
             return;
 
-        var receivedAt = new Date();
-        var actions = root.notificationActions(notification);
+        const receivedAt = new Date();
+        const actions = root.notificationActions(notification);
         if (!notification.transient)
             root.prependHistory(root.historyEntry(notification, receivedAt));
 
@@ -335,12 +335,12 @@ Singleton {
             return;
         }
 
-        var popupId = root.popupCounter++;
-        var timeout = root.timeoutForNotification(notification);
-        var update = function() { root.updateNotification(notification); };
+        const popupId = root.popupCounter++;
+        const timeout = root.timeoutForNotification(notification);
+        const update = () => root.updateNotification(notification);
         notification.summaryChanged.connect(update);
         notification.bodyChanged.connect(update);
-        notification.closed.connect(function() { root.removePopup(popupId); });
+        notification.closed.connect(() => root.removePopup(popupId));
         root.pushPopup({
             popupId: popupId,
             id: notification.id,
@@ -377,7 +377,7 @@ Singleton {
             if (root.dndChangedThisSession)
                 return;
             try {
-                var state = JSON.parse(stateFile.text() || "{}");
+                const state = JSON.parse(stateFile.text() || "{}");
                 root.dndEnabled = !!(state && state.dndEnabled === true);
             } catch (stateError) {
                 console.warn("[Speshell] Ignoring unreadable notification state:", stateError);

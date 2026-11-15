@@ -47,7 +47,7 @@ Item {
 
     EffectClock {
         id: clock
-        onAdvanced: function(dt) {
+        onAdvanced: dt => {
             if (root.active) {
                 if (root.leave > 0) {
                     root.leave = Math.max(0, root.leave - dt / root.exitTime);

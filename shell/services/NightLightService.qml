@@ -17,17 +17,18 @@ Singleton {
     // Why hyprsunset stopped, as when another one already runs; empty while it's fine.
     property string errorText: ""
 
+    // [NightLight] enabled; false when config.ini can't take it.
     function setEnabled(on) {
         root.errorText = "";
-        ConfigService.setProperty("NightLight", "enabled", on ? "true" : "false");
+        return ConfigService.setProperty("NightLight", "enabled", on ? "true" : "false");
     }
 
     // From a keybinding: shown in the OSD.
     function setFromKey(on) {
-        if (!root.available)
-            return;
-        root.setEnabled(on);
+        if (!root.available || !root.setEnabled(on))
+            return false;
         OsdService.show("night-light", on ? "Night light on" : "Night light off");
+        return true;
     }
 
     Process {

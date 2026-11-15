@@ -72,7 +72,7 @@ ShellRoot {
                     return;
                 harness.capturing = true;
                 const index = harness.everyFrame ? harness.frame : harness.frame / 2;
-                loader.item.grabToImage(function(result) {
+                loader.item.grabToImage(result => {
                     result.saveToFile(harness.out + "/" + String(index).padStart(4, "0") + ".bmp");
                     harness.capturing = false;
                 });

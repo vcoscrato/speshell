@@ -15,13 +15,20 @@ default:
 
 # QML module directories under shell/, imported as `qs.<dir>`.
 modules := "bar components core panels services"
+python := "shell/system/speshell-system tests/*.py"
 
-# Lint every shell script and QML module; any warning fails.
+# Lint every script, the Python, and every QML module and JavaScript file; any warning fails.
 lint:
     #!/bin/sh
     set -e
-    shellcheck -x -P SCRIPTDIR shell/speshell shell/greeter/speshell-greeter shell/greeter/speshell-greeter-theme shell/tools/* preview/*.sh
-    ruff check --quiet --select E,F,W,B,UP,SIM --ignore E501 shell/system/speshell-system tests/*.py
+    shellcheck -x -P SCRIPTDIR shell/speshell shell/greeter/speshell-greeter shell/greeter/speshell-greeter-theme \
+        shell/tools/* shell/services/*.sh preview/*.sh
+    ruff check --quiet --select E,F,W,B,UP,SIM --ignore E501 {{ python }}
+    ruff format --quiet --check --line-length 120 {{ python }}
+    # One JavaScript: let and const, and arrows for functions passed as values.
+    old=$(git ls-files --cached --others --exclude-standard '*.qml' '*.js' | xargs grep -nE '(^|[^[:alnum:]_.$])(var[[:space:]]+[[:alpha:]_$]|function[[:space:]]*\()' \
+        | grep -vE 'property var|signal |\(var ' || true)
+    [ -z "$old" ] || { printf 'Use let or const, and arrow functions:\n%s\n' "$old"; exit 1; }
     # Quickshell loads the shell through a module tree it generates, in which each
     # directory is the module `qs.<dir>`; qmllint lints the same tree, built here.
     cd shell
@@ -49,6 +56,10 @@ lint:
     out=$(cd "$tree" && {{ qmllint }} -I "$tree/imports" shell.qml greeter.qml $(for dir in {{ modules }}; do echo "$dir"/*.qml; done) 2>&1 \
         | grep -v 'not declared as singleton in qmldir but using pragma Singleton' || true)
     [ -z "$out" ] || { printf '%s\n' "$out"; exit 1; }
+
+# Format the Python as lint expects.
+format:
+    ruff format --line-length 120 {{ python }}
 
 # Run the QML unit tests.
 test:
@@ -141,12 +152,15 @@ clean:
 local-package-install:
     #!/bin/sh
     set -e
-    builddir=$(mktemp -d /tmp/speshell-local.XXXXXX)
-    printf 'Building local package in %s\n' "$builddir"
-    mkdir -p "$builddir/src/speshell"
-    cp packaging/PKGBUILD "$builddir/"
-    tar --exclude='./packaging/src' --exclude='./packaging/pkg' --exclude='./packaging/speshell' --exclude='./packaging/*.pkg.tar.*' \
-        --exclude='qsb' \
-        -cf - . | tar -C "$builddir/src/speshell" -xf -
-    (cd "$builddir" && makepkg -efsi)
+    dir=$(mktemp -d /tmp/speshell-local.XXXXXX)
+    trap 'rm -rf "$dir"' EXIT
+    # The checkout as a commit would take it, over HEAD's history for pkgver: what git
+    # ignores, such as compiled shaders and __pycache__, stays out.
+    cp "$(git rev-parse --git-path index)" "$dir/index"
+    GIT_INDEX_FILE="$dir/index" git add -A
+    tree=$(GIT_INDEX_FILE="$dir/index" git write-tree)
+    git clone --quiet --no-checkout . "$dir/src/speshell"
+    git archive "$tree" | tar -x -C "$dir/src/speshell"
+    cp packaging/PKGBUILD "$dir/"
+    (cd "$dir" && makepkg -efsi)
     echo "Installed. Restart Speshell to load new shaders."

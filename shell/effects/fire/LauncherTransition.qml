@@ -77,7 +77,7 @@ Item {
 
     EffectClock {
         id: clock
-        onAdvanced: function(dt) {
+        onAdvanced: dt => {
             root.glow += (root.simmering - root.glow) * Math.min(1, dt * 5);
             if (root.active) {
                 if (root.sparkPending && root.phaseAge < root.igniteTime)
@@ -117,12 +117,12 @@ Item {
     function simmerBits(dt) {
         if (root.simmering <= 0)
             return;
-        var r = root.panelRect;
+        const r = root.panelRect;
         root.embersOwed += dt * root.emberRate * root.simmering;
         while (root.embersOwed >= 1) {
             root.embersOwed -= 1;
             // Some small and quick, a few larger and lazier, swaying as they rise.
-            var big = Math.random() < 0.25;
+            const big = Math.random() < 0.25;
             bits.spawn({ x: r.x + r.width * rnd(0.04, 0.96), y: r.y - rnd(6, 18), vx: rnd(-18, 18),
                          vy: -rnd(30, big ? 60 : 110), gravity: -rnd(10, 50), drag: 0.6,
                          life: rnd(big ? 1.6 : 0.9, big ? 2.4 : 1.6), size: Math.round(big ? rnd(15, 19) : rnd(10, 13)),
@@ -131,8 +131,8 @@ Item {
         root.nextSmoke -= dt;
         if (root.nextSmoke <= 0) {
             root.nextSmoke = rnd(2.5, 5);
-            var x = r.x + r.width * rnd(0.15, 0.85), drift = rnd(-14, 14);
-            for (var i = 0; i < 3; i++)
+            const x = r.x + r.width * rnd(0.15, 0.85), drift = rnd(-14, 14);
+            for (let i = 0; i < 3; i++)
                 bits.spawn({ x: x + drift * i * 0.4, y: r.y - 20 - i * 6, vx: drift + rnd(-6, 6), vy: -rnd(24, 36),
                              drag: 0.4, life: rnd(1.4, 1.9), delay: i * 0.22, size: Math.round(30 + 10 * i),
                              props: { kind: 2, seed: Math.random(), z: 0 } });

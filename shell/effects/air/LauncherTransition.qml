@@ -42,7 +42,7 @@ Item {
 
     EffectClock {
         id: clock
-        onAdvanced: function(dt) {
+        onAdvanced: dt => {
             if (root.active) {
                 // Reopened mid-exit: the panel unwinds back out first.
                 if (root.leave > 0) {

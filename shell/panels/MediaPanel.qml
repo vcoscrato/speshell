@@ -112,7 +112,7 @@ Card {
                     Label {
                         id: artistText
                         text: root.player
-                            ? [root.player.trackArtist, root.player.trackAlbum].filter(function(part) {
+                            ? [root.player.trackArtist, root.player.trackAlbum].filter(part => {
                                 return !!part;
                             }).join(" · ")
                             : ""

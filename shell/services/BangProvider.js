@@ -37,12 +37,12 @@ function webResult(id, title, subtitle, url) {
 }
 
 function configuredBangResults(prefix, bangs) {
-    var results = [];
-    var names = Object.keys(bangs || ({})).sort();
-    for (var i = 0; i < names.length; i++) {
+    const results = [];
+    const names = Object.keys(bangs || ({})).sort();
+    for (let i = 0; i < names.length; i++) {
         if (names[i].indexOf(prefix) !== 0)
             continue;
-        var suggestion = webResult(
+        const suggestion = webResult(
             "bang:" + names[i],
             "!" + names[i],
             "Type a search for this site · Tab to complete",
@@ -58,17 +58,17 @@ function configuredBangResults(prefix, bangs) {
 
 // `commands`: commandResult()s available right now.
 function bangResults(query, launcherConfig, commands) {
-    var raw = String(query || "").trim();
-    var config = launcherConfig || ({});
-    var bangs = config.bangs || ({});
-    var body = raw.substring(1);
-    var space = body.search(/\s/);
-    var alias = (space < 0 ? body : body.substring(0, space)).toLowerCase();
-    var terms = space < 0 ? "" : body.substring(space).trim();
-    var actions = commands || [];
+    const raw = String(query || "").trim();
+    const config = launcherConfig || ({});
+    const bangs = config.bangs || ({});
+    const body = raw.substring(1);
+    const space = body.search(/\s/);
+    const alias = (space < 0 ? body : body.substring(0, space)).toLowerCase();
+    const terms = space < 0 ? "" : body.substring(space).trim();
+    const actions = commands || [];
 
     if (space < 0) {
-        var suggestions = actions.filter(function(command) {
+        let suggestions = actions.filter(command => {
             return command.bang.indexOf(alias) === 0;
         });
         suggestions = suggestions.concat(configuredBangResults(alias, bangs));
@@ -76,7 +76,7 @@ function bangResults(query, launcherConfig, commands) {
             return suggestions;
     }
 
-    var action = actions.filter(function(command) { return command.bang === alias; })[0];
+    const action = actions.filter(command => command.bang === alias)[0];
     if (action)
         return [action];
 
@@ -98,8 +98,8 @@ function bangResults(query, launcherConfig, commands) {
 }
 
 function searchResult(query, launcherConfig) {
-    var raw = String(query || "").trim();
-    var terms = raw.substring(1).trim();
+    const raw = String(query || "").trim();
+    const terms = raw.substring(1).trim();
     if (terms === "")
         return [];
     return [webResult(

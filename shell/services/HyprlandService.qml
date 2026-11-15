@@ -12,16 +12,15 @@ Singleton {
 
     readonly property bool running: (Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE") || "") !== ""
     // Whether Hyprland reads a Lua config; its dispatchers then take Lua.
-    readonly property bool usingLua: root.running && Hyprland.usingLua
+    // Undefined until Quickshell has asked Hyprland.
+    readonly property bool usingLua: root.running && Hyprland.usingLua === true
     readonly property string focusedMonitor: root.running && Hyprland.focusedMonitor
         ? Hyprland.focusedMonitor.name
         : ""
-    property string version: ""
-    // The main keyboard's layout, as "Portuguese (Brazil)", and how many it switches
-    // between.
-    property string keyboard: ""
     // The touchpads' names, for InputService.
     property var touchpads: []
+    // The main keyboard's layout, as "Portuguese (Brazil)", and how many it switches
+    // between.
     property string keyboardLayout: ""
     readonly property int keyboardLayouts: root.keyboardLayoutList.length
     // The layouts it switches between, as { code: "BR", name: "Portuguese (Brazil)" },
@@ -74,18 +73,6 @@ Singleton {
             .replace(/\n/g, "\\n") + "\"";
     }
 
-    Process {
-        running: root.running
-        command: ["hyprctl", "version"]
-        stdout: SplitParser {
-            onRead: line => {
-                const match = String(line || "").match(/^Hyprland\s+(\S+)/);
-                if (match && root.version === "")
-                    root.version = match[1];
-            }
-        }
-    }
-
     // Read again on each layout switch, as the main keyboard may change with it, and
     // on a config reload; a switch on every keyboard reads once.
     Timer {
@@ -104,12 +91,11 @@ Singleton {
                     const parsed = JSON.parse(text);
                     root.touchpads = (parsed.mice || []).map(mouse => String(mouse.name || ""))
                         .filter(name => /touchpad/i.test(name));
-                    const main = (devices.keyboards || []).find(keyboard => keyboard.main);
+                    const main = (parsed.keyboards || []).find(keyboard => keyboard.main);
                     if (!main)
                         return;
                     const layouts = String(main.layout || "").split(",");
                     const variants = String(main.variant || "").split(",");
-                    root.keyboard = main.name;
                     root.keyboardLayout = main.active_keymap;
                     root.keyboardLayoutIndex = main.active_layout_index;
                     root.keyboardLayoutList = layouts.map((layout, i) => {

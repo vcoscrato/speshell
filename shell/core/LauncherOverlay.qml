@@ -190,7 +190,7 @@ ModalWindow {
         MouseArea {
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton
-            onClicked: function(mouse) { mouse.accepted = true; }
+            onClicked: mouse => { mouse.accepted = true; }
         }
 
         Column {

@@ -30,7 +30,7 @@ Item {
 
     // One step at a time: time that passes while a step renders goes into the next.
     function step() {
-        var dt = Math.min(0.1, root.time - root.steppedTime);
+        const dt = Math.min(0.1, root.time - root.steppedTime);
         if (root.stepping || dt <= 0)
             return;
         sim.dt = dt;

@@ -3,7 +3,7 @@
 // Speshell's icon names, each mapped to an SVG under icons/: a pinned Tabler
 // outline icon, or one of Speshell's own in Tabler's style. Apps' and tray items'
 // icons come from the icon theme instead.
-var files = ({
+const files = ({
     "airplane": "tabler/plane",
     "alert": "tabler/alert-triangle",
     "apps": "tabler/apps",
@@ -115,7 +115,7 @@ var files = ({
 
 // The icon's path under icons/, without the extension.
 function fileFor(name) {
-    var requested = String(name || "");
+    const requested = String(name || "");
     return Object.prototype.hasOwnProperty.call(files, requested) ? files[requested] : files.missing;
 }
 

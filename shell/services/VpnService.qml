@@ -3,6 +3,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "Shell.js" as Shell
 
 // NetworkManager's VPN and WireGuard profiles. Connecting runs a conversation:
 // whatever the login asks that nothing saved answers becomes a prompt on the
@@ -17,13 +18,13 @@ Singleton {
     id: root
 
     property var connections: [] // [{uuid, name, type, state}]
-    readonly property bool active: root.connections.some(function(item) {
+    readonly property bool active: root.connections.some(item => {
         return item.state === "activated";
     })
 
-    // The profile being brought up or down by this service.
-    property string busyUuid: ""
-    property bool busyConnecting: false
+    // The profile this service is bringing up or down, or null: { uuid, kind: "connect"
+    // or "disconnect" }.
+    property var operation: null
     // What the login is asking: {uuid, kind: "login" | "question" | "choice",
     // message, label, masked, choices, user, needUser}.
     property var prompt: null
@@ -44,7 +45,7 @@ Singleton {
     })
 
     function find(uuid) {
-        for (var i = 0; i < root.connections.length; i++) {
+        for (let i = 0; i < root.connections.length; i++) {
             if (root.connections[i].uuid === uuid)
                 return root.connections[i];
         }
@@ -56,18 +57,22 @@ Singleton {
     }
 
     function subtitle(item) {
-        var kind = item.type === "wireguard" ? "WireGuard" : "VPN";
+        const kind = item.type === "wireguard" ? "WireGuard" : "VPN";
         if (root.promptFor(item.uuid))
             return kind + " · Signing in";
-        if (root.busyUuid === item.uuid && (item.state === "" || item.state === "activated"))
-            return kind + (root.busyConnecting ? " · Connecting…" : " · Disconnecting…");
+        if (root.operatesOn(item.uuid) && (item.state === "" || item.state === "activated"))
+            return kind + (root.operation.kind === "connect" ? " · Connecting…" : " · Disconnecting…");
         return kind + " · " + (root.stateText[item.state] || "Off");
     }
 
     function busy(item) {
         if (root.promptFor(item.uuid))
             return false;
-        return root.busyUuid === item.uuid || item.state === "activating" || item.state === "deactivating";
+        return root.operatesOn(item.uuid) || item.state === "activating" || item.state === "deactivating";
+    }
+
+    function operatesOn(uuid) {
+        return root.operation !== null && root.operation.uuid === uuid;
     }
 
     function refresh() {
@@ -78,10 +83,10 @@ Singleton {
     // nmcli -t escapes ':' and '\' in values; NAME is last, so the first three
     // separators split the fixed fields.
     function parseList(text) {
-        var result = [];
-        var lines = String(text || "").split("\n");
-        for (var i = 0; i < lines.length; i++) {
-            var fields = lines[i].split(":");
+        const result = [];
+        const lines = String(text || "").split("\n");
+        for (let i = 0; i < lines.length; i++) {
+            const fields = lines[i].split(":");
             if (fields.length < 4 || (fields[1] !== "vpn" && fields[1] !== "wireguard"))
                 continue;
             result.push({
@@ -91,17 +96,17 @@ Singleton {
                 name: fields.slice(3).join(":").replace(/\\(.)/g, "$1")
             });
         }
-        return result.sort(function(a, b) {
+        return result.sort((a, b) => {
             return a.name.localeCompare(b.name);
         });
     }
 
     // vpn.data prints as "key = value, key = value".
     function parseVpnData(text) {
-        var data = {};
-        var items = String(text || "").split(/, (?=[^,=]+ = )/);
-        for (var i = 0; i < items.length; i++) {
-            var at = items[i].indexOf(" = ");
+        const data = {};
+        const items = String(text || "").split(/, (?=[^,=]+ = )/);
+        for (let i = 0; i < items.length; i++) {
+            const at = items[i].indexOf(" = ");
             if (at > 0)
                 data[items[i].slice(0, at)] = items[i].slice(at + 3);
         }
@@ -109,22 +114,20 @@ Singleton {
     }
 
     function connect(uuid, fresh) {
-        if (root.busyUuid !== "")
+        if (root.operation)
             return;
-        root.busyUuid = uuid;
-        root.busyConnecting = true;
+        root.operation = { uuid: uuid, kind: "connect" };
         root.clearError();
         root.prompt = null;
         root.session = { uuid: uuid, fresh: !!fresh };
-        prepareProc.command = ["bash", "-c", root.prepareScript, "speshell-vpn", uuid];
+        prepareProc.command = Shell.script("vpn.sh", ["prepare", uuid]);
         prepareProc.running = true;
     }
 
     function disconnect(uuid) {
-        if (root.busyUuid !== "")
+        if (root.operation)
             return;
-        root.busyUuid = uuid;
-        root.busyConnecting = false;
+        root.operation = { uuid: uuid, kind: "disconnect" };
         root.clearError();
         disconnectProc.command = ["nmcli", "connection", "down", "uuid", uuid];
         disconnectProc.running = true;
@@ -144,7 +147,7 @@ Singleton {
     }
 
     function finish() {
-        root.busyUuid = "";
+        root.operation = null;
         root.prompt = null;
         root.session = null;
         root.refresh();
@@ -169,22 +172,22 @@ Singleton {
     }
 
     function finishPrepare(text) {
-        var s = root.session;
-        var info = {};
-        var lines = String(text || "").split("\n");
-        for (var i = 0; i < lines.length; i++) {
-            var at = lines[i].indexOf("=");
+        const s = root.session;
+        const info = {};
+        const lines = String(text || "").split("\n");
+        for (let i = 0; i < lines.length; i++) {
+            const at = lines[i].indexOf("=");
             if (at > 0)
                 info[lines[i].slice(0, at)] = lines[i].slice(at + 1);
         }
         if (/\.openconnect$/.test(info.service || "")) {
-            var data = root.parseVpnData(info.data);
+            const data = root.parseVpnData(info.data);
             s.openconnect = true;
             s.gateway = data.gateway || "";
             s.protocol = data.protocol || "anyconnect";
             s.formEntries = [];
-            for (var key in data) {
-                var match = /^form:([^:]+):(.+)$/.exec(key);
+            for (const key in data) {
+                const match = /^form:([^:]+):(.+)$/.exec(key);
                 if (match)
                     s.formEntries.push(match[1] + ":" + match[2] + "=" + data[key]);
             }
@@ -205,7 +208,7 @@ Singleton {
 
     // live: openconnect is waiting at the rejected form for a new password.
     function askLogin(message, live) {
-        var s = root.session;
+        const s = root.session;
         root.prompt = {
             uuid: s.uuid,
             kind: "login",
@@ -217,8 +220,8 @@ Singleton {
     }
 
     function submitLogin(user, password) {
-        var s = root.session;
-        var asked = root.prompt;
+        const s = root.session;
+        const asked = root.prompt;
         if (!s || !asked || asked.kind !== "login" || password === "" || (asked.needUser && user === ""))
             return;
         root.prompt = null;
@@ -233,15 +236,15 @@ Singleton {
     }
 
     function startOpenconnect() {
-        var s = root.session;
-        root.launch(["bash", "-c", root.openconnectScript, "speshell-vpn",
-                     s.uuid, s.protocol, s.gateway, s.user, s.authgroup].concat(s.formEntries), s.password);
+        const s = root.session;
+        root.launch(Shell.script("vpn.sh", ["openconnect", s.uuid, s.protocol, s.gateway, s.user, s.authgroup]
+            .concat(s.formEntries)), s.password);
     }
 
     function startNmcli() {
-        var s = root.session;
+        const s = root.session;
         s.answers = {};
-        root.launch(["bash", "-c", root.nmcliScript, "speshell-vpn", s.uuid, s.fresh ? "1" : "0"], null);
+        root.launch(Shell.script("vpn.sh", ["nmcli", s.uuid, s.fresh ? "1" : "0"]), null);
     }
 
     // Codes, tokens, and challenge answers change every login.
@@ -252,7 +255,7 @@ Singleton {
     // Output arrives in chunks. A prompt is an unterminated line ending in ':'
     // after which the program goes quiet.
     function read(chunk) {
-        var s = root.session;
+        const s = root.session;
         if (!s || root.pendingLaunch)
             return;
         s.transcript += chunk;
@@ -263,13 +266,13 @@ Singleton {
     }
 
     function promptReady() {
-        var s = root.session;
+        const s = root.session;
         if (!s || !sessionProc.running)
             return;
-        var lastBreak = s.transcript.lastIndexOf("\n");
-        var tail = s.transcript.slice(lastBreak + 1);
-        var lines = s.transcript.slice(0, Math.max(0, lastBreak)).split("\n");
-        var message = lines.length > 0 ? lines[lines.length - 1].trim() : "";
+        const lastBreak = s.transcript.lastIndexOf("\n");
+        const tail = s.transcript.slice(lastBreak + 1);
+        const lines = s.transcript.slice(0, Math.max(0, lastBreak)).split("\n");
+        const message = lines.length > 0 ? lines[lines.length - 1].trim() : "";
         if (s.openconnect)
             root.openconnectPrompt(tail, message, lines);
         else
@@ -277,12 +280,12 @@ Singleton {
     }
 
     function openconnectPrompt(tail, message, lines) {
-        var s = root.session;
+        const s = root.session;
         if (/SAML|single sign-on/i.test(s.transcript)) {
             root.stopForError("This VPN signs in through a web browser, which Speshell can't do.");
             return;
         }
-        var choice = /^(.*?)\s*\[(.*)\]:\s?$/.exec(tail);
+        const choice = /^(.*?)\s*\[(.*)\]:\s?$/.exec(tail);
         if (choice) {
             root.prompt = {
                 uuid: s.uuid,
@@ -308,9 +311,9 @@ Singleton {
     }
 
     function nmcliPrompt(tail, message) {
-        var s = root.session;
-        var match = /^(.*) \(([^()\s]+)\): $/.exec(tail);
-        var label = match ? match[1] : tail.trim().replace(/:$/, "");
+        const s = root.session;
+        const match = /^(.*) \(([^()\s]+)\): $/.exec(tail);
+        const label = match ? match[1] : tail.trim().replace(/:$/, "");
         s.field = match ? match[2] : "";
         root.prompt = {
             uuid: s.uuid,
@@ -322,7 +325,7 @@ Singleton {
     }
 
     function answer(text) {
-        var s = root.session;
+        const s = root.session;
         if (!s || !root.prompt || root.prompt.kind === "login")
             return;
         if (root.prompt.kind === "choice")
@@ -336,7 +339,7 @@ Singleton {
     // Answers the waiting prompt; its line leaves the transcript so the next
     // prompt's message is real output.
     function reply(text) {
-        var s = root.session;
+        const s = root.session;
         s.transcript = s.transcript.slice(0, s.transcript.lastIndexOf("\n") + 1);
         sessionProc.write(text + "\n");
     }
@@ -347,7 +350,7 @@ Singleton {
     }
 
     function lastLine(text) {
-        var lines = String(text || "").trim().split("\n").filter(function(line) {
+        const lines = String(text || "").trim().split("\n").filter(line => {
             return line !== "***" && line.indexOf("Failed to complete authentication") === -1
                 && line.indexOf("User input required") === -1;
         });
@@ -355,7 +358,7 @@ Singleton {
     }
 
     function finishSession(exitCode) {
-        var s = root.session;
+        const s = root.session;
         if (!s)
             return;
         if (exitCode === 0) {
@@ -371,7 +374,7 @@ Singleton {
 
     // Writes the credentials this login used to the Secret Service.
     function save(s) {
-        var fields = {};
+        let fields = {};
         if (s.openconnect) {
             if (s.password !== "")
                 fields.password = s.password;
@@ -382,69 +385,16 @@ Singleton {
         } else {
             fields = s.answers;
         }
-        var input = "";
-        for (var field in fields)
+        let input = "";
+        for (const field in fields)
             input += field + "\n" + fields[field] + "\n";
         if (input === "")
             return;
-        var item = root.find(s.uuid);
+        const item = root.find(s.uuid);
         storeProc.input = input;
-        storeProc.command = ["bash", "-c", root.storeScript, "speshell-vpn", s.uuid, item ? item.name : "VPN"];
+        storeProc.command = Shell.script("vpn.sh", ["store", s.uuid, item ? item.name : "VPN"]);
         storeProc.running = true;
     }
-
-    // Prints what connecting needs to know, one key=value per line.
-    readonly property string prepareScript: "uuid=$1\n"
-        + "show() { nmcli -e no -g \"$1\" connection show uuid \"$uuid\" 2>/dev/null; }\n"
-        + "saved() { secret-tool lookup speshell-vpn \"$uuid\" field \"$1\" 2>/dev/null; }\n"
-        + "echo \"service=$(show vpn.service-type)\"\n"
-        + "echo \"data=$(show vpn.data)\"\n"
-        + "echo \"user=$(show vpn.user-name)\"\n"
-        + "echo \"savedUser=$(saved user)\"\n"
-        + "echo \"savedAuthgroup=$(saved authgroup)\"\n"
-        + "saved password >/dev/null && echo savedPassword=yes\n"
-        + "echo \"savedFields=$(secret-tool search --all speshell-vpn \"$uuid\" 2>/dev/null | grep -c '^label = .* · .*\\..*')\"\n"
-
-    // Args: uuid protocol gateway user authgroup form-entries…; stdin's first line
-    // is a typed password (empty: the saved one), and later lines answer prompts.
-    readonly property string openconnectScript: "exec 2>&1\n"
-        + "uuid=$1 protocol=$2 gateway=$3 user=$4 group=$5\n"
-        + "shift 5\n"
-        + "args=(--protocol=\"$protocol\")\n"
-        + "[ -z \"$user\" ] || args+=(--user=\"$user\")\n"
-        + "[ -z \"$group\" ] || args+=(--authgroup=\"$group\")\n"
-        + "for entry; do args+=(--form-entry=\"$entry\"); done\n"
-        + "IFS= read -r password\n"
-        + "[ -n \"$password\" ] || password=$(secret-tool lookup speshell-vpn \"$uuid\" field password)\n"
-        + "exec 3< <(printf '%s\\n' \"$password\"; exec cat)\n"
-        + "feeder=$!\n"
-        + "login=$(openconnect --authenticate --non-inter --passwd-on-stdin \"${args[@]}\" \"$gateway\" <&3)\n"
-        + "status=$?\n"
-        + "exec 3<&-\n"
-        + "kill \"$feeder\" 2>/dev/null\n"
-        + "[ \"$status\" -eq 0 ] || exit 1\n"
-        + "COOKIE= HOST= CONNECT_URL= FINGERPRINT= RESOLVE=\n"
-        + "eval \"$login\"\n"
-        + "{ printf 'vpn.secrets.cookie:%s\\n' \"$COOKIE\"\n"
-        + "  printf 'vpn.secrets.gateway:%s\\n' \"${CONNECT_URL:-$HOST}\"\n"
-        + "  printf 'vpn.secrets.gwcert:%s\\n' \"$FINGERPRINT\"\n"
-        + "  [ -z \"$RESOLVE\" ] || printf 'vpn.secrets.resolve:%s\\n' \"$RESOLVE\"\n"
-        + "} | nmcli connection up uuid \"$uuid\" passwd-file /dev/stdin\n"
-
-    // Args: uuid fresh. Saved secrets are labelled "<name> VPN · <setting.key>";
-    // nmcli asks for anything they don't cover.
-    readonly property string nmcliScript: "uuid=$1\n"
-        + "saved=\n"
-        + "[ \"$2\" = 1 ] || saved=$(secret-tool search --all speshell-vpn \"$uuid\" 2>/dev/null | awk '\n"
-        + "  /^label = / { n = split($0, part, \" · \"); field = n > 1 ? part[n] : \"\" }\n"
-        + "  /^secret = / && field ~ /\\./ { print field \":\" substr($0, 10) }')\n"
-        + "nmcli --ask connection up uuid \"$uuid\" passwd-file <(printf '%s\\n' \"$saved\") 2>&1\n"
-
-    // Args: uuid name; stdin holds field and value lines in pairs.
-    readonly property string storeScript: "uuid=$1 name=$2\n"
-        + "while IFS= read -r field && IFS= read -r value; do\n"
-        + "  printf '%s' \"$value\" | secret-tool store --label=\"$name VPN · $field\" speshell-vpn \"$uuid\" field \"$field\"\n"
-        + "done\n"
 
     Process {
         id: listProc
@@ -473,7 +423,7 @@ Singleton {
         id: prepareProc
         stdout: StdioCollector {
             onStreamFinished: {
-                if (root.session && root.busyUuid !== "")
+                if (root.session && root.operation)
                     root.finishPrepare(text);
             }
         }
@@ -499,8 +449,8 @@ Singleton {
                 sessionProc.write(sessionProc.firstLine + "\n");
             sessionProc.firstLine = null;
         }
-        onExited: function(exitCode) {
-            var next = root.pendingLaunch;
+        onExited: exitCode => {
+            const next = root.pendingLaunch;
             root.pendingLaunch = null;
             if (next) {
                 sessionProc.command = next.command;
@@ -527,9 +477,9 @@ Singleton {
     Process {
         id: disconnectProc
         stderr: StdioCollector { id: disconnectErr }
-        onExited: function(exitCode) {
-            var uuid = root.busyUuid;
-            root.busyUuid = "";
+        onExited: exitCode => {
+            const uuid = root.operation ? root.operation.uuid : "";
+            root.operation = null;
             if (exitCode !== 0) {
                 root.errorUuid = uuid;
                 root.errorText = root.lastLine(disconnectErr.text) || "Could not disconnect.";

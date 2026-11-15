@@ -70,7 +70,7 @@ Singleton {
     function get(url, onDone) {
         const id = root.requestId;
         const request = new XMLHttpRequest();
-        request.onreadystatechange = function() {
+        request.onreadystatechange = () => {
             if (request.readyState !== XMLHttpRequest.DONE || id !== root.requestId)
                 return;
             let body = null;
@@ -98,7 +98,7 @@ Singleton {
         }
         const name = root.location.trim();
         if (name === "") {
-            root.get("https://ipinfo.io/json", function(body) {
+            root.get("https://ipinfo.io/json", body => {
                 const coordinates = body && body.loc ? String(body.loc).split(",").map(Number) : [];
                 if (coordinates.length !== 2 || coordinates.some(isNaN))
                     return root.fail("offline");
@@ -112,7 +112,7 @@ Singleton {
             return;
         }
         root.get("https://geocoding-api.open-meteo.com/v1/search?count=1&format=json&language=en&name="
-                + encodeURIComponent(name), function(body) {
+                + encodeURIComponent(name), body => {
             if (!body)
                 return root.fail("offline");
             const found = (body.results || [])[0];
@@ -135,7 +135,7 @@ Singleton {
             + "&hourly=temperature_2m,weather_code,precipitation_probability,is_day"
             + "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset"
             + (root.imperial ? "&temperature_unit=fahrenheit&wind_speed_unit=mph" : "");
-        root.get(url, function(body) {
+        root.get(url, body => {
             if (!body || !body.current || !body.hourly || !body.daily)
                 return root.fail("offline");
             root.apply(body, spot.place);
@@ -198,6 +198,12 @@ Singleton {
     }
 
     // Refreshes a reading older than a quarter hour, as after waking from sleep.
+    // Saved to config.ini, which `location` follows.
+    function setLocation(location) {
+        if (location !== root.location)
+            ConfigService.setProperty("Weather", "location", location);
+    }
+
     function refreshIfStale() {
         if (root.enabled && Date.now() - root.fetchedAt > 15 * 60 * 1000)
             root.refresh();

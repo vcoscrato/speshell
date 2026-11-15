@@ -64,7 +64,7 @@ Item {
         if (root.enter < root.arriveEnd)
             return -root.farLeft * Math.pow(1 - root.enter / root.arriveEnd, 3.2);
         // Past its mark a little as it skids, then back.
-        var s = (root.enter - root.arriveEnd) / (1 - root.arriveEnd);
+        const s = (root.enter - root.arriveEnd) / (1 - root.arriveEnd);
         return 16 * Math.sin(Math.PI * Math.min(1, s * 1.15)) * (1 - s);
     }
 
@@ -72,9 +72,9 @@ Item {
 
     EffectClock {
         id: clock
-        onAdvanced: function(dt) {
-            var wasStopped = root.enter >= root.arriveEnd * 0.94;
-            var wasLeaving = root.leave > 0;
+        onAdvanced: dt => {
+            const wasStopped = root.enter >= root.arriveEnd * 0.94;
+            const wasLeaving = root.leave > 0;
             if (root.active) {
                 // Reopened mid-exit: it backs into place first.
                 if (root.leave > 0)
@@ -91,21 +91,21 @@ Item {
                 return;
             }
 
-            var x = root.position();
+            const x = root.position();
             if (!root.primed) {
                 root.primed = true;
                 root.driveX = x;
             }
-            var v = (x - root.driveX) / dt;
-            var accel = (v - root.speed) / dt;
+            const v = (x - root.driveX) / dt;
+            const accel = (v - root.speed) / dt;
             root.driveX = x;
             root.speed = v;
             // Leans into braking and back from acceleration, settling by the end.
-            var want = Math.max(-14, Math.min(14, -accel * 0.0009)) * (1 - root.span(root.enter, 0.85, 1) * (root.leave > 0 ? 0 : 1));
+            const want = Math.max(-14, Math.min(14, -accel * 0.0009)) * (1 - root.span(root.enter, 0.85, 1) * (root.leave > 0 ? 0 : 1));
             root.lean += (want - root.lean) * Math.min(1, dt * 18);
             if (root.enter >= 1 && root.leave === 0)
                 root.lean = 0;
-            var stretchTo = Math.min(0.2, Math.abs(v) / 9000);
+            const stretchTo = Math.min(0.2, Math.abs(v) / 9000);
             root.stretchVel += (380 * (stretchTo - root.stretch) - 13 * root.stretchVel) * dt;
             root.stretch = Math.max(-0.2, Math.min(0.25, root.stretch + root.stretchVel * dt));
             root.travel += dt * (650 + Math.abs(v) * 0.5);
@@ -143,16 +143,16 @@ Item {
     function stopped() {
         root.skidAge = 0;
         root.stretchVel -= 4.5;
-        var x0 = root.panelRect.x, w = root.panelRect.width;
-        for (var i = 0; i < 6; i++)
+        const x0 = root.panelRect.x, w = root.panelRect.width;
+        for (let i = 0; i < 6; i++)
             bits.emit(bits.smoke, { x: x0 + w * bits.rnd(0.05, 0.3), y: root.floorY + bits.rnd(0, 12),
                                     vx: bits.rnd(-90, -20), vy: bits.rnd(-50, -10), drag: 1.5,
                                     life: bits.rnd(0.9, 1.3), size: Math.round(bits.rnd(64, 104)), delay: i * 0.03 });
-        for (i = 0; i < 4; i++)
+        for (let i = 0; i < 4; i++)
             bits.emit(bits.smoke, { x: x0 + w * bits.rnd(0.72, 0.92), y: root.floorY + bits.rnd(0, 10),
                                     vx: bits.rnd(-30, 50), vy: bits.rnd(-40, -10), drag: 1.5,
                                     life: bits.rnd(0.7, 1.0), size: Math.round(bits.rnd(48, 76)), delay: 0.04 + i * 0.03 });
-        for (i = 0; i < 10; i++)
+        for (let i = 0; i < 10; i++)
             bits.emit(bits.spark, { x: x0 + w * bits.rnd(0.78, 0.95), y: root.floorY + 6, vx: bits.rnd(60, 320),
                                     vy: bits.rnd(-260, -60), gravity: 800, life: bits.rnd(0.35, 0.6),
                                     size: Math.round(bits.rnd(18, 28)), orient: true });
@@ -161,14 +161,14 @@ Item {
                                    size: Math.round(Math.min(200, root.panelRect.height * 0.55)), angle: bits.rnd(0, 360) });
         bits.emit(bits.glint, { x: x0 + 18, y: root.panelRect.y + 6, life: 0.45, size: 30, delay: 0.12 });
         // Lightning strikes it from all around as it stops.
-        for (i = 0; i < 4; i++)
+        for (let i = 0; i < 4; i++)
             root.strikeBorder(0.03 + i * bits.rnd(0.05, 0.09));
     }
 
     // A bolt striking a random point of the panel's border from outside, mostly from
     // above, after `delay` s.
     function strikeBorder(delay) {
-        var r = root.panelRect, side = Math.random(), x, y, angle;
+        let r = root.panelRect, side = Math.random(), x, y, angle;
         if (side < 0.5) {
             x = r.x + r.width * bits.rnd(0.1, 0.9); y = r.y; angle = 0;
         } else if (side < 0.7) {
@@ -180,7 +180,7 @@ Item {
         }
         bits.emit(bits.strike, { x: x, y: y, life: bits.rnd(0.4, 0.55), size: Math.round(bits.rnd(260, 440)),
                                  angle: angle + bits.rnd(-25, 25), delay: delay });
-        for (var i = 0; i < 3; i++)
+        for (let i = 0; i < 3; i++)
             bits.emit(bits.spark, { x: x, y: y, vx: bits.rnd(-200, 200), vy: bits.rnd(-220, 40), gravity: 700,
                                     life: bits.rnd(0.25, 0.45), size: Math.round(bits.rnd(16, 24)), orient: true,
                                     delay: delay + 0.04 });
@@ -191,11 +191,11 @@ Item {
         root.fireAge = 0;
         root.stretchVel -= 3;
         root.skidAge = Math.max(root.skidAge, 0.8);
-        for (var i = 0; i < 6; i++)
+        for (let i = 0; i < 6; i++)
             bits.emit(bits.smoke, { x: root.rear + bits.rnd(-30, 10), y: root.floorY + bits.rnd(0, 12),
                                     vx: bits.rnd(-140, -40), vy: bits.rnd(-60, -10), drag: 1.8,
                                     life: bits.rnd(0.5, 0.7), size: Math.round(bits.rnd(56, 90)), delay: i * 0.02 });
-        for (i = 0; i < 8; i++)
+        for (let i = 0; i < 8; i++)
             bits.emit(bits.spark, { x: root.rear, y: root.floorY + 8, vx: bits.rnd(-340, -100), vy: bits.rnd(-220, -40),
                                     gravity: 800, life: bits.rnd(0.3, 0.5), size: Math.round(bits.rnd(18, 26)), orient: true });
     }

@@ -9,8 +9,8 @@ T.Menu {
 
     // As wide as its widest row; menus don't size to their rows on their own.
     implicitWidth: {
-        var widest = implicitBackgroundWidth - leftPadding - rightPadding;
-        for (var i = 0; i < root.count; i++)
+        let widest = implicitBackgroundWidth - leftPadding - rightPadding;
+        for (let i = 0; i < root.count; i++)
             widest = Math.max(widest, root.itemAt(i).implicitWidth);
         return widest + leftPadding + rightPadding;
     }

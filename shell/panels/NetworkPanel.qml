@@ -40,7 +40,7 @@ Card {
             visible: NetworkService.wifiDevice !== null
             checked: NetworkService.wifiOn
             tooltipText: NetworkService.wifiOn ? "Turn Wi-Fi off" : "Turn Wi-Fi on"
-            onToggled: function(state) { NetworkService.setWifiEnabled(state); }
+            onToggled: state => NetworkService.setWifiEnabled(state)
         }
     }
 
@@ -70,10 +70,7 @@ Card {
             current: true
             primaryEnabled: false
             actions: [{ text: "Disconnect", actionId: "disconnect" }]
-            onActionTriggered: {
-                if (NetworkService.connectedWifi)
-                    NetworkService.connectedWifi.disconnect();
-            }
+            onActionTriggered: NetworkService.disconnectWifi()
         },
 
         DeviceRow {

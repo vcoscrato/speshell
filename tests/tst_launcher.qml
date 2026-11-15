@@ -45,7 +45,7 @@ TestCase {
     })
 
     function topResult(query, usage) {
-        var results = AppProvider.search(AppProvider.buildIndex(entries), query, usage || {}, 10);
+        const results = AppProvider.search(AppProvider.buildIndex(entries), query, usage || {}, 10);
         return results.length > 0 ? results[0].title : "";
     }
 
@@ -74,15 +74,15 @@ TestCase {
     }
 
     function test_bangEncodesItsQuery() {
-        var results = BangProvider.bangResults("!docs qml singleton", config, []);
+        const results = BangProvider.bangResults("!docs qml singleton", config, []);
         compare(results.length, 1);
         compare(results[0].payload.url, "https://docs.example.com/?q=qml%20singleton");
     }
 
     function test_bangPrefixSuggestsActionsAndShortcuts() {
-        var mirror = BangProvider.commandResult("mirror", "Mirror displays", "Show this display on all of them", "display");
-        var results = BangProvider.bangResults("!", config, [mirror]);
-        compare(results.map(function(result) { return result.id; }), ["command:mirror", "bang:docs"]);
+        const mirror = BangProvider.commandResult("mirror", "Mirror displays", "Show this display on all of them", "display");
+        const results = BangProvider.bangResults("!", config, [mirror]);
+        compare(results.map(result => result.id), ["command:mirror", "bang:docs"]);
         compare(BangProvider.bangResults("!mi", config, [mirror])[0].id, "command:mirror");
     }
 

@@ -132,7 +132,7 @@ Card {
         ToggleSwitch {
             checked: PowerService.saverOnBattery
             tooltipText: "Saver on battery"
-            onToggled: on => ConfigService.setProperty("Power", "saverOnBattery", on ? "true" : "false")
+            onToggled: on => PowerService.setSaverOnBattery(on)
         }
     }
 

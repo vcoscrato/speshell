@@ -41,7 +41,7 @@ preview() {
   ((${#text} <= 120)) && printf '%s' "$text" || printf '%s…' "${text:0:120}"
 }
 
-# Has Speshell probe the tools' processes now instead of on its next poll.
+# Has Speshell look at the tools' processes, as it does only when asked.
 # Detached and delayed so it sees them as they are after the caller moves on.
 refresh_activity() {
   command -v speshell >/dev/null 2>&1 || return 0

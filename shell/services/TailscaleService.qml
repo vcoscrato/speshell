@@ -44,7 +44,7 @@ Singleton {
     }
 
     function parseStatus(text) {
-        var status;
+        let status;
         try {
             status = JSON.parse(text);
         } catch (error) {
@@ -84,7 +84,7 @@ Singleton {
 
     function read(line) {
         switchProc.transcript += line + "\n";
-        var match = /https:\/\/\S+/.exec(line);
+        const match = /https:\/\/\S+/.exec(line);
         if (match && root.authUrl === "") {
             root.authUrl = match[0];
             root.openLogin();
@@ -92,7 +92,7 @@ Singleton {
     }
 
     function finishSwitch(exitCode) {
-        var transcript = switchProc.transcript.trim();
+        const transcript = switchProc.transcript.trim();
         if (exitCode !== 0 && !switchProc.cancelled) {
             if (/access denied/i.test(transcript))
                 root.errorText = "Switching Tailscale needs you as its operator: run sudo tailscale set --operator=$USER once.";

@@ -24,7 +24,6 @@ depends=(
   'systemd'
   'upower'
   'util-linux'
-  'which'
   'wireplumber'
 )
 makedepends=('git' 'just' 'qt6-shadertools')

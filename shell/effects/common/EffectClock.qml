@@ -25,7 +25,7 @@ Item {
     signal advanced(real dt)
 
     readonly property Item speedHost: {
-        for (var item = root.parent; item; item = item.parent) {
+        for (let item = root.parent; item; item = item.parent) {
             if (item.timeScale !== undefined)
                 return item;
         }
@@ -37,7 +37,7 @@ Item {
     readonly property bool everyFrame: root.frameRate === 0
 
     readonly property Item previewHost: {
-        for (var item = root.parent; item; item = item.parent) {
+        for (let item = root.parent; item; item = item.parent) {
             if (item.previewTime !== undefined)
                 return item;
         }
@@ -45,7 +45,7 @@ Item {
     }
 
     function tick(now) {
-        var dt = (root.lastTime < 0 ? root.step : Math.min(0.1, now - root.lastTime)) * root.timeScale;
+        const dt = (root.lastTime < 0 ? root.step : Math.min(0.1, now - root.lastTime)) * root.timeScale;
         root.lastTime = now;
         root.advance(dt);
     }
@@ -82,8 +82,8 @@ Item {
         repeat: true
         running: root.previewHost === null && !root.everyFrame
         onTriggered: {
-            var now = Date.now();
-            var period = 1000 * root.step;
+            const now = Date.now();
+            const period = 1000 * root.step;
             // Started, or more than a frame off schedule: restart the schedule now.
             if (Math.abs(now - root.nextDue) > period)
                 root.nextDue = now;

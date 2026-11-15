@@ -2,6 +2,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "Shell.js" as Shell
 
 // Hyprland's regular workspaces for the bar and its windows for WindowService, and the
 // dispatches that show one. Quickshell's own Hyprland models are incomplete under a Lua
@@ -162,7 +163,7 @@ Singleton {
 
     Process {
         id: stateProc
-        command: ["sh", "-c", "hyprctl -j monitors; printf '\\036'; hyprctl -j workspaces; printf '\\036'; hyprctl -j clients"]
+        command: Shell.script("workspace.sh")
         stdout: StdioCollector {
             onStreamFinished: root.apply(text)
         }

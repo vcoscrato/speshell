@@ -54,7 +54,7 @@ Item {
     }
 
     function slide(at, dx) {
-        var back = dx > 0 ? -1 : 1;
+        const back = dx > 0 ? -1 : 1;
         root.streakOwed = Math.min(root.streakOwed + Math.abs(dx), 48);
         while (root.streakOwed >= 8) {
             root.streakOwed -= 8;
@@ -70,7 +70,7 @@ Item {
     }
 
     function release(at) {
-        for (var i = 0; i < 5; i++)
+        for (let i = 0; i < 5; i++)
             root.spark(at.x, at.y - 3, rnd(-110, 110), -rnd(170, 320));
         root.tongue(at.x, at.y - 3, 0, 22);
     }
@@ -88,25 +88,25 @@ Item {
     // A flash where it lit, flames standing on (x, y) at `scale`, embers floating up.
     function ignite(x, y, scale, embers) {
         root.flash(x, y, Math.round(26 * scale), 0.2);
-        var sizes = [28, 21, 18];
-        var offsets = [0, -7, 7];
-        for (var i = 0; i < 3; i++) {
-            var size = Math.round(sizes[i] * scale);
+        const sizes = [28, 21, 18];
+        const offsets = [0, -7, 7];
+        for (let i = 0; i < 3; i++) {
+            const size = Math.round(sizes[i] * scale);
             root.put({ x: x + (offsets[i] + rnd(-2, 2)) * scale, y: y - size * 0.28, vy: -rnd(5, 15),
                        life: rnd(0.45, 0.65), delay: 0.03 + i * 0.04, size: size,
                        props: { kind: 0, seed: Math.random(), z: 1 } });
         }
-        for (var j = 0; j < embers; j++)
+        for (let j = 0; j < embers; j++)
             root.ember(x + rnd(-8, 8) * scale, y - rnd(2, 10) * scale, 0.08 + j * 0.06);
     }
 
     function pick(area, at) {
         root.flash(at.x, at.y, 16, 0.14, 0.45);
-        var size = Math.round(rnd(17, 21));
+        const size = Math.round(rnd(17, 21));
         root.put({ x: at.x + rnd(-1.5, 1.5), y: at.y - size * 0.28, vy: -rnd(5, 15), life: rnd(0.3, 0.4),
                    delay: 0.02, size: size, props: { kind: 0, seed: Math.random(), z: 1 } }, 0.5);
         // Embers rising quickly off it, out of the line of text.
-        for (var j = 0; j < 5; j++)
+        for (let j = 0; j < 5; j++)
             root.put({ x: at.x + rnd(-5, 5), y: at.y - rnd(2, 6), vx: rnd(-55, 55), vy: -rnd(110, 170),
                        gravity: -rnd(20, 60), drag: 1.4, life: rnd(0.6, 0.9), delay: 0.04 + j * 0.05,
                        size: Math.round(rnd(8, 11)), props: { kind: 4, seed: Math.random(), z: 2 } });
@@ -114,8 +114,8 @@ Item {
     }
 
     function toggle(area, on) {
-        var x = on ? area.x + area.width - area.height / 2 : area.x + area.height / 2;
-        var cy = area.y + area.height / 2;
+        const x = on ? area.x + area.width - area.height / 2 : area.x + area.height / 2;
+        const cy = area.y + area.height / 2;
         if (on) {
             root.ignite(x, cy, 0.7, 3);
         } else {

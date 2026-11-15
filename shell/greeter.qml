@@ -7,6 +7,7 @@ import Quickshell.Wayland
 import qs.components
 import qs.core
 import qs.services
+import "services/Shell.js" as Shell
 
 // Speshell's login screen, greetd's greeter: greeter/hyprland.lua runs it. It wears the
 // theme the user last had, which speshell-greeter-theme copies out of their home, and
@@ -179,8 +180,7 @@ ShellRoot {
 
     Process {
         running: true
-        command: ["sh", "-c", "for f in /usr/share/wayland-sessions/*.desktop; do [ -f \"$f\" ] || continue; "
-            + "printf 'file\\t%s\\n' \"$f\"; grep -E '^(Name|Exec|DesktopNames|NoDisplay|Hidden)=' \"$f\"; done"]
+        command: [Shell.localPath(Qt.resolvedUrl("greeter/sessions.sh"))]
         stdout: StdioCollector {
             onStreamFinished: root.readSessions(text)
         }

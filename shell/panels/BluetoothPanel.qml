@@ -21,20 +21,20 @@ Card {
 
     function devicesWhere(test) {
         if (!root.adapter) return [];
-        var result = [];
-        for (var i = 0; i < root.adapter.devices.values.length; i++) {
-            var dev = root.adapter.devices.values[i];
+        const result = [];
+        for (let i = 0; i < root.adapter.devices.values.length; i++) {
+            const dev = root.adapter.devices.values[i];
             if (test(dev)) result.push(dev);
         }
         return result;
     }
 
-    readonly property var connectedDevices: root.devicesWhere(function(dev) { return dev.connected; })
-    readonly property var knownDevices: root.devicesWhere(function(dev) { return dev.paired && !dev.connected; })
-    readonly property var discoveredDevices: root.devicesWhere(function(dev) { return !dev.paired && !dev.connected; })
+    readonly property var connectedDevices: root.devicesWhere(dev => dev.connected)
+    readonly property var knownDevices: root.devicesWhere(dev => dev.paired && !dev.connected)
+    readonly property var discoveredDevices: root.devicesWhere(dev => !dev.paired && !dev.connected)
     readonly property int deviceCount: root.connectedDevices.length + root.knownDevices.length
         + root.discoveredDevices.length
-    readonly property bool anyBusy: root.devicesWhere(function(dev) { return root.isBusy(dev); }).length > 0
+    readonly property bool anyBusy: root.devicesWhere(dev => root.isBusy(dev)).length > 0
 
     function isBusy(dev) {
         return dev.state === BluetoothDeviceState.Connecting
@@ -44,14 +44,14 @@ Card {
     function deviceSubtitle(dev) {
         if (dev.state === BluetoothDeviceState.Connecting) return "Connecting…";
         if (dev.state === BluetoothDeviceState.Disconnecting) return "Disconnecting…";
-        var parts = [dev.connected ? "Connected" : (dev.paired ? "Paired" : "Available")];
+        const parts = [dev.connected ? "Connected" : (dev.paired ? "Paired" : "Available")];
         if (dev.batteryAvailable)
             parts.push("Battery " + Math.round(dev.battery * 100) + "%");
         return parts.join(" · ");
     }
 
     function deviceActions(dev) {
-        var busy = root.isBusy(dev);
+        const busy = root.isBusy(dev);
         if (dev.connected)
             return [{ text: "Disconnect", enabled: !busy, actionId: "disconnect" }];
         return [{ text: "Connect", enabled: !busy, actionId: "connect" }];
@@ -72,7 +72,7 @@ Card {
             enabled: root.adapter !== null
             checked: root.btOn
             tooltipText: root.btOn ? "Turn Bluetooth off" : "Turn Bluetooth on"
-            onToggled: function(state) { BluetoothService.setEnabled(state); }
+            onToggled: state => BluetoothService.setEnabled(state)
         }
     }
 
@@ -104,9 +104,9 @@ Card {
                 primaryEnabled: false
                 actions: root.deviceActions(deviceRow.modelData)
                 opacity: root.anyBusy && !deviceRow.busy ? 0.5 : 1.0
-                onActionTriggered: function(actionId) {
-                    if (actionId === "disconnect") deviceRow.modelData.disconnect();
-                    if (actionId === "connect") deviceRow.modelData.connect();
+                onActionTriggered: actionId => {
+                    if (actionId === "connect" || actionId === "disconnect")
+                        BluetoothService.connectDevice(deviceRow.modelData, actionId === "connect");
                 }
 
                 Behavior on opacity {

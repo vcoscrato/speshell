@@ -9,55 +9,66 @@ function addError(errors, path, line, message) {
 }
 
 function parseIni(text) {
-    var sections = Object.create(null);
-    var errors = [];
-    var current = null;
-    var lines = String(text || "").replace(/^\uFEFF/, "").split(/\r?\n/);
+    const sections = Object.create(null);
+    const errors = [];
+    let current = null;
+    const lines = String(text || "").replace(/^\uFEFF/, "").split(/\r?\n/);
 
-    for (var i = 0; i < lines.length; i++) {
-        var sourceLine = lines[i];
-        var line = sourceLine.trim();
-        var lineNumber = i + 1;
+    for (let i = 0; i < lines.length; i++) {
+        const sourceLine = lines[i];
+        const line = sourceLine.trim();
+        const lineNumber = i + 1;
         if (line === "" || line.charAt(0) === "#" || line.charAt(0) === ";")
             continue;
 
         if (line.charAt(0) === "[") {
-            var sectionMatch = line.match(/^\[([^\]]+)\]$/);
+            const sectionMatch = line.match(/^\[([^\]]+)\]$/);
             if (!sectionMatch) {
                 addError(errors, "$", lineNumber, "Malformed section header.");
                 current = null;
                 continue;
             }
-            var sectionName = sectionMatch[1].trim();
+            const sectionName = sectionMatch[1].trim();
             if (sectionName === "") {
                 addError(errors, "$", lineNumber, "Section names must not be empty.");
                 current = null;
                 continue;
             }
-            if (!hasOwn(sections, sectionName)) {
-                sections[sectionName] = { values: Object.create(null), keys: [] };
+            // Saving edits a section where it first appears, so it appears once.
+            if (hasOwn(sections, sectionName)) {
+                addError(errors, "$", lineNumber, "[" + sectionName + "] is there already, on line " + sections[sectionName].line + ".");
+                // Its keys go unread, the header's error standing for them.
+                current = false;
+                continue;
             }
+            // `read` and `used` are what build() looked at: the section, and its keys.
+            sections[sectionName] = { values: Object.create(null), keys: [], line: lineNumber, read: false, used: Object.create(null) };
             current = sections[sectionName];
             continue;
         }
 
+        if (current === false)
+            continue;
         if (!current) {
             addError(errors, "$", lineNumber, "Properties must appear inside a section.");
             continue;
         }
 
-        var equalsIndex = sourceLine.indexOf("=");
+        const equalsIndex = sourceLine.indexOf("=");
         if (equalsIndex < 0) {
             addError(errors, "$", lineNumber, "Expected 'key = value'.");
             continue;
         }
-        var key = sourceLine.substring(0, equalsIndex).trim();
+        const key = sourceLine.substring(0, equalsIndex).trim();
         if (key === "") {
             addError(errors, "$", lineNumber, "Property names must not be empty.");
             continue;
         }
-        if (!hasOwn(current.values, key))
-            current.keys.push(key);
+        if (hasOwn(current.values, key)) {
+            addError(errors, "$", lineNumber, "'" + key + "' is set already, on line " + current.values[key].line + ".");
+            continue;
+        }
+        current.keys.push(key);
         current.values[key] = { value: sourceLine.substring(equalsIndex + 1).trim(), line: lineNumber };
     }
 
@@ -65,14 +76,39 @@ function parseIni(text) {
 }
 
 function section(document, name) {
-    return hasOwn(document.sections, name) ? document.sections[name] : null;
+    if (!hasOwn(document.sections, name))
+        return null;
+    document.sections[name].read = true;
+    return document.sections[name];
+}
+
+// A section whose keys are the user's own, as a list's or a map's, read whole.
+function wholeSection(document, name) {
+    const valueSection = section(document, name);
+    if (valueSection)
+        valueSection.keys.forEach(key => valueSection.used[key] = true);
+    return valueSection;
 }
 
 function entry(document, sectionName, keyName) {
-    var valueSection = section(document, sectionName);
-    return valueSection && hasOwn(valueSection.values, keyName)
-        ? valueSection.values[keyName]
-        : null;
+    const valueSection = section(document, sectionName);
+    if (!valueSection || !hasOwn(valueSection.values, keyName))
+        return null;
+    valueSection.used[keyName] = true;
+    return valueSection.values[keyName];
+}
+
+// Every section and key build() didn't read, so a misspelled one doesn't pass unseen.
+function unknownErrors(document, errors) {
+    for (const name in document.sections) {
+        const valueSection = document.sections[name];
+        if (!valueSection.read) {
+            addError(errors, "$[" + name + "]", valueSection.line, "Unknown section.");
+            continue;
+        }
+        valueSection.keys.filter(key => !valueSection.used[key]).forEach(key =>
+            addError(errors, pathFor(name, key), valueSection.values[key].line, "Unknown setting."));
+    }
 }
 
 function pathFor(sectionName, keyName) {
@@ -80,7 +116,7 @@ function pathFor(sectionName, keyName) {
 }
 
 function stringValue(document, sectionName, keyName, fallback, errors, allowEmpty) {
-    var valueEntry = entry(document, sectionName, keyName);
+    const valueEntry = entry(document, sectionName, keyName);
     if (!valueEntry)
         return fallback;
     if (!allowEmpty && valueEntry.value === "") {
@@ -91,14 +127,14 @@ function stringValue(document, sectionName, keyName, fallback, errors, allowEmpt
 }
 
 function integerValue(document, sectionName, keyName, fallback, minimum, maximum, errors) {
-    var valueEntry = entry(document, sectionName, keyName);
+    const valueEntry = entry(document, sectionName, keyName);
     if (!valueEntry)
         return fallback;
     if (!/^-?\d+$/.test(valueEntry.value)) {
         addError(errors, pathFor(sectionName, keyName), valueEntry.line, "Expected a whole number.");
         return fallback;
     }
-    var value = Number(valueEntry.value);
+    const value = Number(valueEntry.value);
     if (value < minimum || value > maximum) {
         addError(errors, pathFor(sectionName, keyName), valueEntry.line, "Expected a value from " + minimum + " to " + maximum + ".");
         return fallback;
@@ -107,14 +143,14 @@ function integerValue(document, sectionName, keyName, fallback, minimum, maximum
 }
 
 function realValue(document, sectionName, keyName, fallback, minimum, maximum, errors) {
-    var valueEntry = entry(document, sectionName, keyName);
+    const valueEntry = entry(document, sectionName, keyName);
     if (!valueEntry)
         return fallback;
     if (!/^-?(?:\d+(?:\.\d+)?|\.\d+)$/.test(valueEntry.value)) {
         addError(errors, pathFor(sectionName, keyName), valueEntry.line, "Expected a number.");
         return fallback;
     }
-    var value = Number(valueEntry.value);
+    const value = Number(valueEntry.value);
     if (!isFinite(value) || value < minimum || value > maximum) {
         addError(errors, pathFor(sectionName, keyName), valueEntry.line, "Expected a value from " + minimum + " to " + maximum + ".");
         return fallback;
@@ -123,10 +159,10 @@ function realValue(document, sectionName, keyName, fallback, minimum, maximum, e
 }
 
 function booleanValue(document, sectionName, keyName, fallback, errors) {
-    var valueEntry = entry(document, sectionName, keyName);
+    const valueEntry = entry(document, sectionName, keyName);
     if (!valueEntry)
         return fallback;
-    var value = valueEntry.value.toLowerCase();
+    const value = valueEntry.value.toLowerCase();
     if (value !== "true" && value !== "false") {
         addError(errors, pathFor(sectionName, keyName), valueEntry.line, "Expected true or false.");
         return fallback;
@@ -135,7 +171,7 @@ function booleanValue(document, sectionName, keyName, fallback, errors) {
 }
 
 function enumValue(document, sectionName, keyName, fallback, allowed, errors) {
-    var valueEntry = entry(document, sectionName, keyName);
+    const valueEntry = entry(document, sectionName, keyName);
     if (!valueEntry)
         return fallback;
     if (allowed.indexOf(valueEntry.value) < 0) {
@@ -145,43 +181,44 @@ function enumValue(document, sectionName, keyName, fallback, allowed, errors) {
     return valueEntry.value;
 }
 
-function urlValue(document, sectionName, keyName, fallback, errors) {
-    var valueEntry = entry(document, sectionName, keyName);
-    if (!valueEntry)
-        return fallback;
-    var value = valueEntry.value;
-    var path = pathFor(sectionName, keyName);
-    if (!/^https:\/\//i.test(value))
-        addError(errors, path, valueEntry.line, "URL templates must use HTTPS.");
-    var placeholder = value.indexOf("{query}");
-    if (placeholder < 0 || value.indexOf("{query}", placeholder + 1) >= 0)
-        addError(errors, path, valueEntry.line, "URL templates must contain exactly one {query} placeholder.");
-    return value;
+// A search URL: HTTPS, with exactly one {query} placeholder for what was typed.
+function isQueryUrl(value) {
+    return /^https:\/\//i.test(value) && value.split("{query}").length === 2;
 }
 
-// Whitespace-separated codes, each matching `pattern`, joined by `separator`.
-function codesValue(document, sectionName, keyName, fallback, pattern, separator, errors) {
-    var valueEntry = entry(document, sectionName, keyName);
+function urlValue(document, sectionName, keyName, fallback, errors) {
+    const valueEntry = entry(document, sectionName, keyName);
     if (!valueEntry)
         return fallback;
-    var codes = valueEntry.value.split(/[\s,+]+/).filter(function(code) { return code !== ""; });
-    for (var i = 0; i < codes.length; i++) {
-        if (!pattern.test(codes[i])) {
-            addError(errors, pathFor(sectionName, keyName), valueEntry.line, "'" + codes[i] + "' is not a language code.");
-            return fallback;
-        }
+    if (!isQueryUrl(valueEntry.value))
+        addError(errors, pathFor(sectionName, keyName), valueEntry.line,
+            "URL templates must use HTTPS and contain exactly one {query} placeholder.");
+    return valueEntry.value;
+}
+
+// Language codes, each matching `pattern`, however they're separated, joined by
+// `separator`; none is `fallback`.
+function languagesValue(document, sectionName, keyName, fallback, pattern, separator, errors) {
+    const valueEntry = entry(document, sectionName, keyName);
+    if (!valueEntry)
+        return fallback;
+    const codes = valueEntry.value.split(/[\s,+]+/).filter(code => code !== "");
+    const wrong = codes.find(code => !pattern.test(code));
+    if (wrong !== undefined) {
+        addError(errors, pathFor(sectionName, keyName), valueEntry.line, "'" + wrong + "' is not a language code.");
+        return fallback;
     }
-    return codes.join(separator);
+    return codes.length > 0 ? codes.join(separator) : fallback;
 }
 
 function sectionList(document, sectionName, errors) {
-    var valueSection = section(document, sectionName);
-    var result = [];
+    const valueSection = wholeSection(document, sectionName);
+    const result = [];
     if (!valueSection)
         return result;
-    for (var i = 0; i < valueSection.keys.length; i++) {
-        var key = valueSection.keys[i];
-        var valueEntry = valueSection.values[key];
+    for (let i = 0; i < valueSection.keys.length; i++) {
+        const key = valueSection.keys[i];
+        const valueEntry = valueSection.values[key];
         if (valueEntry.value === "")
             addError(errors, pathFor(sectionName, key), valueEntry.line, "List entries must not be empty.");
         else
@@ -191,15 +228,15 @@ function sectionList(document, sectionName, errors) {
 }
 
 function sectionMap(document, sectionName, errors) {
-    var valueSection = section(document, sectionName);
-    var result = Object.create(null);
+    const valueSection = wholeSection(document, sectionName);
+    const result = Object.create(null);
     if (!valueSection)
         return result;
-    for (var i = 0; i < valueSection.keys.length; i++) {
-        var key = valueSection.keys[i];
-        var valueEntry = valueSection.values[key];
+    for (let i = 0; i < valueSection.keys.length; i++) {
+        const key = valueSection.keys[i];
+        const valueEntry = valueSection.values[key];
         if (valueEntry.value === "") {
-            addError(errors, pathFor(sectionName, key), valueEntry.line, "Invalid map entry.");
+            addError(errors, pathFor(sectionName, key), valueEntry.line, "Value must not be empty.");
             continue;
         }
         result[key] = valueEntry.value;
@@ -208,17 +245,17 @@ function sectionMap(document, sectionName, errors) {
 }
 
 function bangsValue(document, errors) {
-    var valueSection = section(document, "Launcher.Bangs");
-    var result = Object.create(null);
+    const valueSection = wholeSection(document, "Launcher.Bangs");
+    const result = Object.create(null);
     if (!valueSection)
         return result;
-    for (var i = 0; i < valueSection.keys.length; i++) {
-        var key = valueSection.keys[i];
-        var valueEntry = valueSection.values[key];
-        var path = pathFor("Launcher.Bangs", key);
+    for (let i = 0; i < valueSection.keys.length; i++) {
+        const key = valueSection.keys[i];
+        const valueEntry = valueSection.values[key];
+        const path = pathFor("Launcher.Bangs", key);
         if (!/^[a-z0-9][a-z0-9-]{0,31}$/.test(key))
             addError(errors, path, valueEntry.line, "Bang names must use lowercase letters, digits, or hyphens.");
-        if (!/^https:\/\//i.test(valueEntry.value) || valueEntry.value.split("{query}").length !== 2)
+        if (!isQueryUrl(valueEntry.value))
             addError(errors, path, valueEntry.line, "Bang URLs must use HTTPS and contain exactly one {query} placeholder.");
         result[key] = valueEntry.value;
     }
@@ -228,7 +265,7 @@ function bangsValue(document, errors) {
 // The settings in `document`, by section as config.ini has them, with every value
 // checked and every missing one at its default.
 function build(document, errors) {
-    var maxVisibleEntry = entry(document, "Notifications", "maxVisible");
+    const maxVisible = entry(document, "Notifications", "maxVisible");
     return {
         appearance: {
             drawWallpaper: booleanValue(document, "Appearance", "drawWallpaper", false, errors),
@@ -265,7 +302,7 @@ function build(document, errors) {
         },
         notifications: {
             // -1 shows every toast.
-            maxVisible: maxVisibleEntry && maxVisibleEntry.value === "-1"
+            maxVisible: maxVisible && maxVisible.value === "-1"
                 ? -1
                 : integerValue(document, "Notifications", "maxVisible", 3, 1, 50, errors)
         },
@@ -294,8 +331,8 @@ function build(document, errors) {
             temperature: integerValue(document, "NightLight", "temperature", 4000, 1000, 6500, errors)
         },
         tools: {
-            ocrLanguages: codesValue(document, "Tools", "ocrLanguages", "eng", /^[A-Za-z0-9_]+$/, "+", errors) || "eng",
-            dictationLanguages: codesValue(document, "Tools", "dictationLanguages", "", /^[a-z]{2,3}$/, ",", errors),
+            ocrLanguages: languagesValue(document, "Tools", "ocrLanguages", "eng", /^[A-Za-z0-9_]+$/, "+", errors),
+            dictationLanguages: languagesValue(document, "Tools", "dictationLanguages", "", /^[a-z]{2,3}$/, ",", errors),
             dictationVocabulary: stringValue(document, "Tools", "dictationVocabulary", "", errors, true),
             dictationModel: stringValue(document, "Tools", "dictationModel", "", errors, true)
         }
@@ -308,24 +345,25 @@ function defaults() {
 }
 
 function parseAndValidate(iniText) {
-    var source = String(iniText || "");
+    const source = String(iniText || "");
     if (source.trim() === "")
         return { ok: false, config: null, errors: [{ kind: "validation", path: "$", line: 1, column: 1, message: "The configuration file is empty." }] };
 
-    var document = parseIni(source);
-    var errors = document.errors.slice();
-    var config = build(document, errors);
+    const document = parseIni(source);
+    const errors = document.errors.slice();
+    const config = build(document, errors);
+    unknownErrors(document, errors);
     return errors.length > 0
-        ? { ok: false, config: null, errors: errors }
+        ? { ok: false, config: null, errors: errors.sort((a, b) => a.line - b.line) }
         : { ok: true, config: config, errors: [] };
 }
 
 function setIniProperty(sourceText, sectionName, keyName, newValue) {
-    var lines = String(sourceText || "").split(/\r?\n/);
-    var sectionStart = -1;
-    var sectionEnd = lines.length;
-    for (var i = 0; i < lines.length; i++) {
-        var header = lines[i].trim().match(/^\[([^\]]+)\]$/);
+    const lines = String(sourceText || "").split(/\r?\n/);
+    let sectionStart = -1;
+    let sectionEnd = lines.length;
+    for (let i = 0; i < lines.length; i++) {
+        const header = lines[i].trim().match(/^\[([^\]]+)\]$/);
         if (!header)
             continue;
         if (sectionStart >= 0) {
@@ -336,18 +374,18 @@ function setIniProperty(sourceText, sectionName, keyName, newValue) {
             sectionStart = i;
     }
 
-    var value = String(newValue === undefined || newValue === null ? "" : newValue).replace(/[\r\n]+/g, " ").trim();
-    var replacement = keyName + " =" + (value !== "" ? " " + value : "");
+    const value = String(newValue === undefined || newValue === null ? "" : newValue).replace(/[\r\n]+/g, " ").trim();
+    const replacement = keyName + " =" + (value !== "" ? " " + value : "");
     if (sectionStart >= 0) {
-        for (var entryIndex = sectionStart + 1; entryIndex < sectionEnd; entryIndex++) {
-            var equalsIndex = lines[entryIndex].indexOf("=");
+        for (let entryIndex = sectionStart + 1; entryIndex < sectionEnd; entryIndex++) {
+            const equalsIndex = lines[entryIndex].indexOf("=");
             if (equalsIndex >= 0 && lines[entryIndex].substring(0, equalsIndex).trim() === keyName) {
                 lines[entryIndex] = replacement;
                 return lines.join("\n");
             }
         }
         // After the section's last line, not after the blank lines that close it.
-        var insertAt = sectionEnd;
+        let insertAt = sectionEnd;
         while (insertAt > sectionStart + 1 && lines[insertAt - 1].trim() === "")
             insertAt--;
         lines.splice(insertAt, 0, replacement);

@@ -3,14 +3,13 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import Quickshell.Services.Notifications
 import qs.bar
 import qs.services
 import "../services/TimerProvider.js" as TimerProvider
 import "../components/Format.js" as Format
 
-// The running shell, once config.ini is valid: the notification server, the IPC
-// targets behind `speshell`, and the windows on each screen.
+// The running shell, once config.ini is valid: the IPC targets behind `speshell` that
+// need it, and the windows on each screen. Daemon holds the rest.
 Scope {
     id: root
 
@@ -20,13 +19,13 @@ Scope {
         if (root.startupAssessmentComplete || !FeatureSupport.issuesReady)
             return;
         root.startupAssessmentComplete = true;
-        var issues = FeatureSupport.issues || [];
+        const issues = FeatureSupport.issues || [];
         if (issues.length === 0)
             return;
         NotificationService.addInternalNotification(
             "configured-features",
             "Some configured features are unavailable",
-            issues.map(function(issue) { return issue.detail; }).join("\n")
+            issues.map(issue => issue.detail).join("\n")
         );
     }
 
@@ -53,16 +52,6 @@ Scope {
         return "";
     }
 
-    // A switch's IPC `set`, to on, off, or toggle: `apply` takes whether it's on.
-    function setSwitch(name, available, current, state, apply) {
-        if (state !== "on" && state !== "off" && state !== "toggle")
-            return "error: " + name + " takes on, off, or toggle, not " + state;
-        if (!available)
-            return "error: no " + name + " switch here";
-        apply(state === "toggle" ? !current : state === "on");
-        return "";
-    }
-
     function noTimer(action, name) {
         return "no timer to " + action + (name !== "" ? ": " + name : "");
     }
@@ -73,17 +62,6 @@ Scope {
         function onOperationMessageChanged() {
             if (ConfigService.operationFailed && ConfigService.operationMessage !== "")
                 NotificationService.addInternalNotification("config", "Speshell config", ConfigService.operationMessage);
-        }
-    }
-
-    NotificationServer {
-        actionsSupported: true
-        imageSupported: true
-        persistenceSupported: true
-
-        onNotification: function(notification) {
-            notification.tracked = true;
-            NotificationService.addNotification(notification);
         }
     }
 
@@ -177,69 +155,15 @@ Scope {
             return root.reply(ToolsService.run(name, mode), name + " is not installed (see speshell tool list)");
         }
         function list(): string {
-            return ToolsService.tools.map(function(tool) { return tool.id + "\t" + tool.label; }).join("\n");
+            return ToolsService.tools.map(tool => tool.id + "\t" + tool.label).join("\n");
         }
-    }
-
-    // For laptop keys: each change shows the OSD. `state` is on, off, or toggle.
-    IpcHandler {
-        target: "brightness"
-
-        function up(): void { BrightnessService.stepFromKey(1); }
-        function down(): void { BrightnessService.stepFromKey(-1); }
-        function set(percent: int): void {
-            BrightnessService.setPercent(percent);
-            BrightnessService.commit();
-            OsdService.showLevel("brightness");
-        }
-        function get(): string { return BrightnessService.available ? String(BrightnessService.percent) : ""; }
-        function keyboard(): void { BrightnessService.cycleKeyboard(); }
-    }
-
-    IpcHandler {
-        target: "awake"
-
-        function set(state: string): string {
-            return root.setSwitch("awake", true, IdleService.keepAwake, state, on => IdleService.setKeepAwake(on));
-        }
-        function get(): string { return IdleService.keepAwake ? "on" : "off"; }
-    }
-
-    IpcHandler {
-        target: "touchpad"
-
-        function set(state: string): string {
-            return root.setSwitch("touchpad", InputService.available, InputService.touchpadEnabled, state,
-                on => InputService.setFromKey(on));
-        }
-        function get(): string { return InputService.available ? (InputService.touchpadEnabled ? "on" : "off") : ""; }
-    }
-
-    IpcHandler {
-        target: "airplane"
-
-        function set(state: string): string {
-            return root.setSwitch("airplane", RadioService.available, RadioService.airplaneMode, state,
-                on => RadioService.setAirplaneMode(on, true));
-        }
-        function get(): string { return RadioService.available ? (RadioService.airplaneMode ? "on" : "off") : ""; }
-    }
-
-    IpcHandler {
-        target: "nightlight"
-
-        function set(state: string): string {
-            return root.setSwitch("nightlight", NightLightService.available, NightLightService.enabled, state,
-                on => NightLightService.setFromKey(on));
-        }
-        function get(): string { return NightLightService.available ? (NightLightService.enabled ? "on" : "off") : ""; }
     }
 
     IpcHandler {
         target: "theme"
 
         function list(): string {
-            return ThemeService.themes.map(function(theme) { return theme.id + "\t" + theme.name; }).join("\n");
+            return ThemeService.themes.map(theme => theme.id + "\t" + theme.name).join("\n");
         }
         function get(): string { return ThemeService.themeId; }
         function set(id: string): string {
@@ -291,7 +215,7 @@ Scope {
 
     ThemeGallery {}
 
-    LevelOsdWindow {}
+    OsdWindow {}
 
     NotificationToastWindow {}
 }

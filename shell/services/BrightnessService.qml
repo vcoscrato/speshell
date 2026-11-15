@@ -60,6 +60,11 @@ Singleton {
     }
 
     // Moves brightness by one wheel step; direction is positive or negative.
+    // The brightness to dim to on battery, 0 to leave it alone; saved to config.ini.
+    function setBatteryPercent(percent) {
+        return ConfigService.setProperty("Backlight", "batteryPercent", percent);
+    }
+
     function stepPercent(direction) {
         if (direction)
             root.setPercent(root.percent + (direction > 0 ? 5 : -5));
@@ -99,12 +104,12 @@ Singleton {
         if (!root.available || !brightnessFile.loaded || !maxBrightnessFile.loaded)
             return;
 
-        var current = parseInt((brightnessFile.text() || "").trim(), 10);
-        var max = parseInt((maxBrightnessFile.text() || "").trim(), 10);
+        const current = parseInt((brightnessFile.text() || "").trim(), 10);
+        const max = parseInt((maxBrightnessFile.text() || "").trim(), 10);
         if (isNaN(current) || isNaN(max) || max <= 0)
             return;
 
-        var pct = Math.max(0, Math.min(100, Math.round((current / max) * 100)));
+        const pct = Math.max(0, Math.min(100, Math.round((current / max) * 100)));
         root.percent = pct;
         if (!writeProc.running && !writeDebounce.running)
             root.pendingPercent = pct;

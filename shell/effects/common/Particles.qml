@@ -35,8 +35,8 @@ Item {
     function spawn(p) {
         if (!root.delegate || root.live >= root.capacity)
             return;
-        var part = null;
-        for (var i = 0; i < root.parts.length; i++) {
+        let part = null;
+        for (let i = 0; i < root.parts.length; i++) {
             if (!root.parts[i].alive) {
                 part = root.parts[i];
                 break;
@@ -62,18 +62,18 @@ Item {
         part.floor = p.floor !== undefined ? p.floor : Infinity;
         part.bounce = p.bounce !== undefined ? p.bounce : 0.35;
         part.alive = true;
-        var item = part.item;
+        const item = part.item;
         item.width = p.size || 16;
         item.height = p.size || 16;
         item.age = 0;
-        for (var key in (p.props || {}))
+        for (const key in (p.props || {}))
             item[key] = p.props[key];
         root.place(part);
         root.live++;
     }
 
     function place(part) {
-        var item = part.item;
+        const item = part.item;
         item.visible = part.age >= 0;
         item.x = part.x - item.width / 2;
         item.y = part.y - item.height / 2;
@@ -83,8 +83,8 @@ Item {
     }
 
     function step(dt) {
-        for (var i = 0; i < root.parts.length; i++) {
-            var part = root.parts[i];
+        for (let i = 0; i < root.parts.length; i++) {
+            const part = root.parts[i];
             if (!part.alive)
                 continue;
             part.age += dt;
@@ -95,7 +95,7 @@ Item {
                 continue;
             }
             if (part.age >= 0) {
-                var keep = Math.exp(-part.drag * dt);
+                const keep = Math.exp(-part.drag * dt);
                 part.vx *= keep;
                 part.vy = part.vy * keep + part.gravity * dt;
                 part.x += part.vx * dt;
@@ -115,11 +115,11 @@ Item {
     function warm() {
         if (!root.delegate || root.parts.length >= root.prewarm)
             return;
-        var incubator = root.delegate.incubateObject(root, { visible: false });
+        const incubator = root.delegate.incubateObject(root, { visible: false });
         // Null once the effect is being torn down, as on a theme change.
         if (!incubator)
             return;
-        var keep = function() {
+        const keep = () => {
             if (incubator.status === Component.Ready && root.parts.length < root.capacity)
                 root.parts.push({ item: incubator.object, alive: false });
             else if (incubator.object)
@@ -140,7 +140,7 @@ Item {
         sourceComponent: Component {
             EffectClock {
                 // Emitted last in the tick, so the last particle dying may destroy this.
-                onAdvanced: function(dt) { root.step(dt); }
+                onAdvanced: dt => root.step(dt)
             }
         }
     }

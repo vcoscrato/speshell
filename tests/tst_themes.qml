@@ -43,31 +43,31 @@ TestCase {
     ].join("\n")
 
     function test_findsThemesAndWallpapers() {
-        var parsed = ThemeProvider.parseScan(scan, themesDirs);
-        compare(parsed.themes.map(function(t) { return t.id; }), ["broken", "fire", "cosmos", "nord"]);
-        compare(parsed.wallpapers.map(function(w) { return w.theme; }), ["cosmos", "fire", "fire", "nord"]);
-        var fire = ThemeProvider.findTheme(parsed.themes, "fire");
+        const parsed = ThemeProvider.parseScan(scan, themesDirs);
+        compare(parsed.themes.map(t => t.id), ["broken", "fire", "cosmos", "nord"]);
+        compare(parsed.wallpapers.map(w => w.theme), ["cosmos", "fire", "fire", "nord"]);
+        const fire = ThemeProvider.findTheme(parsed.themes, "fire");
         compare(fire.name, "Fire");
         compare(fire.description, "Embers and ash.");
         compare(fire.colors.accent, "#e5482e");
     }
 
     function test_userFolderOverridesShipped() {
-        var parsed = ThemeProvider.parseScan(scan, themesDirs);
+        const parsed = ThemeProvider.parseScan(scan, themesDirs);
         // The user's theme.ini replaces the shipped one, keys and all.
-        var cosmos = ThemeProvider.findTheme(parsed.themes, "cosmos");
+        const cosmos = ThemeProvider.findTheme(parsed.themes, "cosmos");
         compare(cosmos.name, "My Cosmos");
         compare(cosmos.effects, "");
         // So do the user's effects of the same name.
         compare(ThemeProvider.findTheme(parsed.themes, "fire").effectsDir,
             "/home/me/.local/share/speshell/effects/fire");
         // Wallpapers from both folders add up; the user's copy replaces the shipped one.
-        compare(parsed.wallpapers.filter(function(w) { return w.theme === "fire"; }).length, 2);
+        compare(parsed.wallpapers.filter(w => w.theme === "fire").length, 2);
         compare(parsed.wallpapers[0].path, themesDir + "/cosmos/galaxy.jpg");
     }
 
     function test_badThemeIniIsReportedNotApplied() {
-        var broken = ThemeProvider.findTheme(ThemeProvider.parseScan(scan, themesDirs).themes, "broken");
+        const broken = ThemeProvider.findTheme(ThemeProvider.parseScan(scan, themesDirs).themes, "broken");
         compare(broken.effectsDir, "");
         compare(broken.colors, ({}));
         verify(broken.errors[0].indexOf("effects 'smoke' are not installed") >= 0, broken.errors[0]);
@@ -86,8 +86,8 @@ TestCase {
     }
 
     function test_rememberedWallpaperFallsBack() {
-        var parsed = ThemeProvider.parseScan(scan, themesDirs);
-        var island = themesDir + "/fire/zuko/ember_island.png";
+        const parsed = ThemeProvider.parseScan(scan, themesDirs);
+        const island = themesDir + "/fire/zuko/ember_island.png";
         compare(ThemeProvider.themeWallpaper(parsed.wallpapers, "fire", ({})), shippedDir + "/fire/agni-kai.jpg");
         compare(ThemeProvider.themeWallpaper(parsed.wallpapers, "fire", { "fire": island }), island);
         // A remembered wallpaper that is gone, or belongs to another theme, falls back.
@@ -103,13 +103,13 @@ TestCase {
     }
 
     function test_appPaletteFollowsTheBackground() {
-        var palette = ({});
-        ThemeProvider.colorKeys.forEach(function(key) { palette[key] = "#808080"; });
+        const palette = ({});
+        ThemeProvider.colorKeys.forEach(key => { palette[key] = "#808080"; });
         palette.base = "#1d1416";
         palette.crust = "#120c0d";
         palette.text = "#f3e3d3";
         palette.accent = "#e8b04a";
-        var dark = ThemeProvider.appPalette(palette);
+        const dark = ThemeProvider.appPalette(palette);
         compare(dark.mode, "dark");
         compare(dark.colors.primary.default.color, "#e8b04a");
         compare(dark.colors.on_primary.default.color, "#120c0d");
@@ -119,7 +119,7 @@ TestCase {
         palette.crust = "#dce0e8";
         palette.text = "#4c4f69";
         palette.accent = "#1e66f5";
-        var light = ThemeProvider.appPalette(palette);
+        const light = ThemeProvider.appPalette(palette);
         compare(light.mode, "light");
         compare(light.colors.on_primary.default.color, "#eff1f5");
     }

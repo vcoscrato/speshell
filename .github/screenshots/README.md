@@ -34,9 +34,9 @@ A timer counting down in the bar, opened from its chip.
 
 ## Relâmpago
 
-Settings.
+The notifications, newest first, with Do Not Disturb a click away.
 
-![The Settings panel in the Relâmpago theme](relampago.jpg)
+![The notifications panel in the Relâmpago theme](relampago.jpg)
 
 ## Sugar
 

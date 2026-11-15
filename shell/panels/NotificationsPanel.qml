@@ -47,7 +47,7 @@ Card {
     }
 
     function toggleExpanded(notification) {
-        var key = root.notificationKey(notification);
+        const key = root.notificationKey(notification);
         root.expandedNotificationId = root.expandedNotificationId === key ? "" : key;
     }
 

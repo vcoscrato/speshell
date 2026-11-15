@@ -25,7 +25,7 @@ Item {
     readonly property real reach: Math.sqrt(Math.pow(width * 0.5, 2) + Math.pow(height * 0.55, 2)) + 120
 
     EffectClock {
-        onAdvanced: function(dt) {
+        onAdvanced: dt => {
             if (root.sweep < 1) {
                 root.sweep = Math.min(1, root.sweep + dt / root.spreadTime);
             } else if (root.calm < 1) {

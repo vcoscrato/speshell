@@ -72,7 +72,7 @@ Singleton {
     // The wallpaper transition of the effects in `dir`, as wallpaperTransition is the
     // active ones'.
     function wallpaperTransitionIn(dir) {
-        var effects = root.enabled && root.wallpaperSpeed > 0 ? root.effectsIn(dir) : null;
+        const effects = root.enabled && root.wallpaperSpeed > 0 ? root.effectsIn(dir) : null;
         return effects ? effects.wallpaperTransition || null : null;
     }
 
@@ -100,18 +100,18 @@ Singleton {
 
     // The effects object in `dir`, or null when it fails to load, which it reports.
     function create(dir) {
-        var name = dir.substring(dir.lastIndexOf("/") + 1);
-        var component = Qt.createComponent("file://" + dir + "/Effects.qml");
+        const name = dir.substring(dir.lastIndexOf("/") + 1);
+        const component = Qt.createComponent("file://" + dir + "/Effects.qml");
         if (component.status !== Component.Ready) {
             root.fail("Could not load effects '" + name + "': " + component.errorString().trim());
             return null;
         }
-        var effectsObject = component.createObject(root);
+        const effectsObject = component.createObject(root);
         if (!effectsObject) {
             root.fail("Could not create effects '" + name + "'.");
             return null;
         }
-        var effectsApi = root.declaredApi(effectsObject);
+        const effectsApi = root.declaredApi(effectsObject);
         if (effectsApi !== root.apiVersion) {
             effectsObject.destroy();
             root.fail("Effects '" + name + "' target effects API " + effectsApi

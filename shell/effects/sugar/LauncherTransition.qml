@@ -54,11 +54,11 @@ Item {
     // Where the cherries sit, clockwise from the top edge as the bag went: on the
     // border's shells (px, from the panel's center), z the angle facing out there.
     readonly property var cherrySpots: {
-        var r = root.panelRect, w = r.width / 2, h = r.height / 2;
-        var rad = Math.min(root.radius, w, h), a = w - rad, b = h - rad, d = Math.SQRT1_2, off = 6;
-        var spots = [];
+        const r = root.panelRect, w = r.width / 2, h = r.height / 2;
+        const rad = Math.min(root.radius, w, h), a = w - rad, b = h - rad, d = Math.SQRT1_2, off = 6;
+        const spots = [];
         function at(x, y, nx, ny) { spots.push(Qt.vector3d(x + nx * off, y + ny * off, Math.atan2(ny, nx))); }
-        var wide = r.width > 360, tall = r.height > 360;
+        const wide = r.width > 360, tall = r.height > 360;
         if (wide)
             at(0, -h, 0, -1);
         at(a + rad * d, -b - rad * d, d, -d);
@@ -80,38 +80,38 @@ Item {
     function cherry(i) {
         if (i >= root.cherrySpots.length)
             return Qt.vector4d(0, 0, 0, 0);
-        var s = root.cherrySpots[i], t0 = root.cherryStart + i * root.cherryGap;
+        const s = root.cherrySpots[i], t0 = root.cherryStart + i * root.cherryGap;
         return Qt.vector4d(s.x, s.y, s.z, root.span(root.open, t0, t0 + root.cherryDrop));
     }
 
     // Where the bites land: three on different sides, and the last on the fourth.
     function planBites() {
-        var plan = [];
-        var sides = [0, 1, 2, 3].sort(function() { return Math.random() - 0.5; });
-        for (var i = 0; i < 3; i++) {
-            var t = 0.15 + 0.7 * Math.random();
-            var side = sides[i];
-            var x = side === 0 ? t : side === 1 ? 1.02 : side === 2 ? t : -0.02;
-            var y = side === 0 ? -0.02 : side === 1 ? t : side === 2 ? 1.02 : t;
+        const plan = [];
+        const sides = [0, 1, 2, 3].sort(() => Math.random() - 0.5);
+        for (let i = 0; i < 3; i++) {
+            const t = 0.15 + 0.7 * Math.random();
+            const side = sides[i];
+            const x = side === 0 ? t : side === 1 ? 1.02 : side === 2 ? t : -0.02;
+            const y = side === 0 ? -0.02 : side === 1 ? t : side === 2 ? 1.02 : t;
             plan.push(Qt.vector3d(x, y, 0.32 + 0.12 * Math.random()));
         }
         // The last, from the side not yet bitten, takes the rest.
-        var t3 = 0.3 + 0.4 * Math.random(), s3 = sides[3];
+        const t3 = 0.3 + 0.4 * Math.random(), s3 = sides[3];
         plan.push(Qt.vector3d(s3 === 0 || s3 === 2 ? t3 : s3 === 1 ? 1.05 : -0.05,
                               s3 === 1 || s3 === 3 ? t3 : s3 === 0 ? -0.05 : 1.05, 0));
         root.bites = plan;
     }
 
     function biteUniform(i) {
-        var r = root.panelRect;
+        const r = root.panelRect;
         if (root.bites.length <= i)
             return Qt.vector4d(0, 0, 0, 0);
-        var b = root.bites[i];
-        var k = root.span(root.leave, root.biteAt[i], root.biteAt[i] + (i === 3 ? 0.36 : 0.16));
+        const b = root.bites[i];
+        const k = root.span(root.leave, root.biteAt[i], root.biteAt[i] + (i === 3 ? 0.36 : 0.16));
         // The jaws snap shut a little past the bite, then settle on it.
-        var snap = k <= 0 ? 0 : 1 + 2.2 * Math.pow(k - 1, 3) + 1.2 * Math.pow(k - 1, 2);
+        const snap = k <= 0 ? 0 : 1 + 2.2 * Math.pow(k - 1, 3) + 1.2 * Math.pow(k - 1, 2);
         // The last reaches the corner furthest from it.
-        var size = i === 3 ? Math.hypot(Math.max(b.x, 1 - b.x) * r.width, Math.max(b.y, 1 - b.y) * r.height) + 30
+        const size = i === 3 ? Math.hypot(Math.max(b.x, 1 - b.x) * r.width, Math.max(b.y, 1 - b.y) * r.height) + 30
                            : Math.min(r.width, r.height) * b.z;
         return Qt.vector4d(r.x + b.x * r.width, r.y + b.y * r.height, size * snap, i * 1.7 + 0.3);
     }
@@ -120,7 +120,7 @@ Item {
 
     EffectClock {
         id: clock
-        onAdvanced: function(dt) {
+        onAdvanced: dt => {
             if (root.active) {
                 // Reopened mid-exit: it grows back.
                 if (root.leave > 0)
@@ -160,23 +160,23 @@ Item {
 
     // A glint on a cherry's highlight, on its side toward the light.
     function glint() {
-        var r = root.panelRect, s = root.cherrySpots[Math.floor(Math.random() * root.cherrySpots.length)];
+        const r = root.panelRect, s = root.cherrySpots[Math.floor(Math.random() * root.cherrySpots.length)];
         bits.emit(bits.sparkle, { x: r.x + r.width / 2 + s.x - 1.8, y: r.y + r.height / 2 + s.y - 3.1,
                                   life: 0.45, size: Math.round(bits.rnd(8, 11)) });
     }
 
     // Crumbs thrown from bite i as it closes.
     function crumbs(i) {
-        var b = root.biteUniform(i);
-        var c = root.bites[i];
-        var r = root.panelRect;
-        var n = i === 3 ? 10 : 6;
-        for (var k = 0; k < n; k++) {
+        const b = root.biteUniform(i);
+        const c = root.bites[i];
+        const r = root.panelRect;
+        const n = i === 3 ? 10 : 6;
+        for (let k = 0; k < n; k++) {
             // From round the bite's edge, flung outward and falling.
-            var a = Math.random() * 2 * Math.PI;
-            var reach = Math.min(r.width, r.height) * (i === 3 ? bits.rnd(0.2, 0.6) : c.z * bits.rnd(0.6, 1.0));
-            var x = r.x + c.x * r.width + Math.cos(a) * reach;
-            var y = r.y + c.y * r.height + Math.sin(a) * reach;
+            const a = Math.random() * 2 * Math.PI;
+            const reach = Math.min(r.width, r.height) * (i === 3 ? bits.rnd(0.2, 0.6) : c.z * bits.rnd(0.6, 1.0));
+            const x = r.x + c.x * r.width + Math.cos(a) * reach;
+            const y = r.y + c.y * r.height + Math.sin(a) * reach;
             bits.emit(bits.crumb, { x: x, y: y, vx: Math.cos(a) * bits.rnd(60, 220), vy: Math.sin(a) * bits.rnd(60, 160) - 120,
                                     gravity: 900, angle: bits.rnd(0, 360), spin: bits.rnd(-300, 300),
                                     life: bits.rnd(0.5, 0.75), size: Math.round(bits.rnd(14, 26)), delay: i === 3 ? 0.1 : 0.04 });

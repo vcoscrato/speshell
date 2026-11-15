@@ -18,7 +18,7 @@ Rectangle {
     signal valueSelected(var selectedValue)
 
     readonly property string currentLabel: {
-        for (var i = 0; i < root.options.length; i++) {
+        for (let i = 0; i < root.options.length; i++) {
             if (root.options[i].value === root.currentValue)
                 return String(root.options[i].label);
         }
@@ -111,10 +111,10 @@ Rectangle {
                 }
             }
 
-            onObjectAdded: function(index, object) {
+            onObjectAdded: (index, object) => {
                 selectMenu.insertItem(index, object);
             }
-            onObjectRemoved: function(index, object) {
+            onObjectRemoved: (index, object) => {
                 selectMenu.removeItem(object);
             }
         }

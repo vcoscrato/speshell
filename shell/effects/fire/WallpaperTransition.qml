@@ -34,15 +34,15 @@ Item {
     // Embers rise off ground the front has just passed, more as the front grows, and
     // burn out before the transition ends.
     function shedEmbers(dt) {
-        var left = root.spreadTime + root.tailTime - clock.clock - 0.05;
+        const left = root.spreadTime + root.tailTime - clock.clock - 0.05;
         if (root.burnR < 60 || left < 0.3)
             return;
         root.embersOwed += dt * Math.min(90, root.burnR / 7);
         while (root.embersOwed >= 1) {
             root.embersOwed -= 1;
-            var a = Math.random() * 2 * Math.PI;
-            var r = root.burnR - root.rnd(70, 260);
-            var x = root.origin.x + Math.cos(a) * r, y = root.origin.y + Math.sin(a) * r;
+            const a = Math.random() * 2 * Math.PI;
+            const r = root.burnR - root.rnd(70, 260);
+            const x = root.origin.x + Math.cos(a) * r, y = root.origin.y + Math.sin(a) * r;
             if (r < 0 || x < 0 || x > root.width || y < 0 || y > root.height)
                 continue;
             embers.spawn({ x: x, y: y, vx: root.rnd(-30, 30), vy: -root.rnd(60, 140), gravity: -root.rnd(30, 80),
@@ -63,7 +63,7 @@ Item {
 
     EffectClock {
         id: clock
-        onAdvanced: function(dt) {
+        onAdvanced: dt => {
             if (root.sweep < 1) {
                 root.sweep = Math.min(1, root.sweep + dt / root.spreadTime);
                 root.tailStart = clock.clock;

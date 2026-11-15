@@ -15,7 +15,7 @@ Item {
 
     // Whether `item` is part of the host; popups and other windows are not.
     function holds(item) {
-        for (var parentItem = item; parentItem; parentItem = parentItem.parent) {
+        for (let parentItem = item; parentItem; parentItem = parentItem.parent) {
             if (parentItem === root.host)
                 return true;
         }
@@ -69,7 +69,7 @@ Item {
 
         function onPicked(target, pointer) {
             if (root.holds(target)) {
-                var area = root.areaOf(target);
+                const area = root.areaOf(target);
                 root.interactions.pick(area, root.pointOf(pointer, area));
             }
         }

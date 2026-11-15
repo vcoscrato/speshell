@@ -5,6 +5,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "Shell.js" as Shell
 import Quickshell.Bluetooth
 import Quickshell.Services.UPower
 
@@ -19,8 +20,10 @@ Singleton {
     property var keyboardBacklightDevices: []
 
     // The commands Speshell may run: brightnessctl, power profiles, rfkill (airplane
-    // mode), hyprsunset (night light), Tailscale, and the tools'.
-    readonly property var wantedCommands: ["brightnessctl", "powerprofilesctl", "rfkill", "hyprsunset", "tailscale"]
+    // mode), hyprsunset (night light), Tailscale, the clipboard history's, hyprshutdown
+    // (logging out), and the tools'.
+    readonly property var wantedCommands: ["brightnessctl", "powerprofilesctl", "rfkill", "hyprsunset", "tailscale",
+        "cliphist", "wl-paste", "hyprshutdown"]
         .concat(ToolsService.commands)
         .filter((command, index, all) => command !== "" && all.indexOf(command) === index)
 
@@ -61,8 +64,8 @@ Singleton {
     readonly property var issues: {
         if (!root.issuesReady)
             return [];
-        var result = [];
-        var backlight = root.configuredBacklightDevice;
+        const result = [];
+        const backlight = root.configuredBacklightDevice;
         if (backlight !== "" && root.backlightDevices.indexOf(backlight) === -1) {
             result.push({
                 id: "backlight-device",
@@ -90,8 +93,7 @@ Singleton {
             return;
         }
         commandProbe.looking = root.wantedCommands.join(" ");
-        commandProbe.command = ["sh", "-c", "for c; do command -v \"$c\" >/dev/null 2>&1 && echo \"$c\"; done", "sh"]
-            .concat(root.wantedCommands);
+        commandProbe.command = Shell.script("feature.sh", ["commands"].concat(root.wantedCommands));
         commandProbe.running = true;
     }
 
@@ -102,7 +104,7 @@ Singleton {
     // The backlights, a line between them and the keyboard's.
     Process {
         running: true
-        command: ["sh", "-c", "ls -1 /sys/class/backlight; echo --; ls -1 /sys/class/leds | grep 'kbd_backlight$'"]
+        command: Shell.script("feature.sh", ["backlights"])
         stdout: StdioCollector { id: backlightOutput }
         onExited: {
             const parts = backlightOutput.text.split(/^--$/m);

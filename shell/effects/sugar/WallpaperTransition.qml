@@ -23,7 +23,7 @@ Item {
 
     EffectClock {
         id: clock
-        onAdvanced: function(dt) {
+        onAdvanced: dt => {
             if (root.progress < 1) {
                 root.progress = Math.min(1, root.progress + dt / root.pourTime);
                 root.tailStart = clock.clock;

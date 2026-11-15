@@ -3,6 +3,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "ThemeProvider.js" as ThemeProvider
+import "Shell.js" as Shell
 
 // The active theme and its wallpaper. Themes are folders holding a theme.ini and
 // wallpapers, shipped under themes/ and added under <configDir>/themes;
@@ -27,13 +28,15 @@ Singleton {
 
     property var folderThemes: []
     property var wallpapers: []
-    property bool scanned: false
-    // The user folders the last finished scan covered; until they are the current
-    // ones, a scan from before the config loaded may be missing the user's themes.
+    // The user folders the last finished scan covered, "" before one; until they are
+    // the current ones, a scan from before the config loaded may be missing the
+    // user's themes.
     property string scannedDirs: ""
     readonly property string scanDirs: root.themesDir + "\n" + root.userEffectsDir
-    readonly property bool scanning: scanProc.running
-    property bool stateLoaded: false
+    readonly property bool scanned: root.scannedDirs !== ""
+    // "loading" theme.json, "waiting" for the scan and config.ini, or "launched" once
+    // the selection is checked and the launch's shuffle picked.
+    property string phase: "loading"
     property bool saving: false
     property bool saveQueued: false
     property string reported: ""
@@ -77,16 +80,15 @@ Singleton {
     // [Appearance] shuffleAtLaunch: off, wallpaper, theme, or both, picked at
     // random once the themes are known; "" until config.ini loads, which may ask for one.
     readonly property string launchShuffle: ConfigService.config ? ConfigService.config.appearance.shuffleAtLaunch : ""
-    property bool launched: false
     // The wallpaper to draw: held back until the launch pick, so startup does not
     // show the saved one only to replace it.
-    readonly property string shownWallpaper: root.launched ? root.wallpaper : ""
+    readonly property string shownWallpaper: root.phase === "launched" ? root.wallpaper : ""
     // The active palette for other apps, which matugen renders into their themes.
     // See README "App themes".
     readonly property string palettePath: ConfigService.dataDir !== ""
         ? ConfigService.dataDir + "/palette.json"
         : ""
-    readonly property var appPalette: root.launched
+    readonly property var appPalette: root.phase === "launched"
         ? ThemeProvider.appPalette(Theme.mergePalette(root.colors))
         : null
 
@@ -131,8 +133,8 @@ Singleton {
 
     // A wallpaper brings its theme along.
     function setWallpaper(path, placedOn) {
-        var next = String(path || "");
-        var id = ThemeProvider.themeFor(next, root.themesDirs);
+        const next = String(path || "");
+        const id = ThemeProvider.themeFor(next, root.themesDirs);
         if (!root.wallpaperEnabled || id === "")
             return false;
         if (next !== root.wallpaper || id !== root.themeId) {
@@ -150,7 +152,7 @@ Singleton {
 
     // A random wallpaper of a theme, the current one by default.
     function shuffle(id) {
-        var next = ThemeProvider.pickRandom(root.wallpapers, id || root.themeId, root.wallpaper);
+        const next = ThemeProvider.pickRandom(root.wallpapers, id || root.themeId, root.wallpaper);
         return next !== "" && root.setWallpaper(next);
     }
 
@@ -158,7 +160,7 @@ Singleton {
     function remember() {
         if (root.wallpaper === "" || root.chosen[root.themeId] === root.wallpaper)
             return;
-        var next = Object.assign({}, root.chosen);
+        const next = Object.assign({}, root.chosen);
         next[root.themeId] = root.wallpaper;
         root.chosen = next;
     }
@@ -171,7 +173,7 @@ Singleton {
             root.saveQueued = true;
             return;
         }
-        var theme = root.theme;
+        const theme = root.theme;
         root.snapshot = { id: theme.id, name: theme.name, effects: theme.effects, effectsDir: theme.effectsDir,
                           colors: theme.colors, errors: [] };
         root.saving = true;
@@ -188,7 +190,7 @@ Singleton {
     }
 
     function finishStateLoad(text) {
-        var parsed = ({});
+        let parsed = ({});
         try {
             parsed = JSON.parse(text || "{}");
         } catch (stateError) {
@@ -201,7 +203,8 @@ Singleton {
         }
         if (parsed && parsed.wallpapers && typeof parsed.wallpapers === "object")
             root.chosen = parsed.wallpapers;
-        root.stateLoaded = true;
+        if (root.phase === "loading")
+            root.phase = "waiting";
         // Later: FileView drops a write started inside its own loaded signal, and
         // reconciling may save.
         Qt.callLater(root.reconcile);
@@ -213,44 +216,30 @@ Singleton {
             return;
         }
         scanProc.dirs = root.scanDirs;
-        scanProc.command = [
-            "sh", "-c",
-            "for dir in \"$1\" \"$2\"; do [ -d \"$dir\" ] || continue; "
-                + "for f in \"$dir\"/*/theme.ini; do [ -f \"$f\" ] || continue; "
-                + "printf 'theme\\t%s\\n' \"${f%/theme.ini}\"; awk '{ print \"ini\\t\" $0 }' \"$f\"; done; "
-                + "find -L \"$dir\" -mindepth 2 -type f \\( -iname '*.jpg' -o -iname '*.jpeg' "
-                + "-o -iname '*.png' -o -iname '*.webp' \\) -printf 'wall\\t%p\\n'; done; "
-                + "for dir in \"$3\" \"$4\"; do [ -d \"$dir\" ] || continue; for f in \"$dir\"/*/Effects.qml; do "
-                + "[ -f \"$f\" ] && printf 'effects\\t%s\\n' \"${f%/Effects.qml}\"; done; done; true",
-            "speshell-theme-scan",
-            root.shippedThemesDir,
-            root.themesDir,
-            root.shippedEffectsDir,
-            root.userEffectsDir
-        ];
+        scanProc.command = Shell.script("theme.sh", ["scan", root.shippedThemesDir, root.themesDir, "--",
+            root.shippedEffectsDir, root.userEffectsDir]);
         scanProc.running = true;
     }
 
     function finishScan(text) {
-        var library = ThemeProvider.parseScan(text, root.themesDirs);
+        const library = ThemeProvider.parseScan(text, root.themesDirs);
         root.folderThemes = library.themes;
         root.wallpapers = library.wallpapers;
         root.scannedDirs = scanProc.dirs;
-        root.scanned = true;
         root.reconcile();
     }
 
     function reconcile() {
-        if (!root.scanned || root.scannedDirs !== root.scanDirs || !root.stateLoaded || root.launchShuffle === "")
+        if (root.scannedDirs !== root.scanDirs || root.phase === "loading" || root.launchShuffle === "")
             return;
-        var before = root.themeId + "\n" + root.wallpaper;
-        var chosenBefore = root.chosen;
+        const before = root.themeId + "\n" + root.wallpaper;
+        const chosenBefore = root.chosen;
         // The selection may have gone stale: a removed theme or wallpaper.
         if (!ThemeProvider.findTheme(root.themes, root.themeId)) {
             root.themeId = ThemeProvider.defaultTheme;
             root.wallpaper = "";
         }
-        if (!root.launched) {
+        if (root.phase === "waiting") {
             if (root.launchShuffle === "theme" || root.launchShuffle === "both") {
                 const id = ThemeProvider.pickRandomTheme(root.themes, root.themeId);
                 if (id !== "") {
@@ -264,13 +253,13 @@ Singleton {
                     root.wallpaper = next;
             }
         }
-        var own = root.wallpapers.filter(function(wallpaper) {
+        const own = root.wallpapers.filter(wallpaper => {
             return wallpaper.theme === root.themeId && wallpaper.path === root.wallpaper;
         });
         if (own.length === 0)
             root.wallpaper = root.wallpaperFor(root.themeId);
         root.remember();
-        root.launched = true;
+        root.phase = "launched";
         // Keep the saved snapshot in step with edits to theme.ini.
         if (before !== root.themeId + "\n" + root.wallpaper || root.chosen !== chosenBefore || !root.snapshot || JSON.stringify(root.snapshot.colors) !== JSON.stringify(root.theme.colors)
                 || root.snapshot.effectsDir !== root.theme.effectsDir || root.snapshot.effects !== root.theme.effects
@@ -288,26 +277,15 @@ Singleton {
             paletteProc.queued = true;
             return;
         }
-        paletteProc.command = [
-            "sh", "-c",
-            "path=$1; text=$2; mode=$3; [ \"$(cat \"$path\" 2>/dev/null)\" = \"$text\" ] && exit 0; "
-                + "mkdir -p \"${path%/*}\" && printf '%s\\n' \"$text\" > \"$path.next\" || exit 1; "
-                + "command -v gsettings >/dev/null && gsettings set org.gnome.desktop.interface color-scheme \"prefer-$mode\"; "
-                + "if [ -f \"${XDG_CONFIG_HOME:-$HOME/.config}/matugen/config.toml\" ] && command -v matugen >/dev/null; then "
-                + "matugen json \"$path.next\" -m \"$mode\" -q || { rm -f \"$path.next\"; exit 1; }; fi; "
-                + "mv \"$path.next\" \"$path\"",
-            "speshell-app-themes",
-            root.palettePath,
-            JSON.stringify(root.appPalette, null, 2),
-            root.appPalette.mode
-        ];
+        paletteProc.command = Shell.script("theme.sh", ["palette", root.palettePath,
+            JSON.stringify(root.appPalette, null, 2), root.appPalette.mode]);
         paletteProc.running = true;
     }
 
     // Tell the user once about problems in the active theme's theme.ini.
     function report() {
-        var theme = root.theme;
-        var key = theme.id + "\n" + theme.errors.join("\n");
+        const theme = root.theme;
+        const key = theme.id + "\n" + theme.errors.join("\n");
         if (theme.errors.length === 0 || key === root.reported)
             return;
         root.reported = key;

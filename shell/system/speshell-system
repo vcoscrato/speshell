@@ -21,6 +21,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -50,8 +51,10 @@ LINES = {
     "user-service": (re.compile(r"(\S+)"), "a unit"),
     "group": (re.compile(r"([a-z_][a-z0-9_-]*)"), "a group"),
     "linger": (re.compile(r""), "nothing"),
-    "file": (re.compile(r"(~/\S+|/\S+)(?:\s+(?![0-7]{3,4}$)(\S+))?(?:\s+([0-7]{3,4}))?"),
-             "a path, then the module's file and a mode when they aren't the default, as in file /etc/thing.conf thing.conf 600"),
+    "file": (
+        re.compile(r"(~/\S+|/\S+)(?:\s+(?![0-7]{3,4}$)(\S+))?(?:\s+([0-7]{3,4}))?"),
+        "a path, then the module's file and a mode when they aren't the default, as in file /etc/thing.conf thing.conf 600",
+    ),
     "on": (re.compile(r"([/~][^:]*):\s*(.+)"), "a path, a colon, and a command, as in on /etc/thing/*: reload"),
     "run": (re.compile(r"(.+)"), "a command"),
 }
@@ -71,7 +74,7 @@ def shown(path):
     """A path as the modules write it: under the home as ~/…, anything else as is."""
     path = str(path)
     home = str(HOME) + "/"
-    return "~/" + path[len(home):] if path.startswith(home) else path
+    return "~/" + path[len(home) :] if path.startswith(home) else path
 
 
 def expand(path):
@@ -160,15 +163,16 @@ def plural(count, word):
 
 # ── The modules ─────────────────────────────────────────────────────────────
 
+
 @dataclass
 class Module:
     id: str
-    uses: list = field(default_factory=list)      # (module, line)
+    uses: list = field(default_factory=list)  # (module, line)
     packages: list = field(default_factory=list)
     services: list = field(default_factory=list)  # (scope, unit), scope "system" or "user"
     groups: list = field(default_factory=list)
     linger: bool = False
-    files: list = field(default_factory=list)     # (target, source, mode or "", line), a directory's spread out
+    files: list = field(default_factory=list)  # (target, source, mode or "", line), a directory's spread out
     triggers: list = field(default_factory=list)  # (glob, command)
     runs: list = field(default_factory=list)
 
@@ -184,18 +188,29 @@ class Module:
 
 @dataclass
 class Problem:
-    file: str   # relative to CONFIG; "" for one about the modules as a whole
-    line: int   # 0 when it isn't about a line
+    file: str  # relative to CONFIG; "" for one about the modules as a whole
+    line: int  # 0 when it isn't about a line
     message: str
 
 
 def is_package(text):
-    return bool(PACKAGE.fullmatch(text)) and text not in LINES
+    """A word alone on its line, other than linger, the one line word that takes nothing:
+    so packages named like a line word, such as file, can be declared."""
+    return bool(PACKAGE.fullmatch(text)) and text != "linger"
 
 
 def split_comment(raw):
-    content, _, comment = raw.partition("#")
-    return content.strip(), comment.strip().replace("\t", " ")
+    """RAW's content and comment. As in a shell, # starts the comment at the line's start
+    or after a space, outside quotes, so a run line's s#a#b# or "#1" stays whole."""
+    quote = None
+    for i, char in enumerate(raw):
+        if quote:
+            quote = None if char == quote else quote
+        elif char in "'\"":
+            quote = char
+        elif char == "#" and (i == 0 or raw[i - 1].isspace()):
+            return raw[:i].strip(), raw[i + 1 :].strip().replace("\t", " ")
+    return raw.strip(), ""
 
 
 class Config:
@@ -223,7 +238,9 @@ class Config:
         if id in self.on:
             return
         if id in chain:
-            self.problem(f"{id}.conf", 0, f"{id} brings itself in, through {' and '.join(chain[chain.index(id) + 1:])}")
+            self.problem(
+                f"{id}.conf", 0, f"{id} brings itself in, through {' and '.join(chain[chain.index(id) + 1 :])}"
+            )
             return
         for name, _ in self.modules[id].uses:
             if name in self.modules:
@@ -242,7 +259,7 @@ class Config:
             if not text:
                 continue
             word, rest = [*text.split(None, 1), ""][:2]
-            if word not in LINES:
+            if word not in LINES or (not rest and is_package(text)):
                 if is_package(text):
                     module.packages.append(text)
                 else:
@@ -285,8 +302,11 @@ class Config:
             return self.problem(file, number, f"files/{module.id} has no {name}")
         if mode and target.startswith("~/"):
             return self.problem(file, number, "a file in your home is linked, so it keeps its module file's mode")
-        sources = [source] if not source.is_dir() else sorted(
-            Path(directory) / entry for directory, _, entries in os.walk(source) for entry in entries)
+        sources = (
+            [source]
+            if not source.is_dir()
+            else sorted(Path(directory) / entry for directory, _, entries in os.walk(source) for entry in entries)
+        )
         for each in sources:
             placed = expand(target) + ("/" + str(each.relative_to(source)) if each != source else "")
             if any(placed == other for other, _, _, _ in module.files):
@@ -309,6 +329,7 @@ def describe_problem(problem):
 
 # ── The machine ─────────────────────────────────────────────────────────────
 
+
 class Machine:
     """What pacman has: every package installed, and which explicitly."""
 
@@ -319,7 +340,9 @@ class Machine:
             raise Stop("pyalpm is missing; install it with pacman -S pyalpm") from None
         handle = pyalpm.Handle("/", "/var/lib/pacman")
         self.installed = {package.name: package for package in handle.get_localdb().pkgcache}
-        self.explicit = {name for name, package in self.installed.items() if package.reason == pyalpm.PKG_REASON_EXPLICIT}
+        self.explicit = {
+            name for name, package in self.installed.items() if package.reason == pyalpm.PKG_REASON_EXPLICIT
+        }
 
 
 def unit_states(scope, units):
@@ -348,8 +371,14 @@ def load_state():
         state = json.loads(STATE.read_text())
     except (OSError, ValueError):
         state = {}
-    for key, empty in (("packages", []), ("services", []), ("groups", []), ("linger", False),
-                       ("files", {}), ("ran", [])):
+    for key, empty in (
+        ("packages", []),
+        ("services", []),
+        ("groups", []),
+        ("linger", False),
+        ("files", {}),
+        ("ran", []),
+    ):
         state.setdefault(key, empty)
     return state
 
@@ -408,7 +437,7 @@ class Plan:
         self.problems = list(config.problems)
         self.on = config.on
         self.steps = []
-        self.drift = []       # (module, target, "changed" or "blocked": something else in the way)
+        self.drift = []  # (module, target, "changed" or "blocked": something else in the way)
         self.undeclared = []
         self.collect()
         self.plan_services_leaving()
@@ -439,10 +468,11 @@ class Plan:
             self.triggers += [(glob, command, id) for glob, command in module.triggers]
             for target, source, mode, number in module.files:
                 if target in self.files:
-                    self.problems.append(Problem(f"{id}.conf", number,
-                                                 f"{shown(target)} is placed by {self.files[target][0]} too"))
+                    self.problems.append(
+                        Problem(f"{id}.conf", number, f"{shown(target)} is placed by {self.files[target][0]} too")
+                    )
                     continue
-                self.files[target] = (id, source, mode)
+                self.files[target] = (id, source, mode, number)
 
     def plan_services_leaving(self):
         left = [tuple(entry.split(" ", 1)) for entry in self.state["services"]]
@@ -482,11 +512,11 @@ class Plan:
                 self.add("explicit", name, id)
 
     def plan_files(self):
-        for target, (id, source, mode) in self.files.items():
+        for target, (id, source, mode, number) in self.files.items():
             if target.startswith(f"{HOME}/"):
                 self.plan_home(id, source, target)
             else:
-                self.plan_root(id, source, target, mode)
+                self.plan_root(id, source, target, mode, number)
         # What the last apply placed and no module has now.
         for target, record in sorted(self.state["files"].items()):
             if target in self.files:
@@ -519,9 +549,11 @@ class Plan:
         stat = os.stat(target)
         return [stat.st_size, int(stat.st_mtime)] == [record["size"], record["mtime"]]
 
-    def plan_root(self, id, source, target, mode):
+    def plan_root(self, id, source, target, mode, number):
         # Unless its file line gives one: 755 for a program, 440 in sudoers.d, 644 otherwise.
-        mode = mode or ("755" if os.access(source, os.X_OK) else "440" if target.startswith("/etc/sudoers.d/") else "644")
+        mode = mode or (
+            "755" if os.access(source, os.X_OK) else "440" if target.startswith("/etc/sudoers.d/") else "644"
+        )
         concealed = hidden(target)
         if concealed:
             changed = not self.recorded_unchanged(source, target)
@@ -534,7 +566,13 @@ class Plan:
         if changed:
             # A sudoers file that doesn't parse would lock sudo out, so it never goes in.
             if target.startswith("/etc/sudoers.d/") and subprocess.run(["visudo", "-cqf", str(source)]).returncode:
-                self.problems.append(Problem(f"{id}/root{target}", 0, "visudo rejects it, so it stays out of /etc/sudoers.d"))
+                self.problems.append(
+                    Problem(
+                        f"{id}.conf",
+                        number,
+                        f"visudo rejects {source.relative_to(CONFIG)}, so it stays out of /etc/sudoers.d",
+                    )
+                )
                 return
             self.add("copy", target, id, mode)
             return
@@ -556,8 +594,11 @@ class Plan:
         return [(command, scope, id) for command, (scope, id) in fired.items()]
 
     def plan_triggers(self):
-        changing = [step.subject for step in self.steps
-                    if step.kind in ("copy", "unlink", "delete") or (step.kind == "link" and step.detail == "new")]
+        changing = [
+            step.subject
+            for step in self.steps
+            if step.kind in ("copy", "unlink", "delete") or (step.kind == "link" and step.detail == "new")
+        ]
         for command, scope, id in self.triggered(changing):
             self.add("trigger", command, id, scope)
 
@@ -572,18 +613,28 @@ class Plan:
         """The run lines this machine hasn't run, or whose command changed since."""
         for id in self.on:
             for command in self.config.modules[id].runs:
-                if command not in self.state["ran"] and not any(s.kind == "run" and s.subject == command for s in self.steps):
+                if command not in self.state["ran"] and not any(
+                    s.kind == "run" and s.subject == command for s in self.steps
+                ):
                     self.add("run", command, id)
 
     def needs_root(self):
-        return any(step.kind not in ("link", "unlink", "run")
-                   and not (step.kind in ("trigger", "enable", "disable") and step.detail == "user")
-                   for step in self.steps)
+        return any(
+            step.kind not in ("link", "unlink", "run")
+            and not (step.kind in ("trigger", "enable", "disable") and step.detail == "user")
+            for step in self.steps
+        )
 
 
 # ── status ──────────────────────────────────────────────────────────────────
 
+
 def print_plan(plan):
+    if plan.problems:
+        print("Apply stops on these")
+        for problem in plan.problems:
+            print(f"  {describe_problem(problem)}")
+        print()
     if plan.undeclared or plan.drift:
         print("Needs your decision")
         if plan.undeclared:
@@ -602,7 +653,8 @@ def print_plan(plan):
                 print(f"  {shown(target)} is in the way of {id}'s file")
         print()
     if not plan.steps:
-        print(f"{HOST.capitalize()} is in sync.")
+        if not plan.problems:
+            print(f"{HOST.capitalize()} is in sync.")
         return
     print("On apply")
     for item in plan.steps:
@@ -620,6 +672,7 @@ def status(args):
 
 
 # ── apply ───────────────────────────────────────────────────────────────────
+
 
 class Run:
     """An apply: it carries out a plan step by step, keeping the state as it goes."""
@@ -697,7 +750,7 @@ class Run:
         if steps:
             step("Placing files")
         for item in steps:
-            target, source = item.subject, self.plan.files.get(item.subject, (None, None, None))[1]
+            target, source = item.subject, self.plan.files.get(item.subject, (None, None, None, None))[1]
             print(f"  {item.text}", flush=True)
             if item.kind == "link":
                 Path(target).parent.mkdir(parents=True, exist_ok=True)
@@ -707,11 +760,19 @@ class Run:
                 if item.detail == "new":
                     self.changed.append(target)
             elif item.kind == "copy":
-                if run(["cmp", "-s", "--", str(source), target], root=True, check=False, stderr=subprocess.DEVNULL).returncode == 0:
+                if (
+                    run(
+                        ["cmp", "-s", "--", str(source), target], root=True, check=False, stderr=subprocess.DEVNULL
+                    ).returncode
+                    == 0
+                ):
                     run(["chown", "root:root", "--", target], root=True)
                     run(["chmod", item.detail, "--", target], root=True)
                 else:
-                    run(["install", "-D", "-m", item.detail, "-o", "root", "-g", "root", "--", str(source), target], root=True)
+                    run(
+                        ["install", "-D", "-m", item.detail, "-o", "root", "-g", "root", "--", str(source), target],
+                        root=True,
+                    )
                     self.changed.append(target)
             elif item.kind == "mode":
                 run(["chown", "root:root", "--", target], root=True)
@@ -723,13 +784,19 @@ class Run:
                 run(["rm", "-f", "--", target], root=True)
                 self.changed.append(target)
         files = {}
-        for target, (id, source, _) in self.plan.files.items():
+        for target, (id, source, _, _) in self.plan.files.items():
             if target.startswith(f"{HOME}/"):
                 if os.path.islink(target) and os.path.exists(target) and os.path.samefile(target, source):
                     files[target] = {"module": id, "kind": "link"}
             elif os.path.exists(target):
                 stat = os.stat(target)
-                files[target] = {"module": id, "kind": "copy", "sha": sha(source), "size": stat.st_size, "mtime": int(stat.st_mtime)}
+                files[target] = {
+                    "module": id,
+                    "kind": "copy",
+                    "sha": sha(source),
+                    "size": stat.st_size,
+                    "mtime": int(stat.st_mtime),
+                }
             elif hidden(target):
                 files[target] = {"module": id, "kind": "copy", "sha": sha(source), "size": None, "mtime": None}
         self.state["files"] = files
@@ -762,9 +829,11 @@ class Run:
         self.state["ran"] = ran
         save_state(self.state)
 
+
 def run_command(hold, body, last=True):
     """Runs an apply or update's BODY, one at a time. With HOLD, the terminal waits for
-    Enter after a failure, and after the end when this is the LAST of the run."""
+    Enter after a failure, and after the end when this is the LAST of the run, while
+    Ctrl+C closes it at once."""
     failed = True
     try:
         STATE_DIR.mkdir(parents=True, exist_ok=True)
@@ -778,11 +847,13 @@ def run_command(hold, body, last=True):
     except Stop as stop:
         for line in str(stop).splitlines():
             print(f"speshell system: {line}", file=sys.stderr, flush=True)
-    finally:
-        if hold and (failed or last):
-            if failed:
-                print("\nspeshell system: stopped by the error above; the steps after it did not run.")
-            input("\nPress Enter to close. ")
+    except Exception:
+        traceback.print_exc()
+        sys.stderr.flush()
+    if hold and (failed or last):
+        if failed:
+            print("\nspeshell system: stopped by the error above; the steps after it did not run.")
+        input("\nPress Enter to close. ")
     if failed:
         sys.exit(1)
 
@@ -836,6 +907,7 @@ def update(args):
 
 # ── The other commands ──────────────────────────────────────────────────────
 
+
 def edit_lines(path, change):
     """Rewrites the file at PATH as CHANGE makes its lines, keeping its mode."""
     lines = path.read_text().splitlines() if path.exists() else []
@@ -849,7 +921,7 @@ def known(config, id):
 
 
 def valid(name):
-    if not PACKAGE.fullmatch(name):
+    if not is_package(name):
         raise Stop(f"'{name}' is not a package name")
     return name
 
@@ -866,7 +938,7 @@ def add(args):
     # After its last package, or first in a module without one.
     def change(lines):
         last = max((i for i, line in enumerate(lines) if is_package(split_comment(line)[0])), default=-1)
-        return lines[:last + 1] + names + lines[last + 1:]
+        return lines[: last + 1] + names + lines[last + 1 :]
 
     edit_lines(module.conf, change)
 
@@ -894,11 +966,14 @@ def switch(turn, args):
     if not config.machine:
         raise Stop(f"there is no {shown(CONFIG / HOST)}.conf for this machine; speshell system init starts one")
     machine = config.modules[config.machine]
-    direct = any(name == id for name, _ in machine.uses)
     if id == config.machine:
         raise Stop(f"{id} is this machine")
-    if turn == "off" and not direct and id in config.on:
-        raise Stop(f"{id} comes with {config.via[id]}; turn that off instead")
+    if turn == "off" and id in config.on:
+        others = [
+            other for other in config.on if other != config.machine and id in (n for n, _ in config.modules[other].uses)
+        ]
+        if others:
+            raise Stop(f"{id} comes with {', '.join(others)}; turn that off instead")
     if (turn == "on") == (id in config.on):
         return
 

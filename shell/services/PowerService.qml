@@ -13,13 +13,9 @@ Singleton {
     // How much power may be used: [Power] mode, or "saver" on battery with [Power]
     // saverOnBattery, until another mode is picked there.
     // - "maximum": the performance profile (balanced where there is none); theme effects
-    //   tick with every frame the display shows; recordings started outside Speshell
-    //   are noticed within 2 s.
-    // - "balanced": the balanced profile; theme effects tick at 60 fps, and that check
-    //   runs every 10 s; on battery, 30 fps and every minute.
-    // - "saver": the power-saver profile; no theme effects, no interface motion, and
-    //   that check every minute.
-    // Speshell's own tools report their recordings at once in every mode.
+    //   tick with every frame the display shows.
+    // - "balanced": the balanced profile; theme effects tick at 60 fps, 30 on battery.
+    // - "saver": the power-saver profile; no theme effects and no interface motion.
     readonly property string mode: root.onSaver ? (root.batteryMode || "saver") : root.configuredMode
     readonly property string configuredMode: ConfigService.settings.power.mode
     readonly property bool saverOnBattery: ConfigService.settings.power.saverOnBattery
@@ -33,9 +29,9 @@ Singleton {
     // Reading it connects to the daemon; its profiles arrive a moment later.
     readonly property bool hasPerformanceProfile: PowerProfiles.hasPerformanceProfile
 
-    readonly property bool locked: LockService.locked
-    property bool busy: false
+    // The action running, or "".
     property string activeAction: ""
+    readonly property bool busy: root.activeAction !== ""
     property string errorMessage: ""
 
 
@@ -50,10 +46,10 @@ Singleton {
     })
 
     function commandError(collector, fallback) {
-        var detail = collector && collector.text ? collector.text.trim() : "";
+        const detail = collector && collector.text ? collector.text.trim() : "";
         if (detail === "")
             return fallback;
-        var firstLine = detail.split("\n")[0].trim();
+        const firstLine = detail.split("\n")[0].trim();
         return firstLine !== "" ? firstLine : fallback;
     }
 
@@ -64,13 +60,11 @@ Singleton {
 
     function fail(message) {
         secureTimer.stop();
-        root.busy = false;
         root.activeAction = "";
         root.errorMessage = message;
     }
 
     function finish() {
-        root.busy = false;
         root.activeAction = "";
     }
 
@@ -91,6 +85,10 @@ Singleton {
             ConfigService.setProperty("Power", "mode", mode);
     }
 
+    function setSaverOnBattery(on) {
+        return ConfigService.setProperty("Power", "saverOnBattery", on ? "true" : "false");
+    }
+
     // Always written: until the daemon answers, PowerProfiles.profile is a placeholder.
     function applyProfile() {
         if (!root.profilesAvailable)
@@ -107,7 +105,6 @@ Singleton {
             return false;
 
         root.errorMessage = "";
-        root.busy = true;
         root.activeAction = action;
 
         if (action === "lock") {
@@ -121,15 +118,13 @@ Singleton {
             return true;
         }
 
-        if (action === "logout") {
-            // Hyprland's own exit lets hyprshutdown close apps gracefully first.
-            actionProcess.command = !HyprlandService.running
-                ? ["loginctl", "terminate-session", Quickshell.env("XDG_SESSION_ID") || ""]
-                : ["sh", "-c",
-                    "if command -v hyprshutdown >/dev/null 2>&1; then exec hyprshutdown; fi; "
-                        + "exec hyprctl dispatch \"$1\"",
-                    "speshell-logout", HyprlandService.usingLua ? "hl.dsp.exit()" : "exit"];
-        }
+        // Under Hyprland, hyprshutdown closes the apps gracefully before it exits.
+        if (action === "logout" && !HyprlandService.running)
+            actionProcess.command = ["loginctl", "terminate-session", Quickshell.env("XDG_SESSION_ID") || ""];
+        else if (action === "logout" && FeatureSupport.hasCommand("hyprshutdown"))
+            actionProcess.command = ["hyprshutdown"];
+        else if (action === "logout")
+            actionProcess.command = ["hyprctl", "dispatch", HyprlandService.usingLua ? "hl.dsp.exit()" : "exit"];
         else if (action === "restart")
             actionProcess.command = ["systemctl", "reboot"];
         else if (action === "poweroff")
@@ -166,7 +161,7 @@ Singleton {
         command: ["systemctl", root.activeAction === "hibernate" ? "hibernate" : "suspend"]
         running: false
         stderr: StdioCollector { id: sleepError }
-        onExited: function(exitCode) {
+        onExited: exitCode => {
             if (!root.sleeps(root.activeAction))
                 return;
             if (exitCode === 0)
@@ -181,8 +176,8 @@ Singleton {
         id: actionProcess
         running: false
         stderr: StdioCollector { id: actionError }
-        onExited: function(exitCode) {
-            var action = root.activeAction;
+        onExited: exitCode => {
+            const action = root.activeAction;
             if (action === "" || action === "lock" || root.sleeps(action))
                 return;
             if (exitCode !== 0) {

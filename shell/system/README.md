@@ -37,14 +37,14 @@ run rustup default stable
 ```
 
 - `use MODULE...` brings in other modules, and the ones they use.
-- A bare name is a package, from the repositories or the AUR (installed through paru or yay when there is one). A group is not a package: list its packages.
+- A bare name is a package, from the repositories or the AUR (installed through paru or yay when there is one), even one named like a line word, such as `file`; only `linger` alone is the line. A group is not a package: list its packages.
 - `service UNIT` enables a system unit, and `user-service UNIT` one of yours. `%u` in UNIT is your user name, as in `speshell-greeter-theme@%u.path`.
 - `group GROUP` puts you in GROUP, from your next login.
 - `linger` starts your user services at boot, without a login.
 - `file PATH [NAME] [MODE]` places the module's file NAME at PATH. NAME is PATH's own name without a leading dot unless given, so `file ~/.bashrc` places `bashrc`; one file can go to several paths. A directory places each file in it, under PATH.
 - `on PATH: COMMAND` runs COMMAND once after an apply changes a file whose path matches: as root for a path under `/`, as you for one under `~/`.
 - `run COMMAND` runs COMMAND once on each machine, and again when the line changes.
-- `#` starts a comment.
+- `#` starts a comment at the start of a line or after a space, outside quotes, as in a shell, so `run sed "s#a#b#"` keeps its `#`.
 
 A file under `~/` is linked, so editing either one edits the module. One under `/` is copied as root, since `/etc` and the login screen can't read your home: mode 644, 755 when the module's file is executable, and 440 under `/etc/sudoers.d`, unless the line gives MODE. A sudoers file visudo rejects never goes in, so a typo can't lock sudo out.
 

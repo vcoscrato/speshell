@@ -47,7 +47,7 @@ Item {
     readonly property var orderTable: orderTex
 
     EffectClock {
-        onAdvanced: function(dt) {
+        onAdvanced: dt => {
             root.elapsed += dt;
             if (!root.done && root.elapsed >= root.duration) {
                 root.done = true;

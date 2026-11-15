@@ -37,7 +37,7 @@ QtObject {
     function mergePalette(colors) {
         if (!colors)
             return root.defaultPalette;
-        var merged = {};
+        const merged = {};
         for (const key in root.defaultPalette)
             merged[key] = colors[key] !== undefined ? colors[key] : root.defaultPalette[key];
         merged.accent = colors.accent || merged.peach;
@@ -80,7 +80,6 @@ QtObject {
     readonly property int fontSizeMicro:      Math.round(9 * root.textScale)
     readonly property int fontSizeCaption:    Math.round(10 * root.textScale)
     readonly property int fontSizeSmall:      Math.round(11 * root.textScale)
-    readonly property int fontSizeSupporting: Math.round(12 * root.textScale)
     readonly property int fontSizeNormal:     Math.round(13 * root.textScale)
     readonly property int fontSizeLarge:      Math.round(16 * root.textScale)
     readonly property int fontSizeHuge:       Math.round(40 * root.textScale)
@@ -138,8 +137,6 @@ QtObject {
     readonly property int animDuration:     root.motion ? 200 : 0
     readonly property int animDurationSlow: root.motion ? 350 : 0
     readonly property int animEasing:       Easing.OutCubic
-    // One turn of a busy spinner.
-    readonly property int spinDuration:     1000
 
     // ── Layout ──────────────────────────────────────────────
     // A bar dropdown's content; wider text gets wider panels.

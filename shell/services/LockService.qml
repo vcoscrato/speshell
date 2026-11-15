@@ -23,10 +23,11 @@ Singleton {
     property int failures: 0
     // The password typed, shared by every screen's prompt.
     property string draft: ""
+    readonly property string user: Quickshell.env("USER") || ""
+    // The account's full name from its GECOS field, or the user name.
+    property string userName: root.user
 
     readonly property string markerPath: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/speshell-locked"
-
-    signal unlocked()
 
     function lock() {
         if (root.locked)
@@ -60,7 +61,6 @@ Singleton {
         root.locked = false;
         Quickshell.execDetached(["rm", "-f", root.markerPath]);
         SessionService.setLockedHint(false);
-        root.unlocked();
     }
 
     PamContext {
@@ -106,5 +106,17 @@ Singleton {
         path: root.markerPath
         printErrors: false
         onLoaded: root.lock()
+    }
+
+    Process {
+        running: root.user !== ""
+        command: ["getent", "passwd", root.user]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const name = (text.split(":")[4] || "").split(",")[0].trim();
+                if (name !== "")
+                    root.userName = name;
+            }
+        }
     }
 }

@@ -19,15 +19,17 @@ import "../services/ThemeProvider.js" as ThemeProvider
 ModalWindow {
     id: root
 
+    // "" unmapped; "open"; then, closing, "chrome" while the interface fades, "waiting"
+    // for the wallpaper behind and the desktop to settle, "backdrop" while it fades, and
+    // "done".
+    property string phase: ""
     // The interface shows and takes the keyboard.
-    property bool opened: false
-    // The wallpaper behind shows; it outlives `opened` while an applied theme settles.
-    property bool backdropShown: false
+    readonly property bool opened: root.phase === "open"
     // Mapped on screen, until both have faded out.
-    property bool presenting: false
-    // How far closing has come: "chrome" while the interface fades, "waiting" for the
-    // wallpaper behind and the desktop to settle, "backdrop" while it fades; "" open.
-    property string leaving: ""
+    readonly property bool presenting: root.phase !== ""
+    // The wallpaper behind shows, once loaded; it outlives `opened` while an applied
+    // theme settles.
+    property bool backdropShown: false
     property string selectedId: ""
     // The wallpaper previewed, one of the selected theme's, or "" for none.
     property string wallpaperPath: ""
@@ -84,7 +86,6 @@ ModalWindow {
         root.targetScreen = HyprlandService.focusedScreen();
         fadeTimer.stop();
         settleTimer.stop();
-        root.leaving = "";
         root.pending = null;
         root.fromThemes = false;
         filterInput.text = "";
@@ -101,19 +102,17 @@ ModalWindow {
         faceSwap.stop();
         root.faceDir = root.shownDir;
         clock.opacity = 1;
-        root.opened = true;
         // Once loaded, so it arrives as the desktop under it already looks.
         root.backdropShown = !backdrop.busy;
-        root.presenting = true;
+        root.phase = "open";
     }
 
     // Closing without applying lets the wallpaper behind go with the interface.
     function close() {
-        root.opened = false;
+        root.phase = "chrome";
         root.focusGrabActive = false;
         if (root.pending === null)
             root.backdropShown = false;
-        root.leaving = "chrome";
         fadeTimer.restart();
     }
 
@@ -121,7 +120,7 @@ ModalWindow {
     // behind has finished its transition, applies what was picked in place; once the
     // desktop has loaded it, lets the wallpaper behind go; then unmaps.
     function leave() {
-        if (root.leaving === "waiting") {
+        if (root.phase === "waiting") {
             if (root.pending !== null) {
                 if (backdrop.busy)
                     return;
@@ -135,16 +134,14 @@ ModalWindow {
                 return;
             if (root.backdropShown) {
                 root.backdropShown = false;
-                root.leaving = "backdrop";
+                root.phase = "backdrop";
                 fadeTimer.restart();
                 return;
             }
-            root.leaving = "done";
+            root.phase = "done";
         }
-        if (root.leaving === "done") {
-            root.leaving = "";
-            root.presenting = false;
-        }
+        if (root.phase === "done")
+            root.phase = "";
     }
 
     function select(id) {
@@ -351,7 +348,7 @@ ModalWindow {
         id: fadeTimer
         interval: Theme.animDuration
         onTriggered: {
-            root.leaving = root.leaving === "chrome" ? "waiting" : "done";
+            root.phase = root.phase === "chrome" ? "waiting" : "done";
             root.leave();
         }
     }

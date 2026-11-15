@@ -21,9 +21,9 @@ Singleton {
     }
 
     function refreshPlayer() {
-        var values = root.players();
-        var selected = null;
-        for (var i = 0; i < values.length; i++) {
+        const values = root.players();
+        let selected = null;
+        for (let i = 0; i < values.length; i++) {
             if (values[i] && values[i].playbackState === MprisPlaybackState.Playing) {
                 selected = values[i];
                 break;
@@ -32,7 +32,7 @@ Singleton {
         if (!selected && root.player && values.indexOf(root.player) >= 0)
             selected = root.player;
         if (!selected) {
-            for (var j = 0; j < values.length; j++) {
+            for (let j = 0; j < values.length; j++) {
                 if (values[j]) {
                     selected = values[j];
                     break;
@@ -52,7 +52,7 @@ Singleton {
     }
 
     function setViewPresented(presented) {
-        var next = !!presented;
+        const next = !!presented;
         if (root.viewPresented === next)
             return;
         root.viewPresented = next;
