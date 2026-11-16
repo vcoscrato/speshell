@@ -4,6 +4,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.UPower
+import "Shell.js" as Shell
 
 // Locking, sleep, hibernate, logout, restart, and power off, and the power mode that sets how
 // much power the system and Speshell's motion may use.
@@ -29,20 +30,23 @@ Singleton {
     // Reading it connects to the daemon; its profiles arrive a moment later.
     readonly property bool hasPerformanceProfile: PowerProfiles.hasPerformanceProfile
 
+    // Speshell's version: the checkout's revision, or the package's.
+    property string appVersion: "Unknown"
+    property bool relaunching: false
+    readonly property bool canRelaunch: !root.relaunching && !ConfigService.writing
+
     // The action running, or "".
     property string activeAction: ""
     readonly property bool busy: root.activeAction !== ""
     property string errorMessage: ""
 
-
-    // Each action's name, icon, and tone.
-    readonly property var actions: ({
-        lock: { label: "Lock", icon: "lock", tone: "accent" },
-        sleep: { label: "Sleep", icon: "sleep", tone: "accent" },
-        hibernate: { label: "Hibernate", icon: "hibernate", tone: "accent" },
-        logout: { label: "Log out", icon: "logout", tone: "warning" },
-        restart: { label: "Restart", icon: "restart", tone: "warning" },
-        poweroff: { label: "Power off", icon: "power", tone: "error" }
+    // What each action runs, and what its failure says when the command doesn't. Sleep
+    // and hibernate leave locking to LockService, which logind waits on.
+    readonly property var commands: ({
+        sleep: { command: ["systemctl", "suspend"], failure: "Could not suspend the system." },
+        hibernate: { command: ["systemctl", "hibernate"], failure: "Could not hibernate the system." },
+        restart: { command: ["systemctl", "reboot"], failure: "Could not restart the system." },
+        poweroff: { command: ["systemctl", "poweroff"], failure: "Could not power off the system." }
     })
 
     function commandError(collector, fallback) {
@@ -53,29 +57,6 @@ Singleton {
         return firstLine !== "" ? firstLine : fallback;
     }
 
-    // Sleep and hibernate lock first, then leave the system to logind.
-    function sleeps(action) {
-        return action === "sleep" || action === "hibernate";
-    }
-
-    function fail(message) {
-        secureTimer.stop();
-        root.activeAction = "";
-        root.errorMessage = message;
-    }
-
-    function finish() {
-        root.activeAction = "";
-    }
-
-    // Sleeps once every screen shows the lock.
-    function sleepWhenSecure() {
-        if (LockService.secure)
-            sleepProcess.running = true;
-        else
-            secureTimer.restart();
-    }
-
     // Picked on battery with saverOnBattery, it lasts until plugged in; otherwise it
     // becomes [Power] mode.
     function setMode(mode) {
@@ -83,10 +64,6 @@ Singleton {
             root.batteryMode = mode;
         else
             ConfigService.setProperty("Power", "mode", mode);
-    }
-
-    function setSaverOnBattery(on) {
-        return ConfigService.setProperty("Power", "saverOnBattery", on ? "true" : "false");
     }
 
     // Always written: until the daemon answers, PowerProfiles.profile is a placeholder.
@@ -103,91 +80,65 @@ Singleton {
     function runAction(action) {
         if (root.busy)
             return false;
-
         root.errorMessage = "";
-        root.activeAction = action;
 
         if (action === "lock") {
             LockService.lock();
-            root.finish();
             return true;
         }
-        if (root.sleeps(action)) {
-            LockService.lock();
-            root.sleepWhenSecure();
+        // Under Hyprland, hyprshutdown closes the apps gracefully before it exits.
+        if (action === "logout" && HyprlandService.running && !FeatureSupport.hasCommand("hyprshutdown")) {
+            HyprlandService.dispatch("hl.dsp.exit()", "exit");
             return true;
         }
 
-        // Under Hyprland, hyprshutdown closes the apps gracefully before it exits.
-        if (action === "logout" && !HyprlandService.running)
-            actionProcess.command = ["loginctl", "terminate-session", Quickshell.env("XDG_SESSION_ID") || ""];
-        else if (action === "logout" && FeatureSupport.hasCommand("hyprshutdown"))
-            actionProcess.command = ["hyprshutdown"];
-        else if (action === "logout")
-            actionProcess.command = ["hyprctl", "dispatch", HyprlandService.usingLua ? "hl.dsp.exit()" : "exit"];
-        else if (action === "restart")
-            actionProcess.command = ["systemctl", "reboot"];
-        else if (action === "poweroff")
-            actionProcess.command = ["systemctl", "poweroff"];
-        else {
-            root.fail("Unknown power action: " + action);
+        const entry = action === "logout"
+            ? { command: HyprlandService.running ? ["hyprshutdown"]
+                    : ["loginctl", "terminate-session", Quickshell.env("XDG_SESSION_ID") || ""],
+                failure: "Could not log out." }
+            : root.commands[action];
+        if (!entry) {
+            root.errorMessage = "Unknown power action: " + action;
             return false;
         }
-
+        root.activeAction = action;
+        actionProcess.failure = entry.failure;
+        actionProcess.command = entry.command;
         actionProcess.running = true;
         return true;
     }
 
-    // How long the compositor may take to cover the screens before sleep gives up.
-    Timer {
-        id: secureTimer
-        interval: 3000
-        onTriggered: root.fail("The screen did not lock, so the system stayed awake.")
-    }
-
-    Connections {
-        target: LockService
-
-        function onSecureChanged() {
-            if (LockService.secure && secureTimer.running) {
-                secureTimer.stop();
-                sleepProcess.running = true;
-            }
-        }
-    }
-
-    Process {
-        id: sleepProcess
-        command: ["systemctl", root.activeAction === "hibernate" ? "hibernate" : "suspend"]
-        running: false
-        stderr: StdioCollector { id: sleepError }
-        onExited: exitCode => {
-            if (!root.sleeps(root.activeAction))
-                return;
-            if (exitCode === 0)
-                root.finish();
-            else
-                root.fail(root.commandError(sleepError, root.activeAction === "hibernate"
-                    ? "Could not hibernate the system." : "Could not suspend the system."));
-        }
-    }
-
     Process {
         id: actionProcess
+
+        property string failure: ""
+
         running: false
         stderr: StdioCollector { id: actionError }
         onExited: exitCode => {
-            const action = root.activeAction;
-            if (action === "" || action === "lock" || root.sleeps(action))
-                return;
-            if (exitCode !== 0) {
-                root.fail(root.commandError(
-                    actionError,
-                    (root.actions[action]?.label ?? "Power action") + " failed."
-                ));
-                return;
-            }
-            root.finish();
+            root.activeAction = "";
+            if (exitCode !== 0)
+                root.errorMessage = root.commandError(actionError, actionProcess.failure);
+        }
+    }
+
+    // Starts a new Speshell once this process has exited; notes are saved first.
+    function relaunch() {
+        if (!root.canRelaunch)
+            return;
+        root.relaunching = true;
+        NotesService.flush(true);
+        const shellPath = Quickshell.shellDir || Quickshell.shellRoot;
+        Quickshell.execDetached(Shell.script("system.sh", ["relaunch", String(Quickshell.processId)]
+            .concat(shellPath !== "" ? ["-p", shellPath] : [])));
+        Qt.quit();
+    }
+
+    Process {
+        running: true
+        command: Shell.script("system.sh", ["version", Shell.appDir()])
+        stdout: StdioCollector {
+            onStreamFinished: root.appVersion = text.trim() || "Unknown"
         }
     }
 

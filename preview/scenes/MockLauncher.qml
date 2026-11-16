@@ -3,7 +3,7 @@ import QtQuick
 Rectangle {
     id: root
     property var theme: null
-    radius: 10; color: root.theme.bg; border.color: root.theme.surface2; border.width: 1
+    radius: 16; color: root.theme.bg; border.color: root.theme.surface2; border.width: 1
     Rectangle { x: 16; y: 16; width: parent.width - 32; height: 48; radius: 8; color: root.theme.card
         Text { x: 44; anchors.verticalCenter: parent.verticalCenter; text: "Search apps and panels…"; color: root.theme.subtext; font.pixelSize: 16 } }
     Column { x: 16; y: 80; spacing: 4

@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Templates as T
 import qs.services
 
-// A dropdown or context menu of PopupMenuItem and PopupMenuSeparator. Submenus added
+// A dropdown or context menu of PopupMenuItem, and rules between them. Submenus added
 // with insertMenu cascade beside it.
 T.Menu {
     id: root
@@ -32,7 +32,8 @@ T.Menu {
     }
 
     background: Rectangle {
-        implicitWidth: 160
+        // Half a panel, so a short menu still reads as one.
+        implicitWidth: Theme.panelWidth / 2
         radius: Theme.borderRadius
         color: Theme.popupFill
         border.width: Theme.borderWidth

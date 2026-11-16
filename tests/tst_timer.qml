@@ -1,6 +1,6 @@
 import QtQuick
 import QtTest
-import "../shell/services/TimerProvider.js" as TimerProvider
+import "../shell/services/Duration.js" as Duration
 import "../shell/components/Format.js" as Format
 
 TestCase {
@@ -30,7 +30,7 @@ TestCase {
     }
 
     function test_lengths(data) {
-        compare(TimerProvider.parseDuration(data.text), data.seconds);
+        compare(Duration.parseDuration(data.text), data.seconds);
     }
 
     function test_formats() {
@@ -60,7 +60,7 @@ TestCase {
     }
 
     function test_lengthsAndNames(data) {
-        const parsed = TimerProvider.parseTimer(data.text, now);
+        const parsed = Duration.parseTimer(data.text, now);
         compare(parsed.seconds, data.seconds);
         compare(parsed.name, data.name);
     }

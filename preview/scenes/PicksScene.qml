@@ -5,25 +5,9 @@ import Quickshell
 // a panel's row clicked on its label, and a square button, each with the pointer drawn
 // where it pressed. The effects' interactions get pick(area, at) as bar/InteractionsLayer.qml
 // calls it.
-Item {
+EffectScene {
     id: root
-    width: 1920
-    height: 1080
-    property real previewTime: 0
     readonly property real timeScale: Number(Quickshell.env("SPEED") || 1)
-
-    property var effects: {
-        const component = Qt.createComponent("file://" + Quickshell.env("EFFECTS_DIR") + "/Effects.qml");
-        if (component.status !== Component.Ready) {
-            console.error(component.errorString());
-            return null;
-        }
-        return component.createObject(root);
-    }
-
-    ThemePalette {
-        id: swatch
-    }
 
     // ── Script: [time, target, where in it (0..1 across, 0..1 down)] ─
     readonly property var script: [
@@ -62,7 +46,7 @@ Item {
 
         Rectangle {
             anchors.fill: parent
-            color: swatch.bg
+            color: root.swatch.bg
         }
 
         // ── The bar ──────────────────────────────────────────
@@ -70,7 +54,7 @@ Item {
             id: bar
             width: parent.width
             height: 40
-            color: swatch.mantle
+            color: root.swatch.mantle
 
             Row {
                 x: 12
@@ -83,7 +67,7 @@ Item {
                         width: index === 1 ? 22 : 8
                         height: 8
                         radius: 4
-                        color: index === 1 ? swatch.accent : swatch.surface2
+                        color: index === 1 ? root.swatch.accent : root.swatch.surface2
                     }
                 }
             }
@@ -95,13 +79,13 @@ Item {
                 width: 168
                 height: 30
                 radius: 4
-                color: root.previewTime >= 0.3 ? Qt.rgba(swatch.accent.r, swatch.accent.g, swatch.accent.b, 0.14) : "transparent"
+                color: root.previewTime >= 0.3 ? Qt.rgba(root.swatch.accent.r, root.swatch.accent.g, root.swatch.accent.b, 0.14) : "transparent"
                 border.width: root.previewTime >= 0.3 ? 1 : 0
-                border.color: Qt.rgba(swatch.accent.r, swatch.accent.g, swatch.accent.b, 0.5)
+                border.color: Qt.rgba(root.swatch.accent.r, root.swatch.accent.g, root.swatch.accent.b, 0.5)
                 Text {
                     anchors.centerIn: parent
                     text: "Wed 14 Oct   21:37"
-                    color: swatch.text
+                    color: root.swatch.text
                     font.pixelSize: 13
                     font.bold: true
                 }
@@ -114,7 +98,7 @@ Item {
                 width: 30
                 height: 30
                 radius: 4
-                color: root.previewTime >= 1.2 ? Qt.rgba(swatch.accent.r, swatch.accent.g, swatch.accent.b, 0.14) : "transparent"
+                color: root.previewTime >= 1.2 ? Qt.rgba(root.swatch.accent.r, root.swatch.accent.g, root.swatch.accent.b, 0.14) : "transparent"
                 Rectangle {
                     anchors.centerIn: parent
                     width: 14
@@ -122,7 +106,7 @@ Item {
                     radius: 7
                     color: "transparent"
                     border.width: 2
-                    border.color: swatch.text
+                    border.color: root.swatch.text
                 }
             }
 
@@ -140,7 +124,7 @@ Item {
                     radius: 3
                     color: "transparent"
                     border.width: 2
-                    border.color: swatch.subtext
+                    border.color: root.swatch.subtext
                 }
             }
         }
@@ -158,7 +142,7 @@ Item {
                 sourceComponent: root.effects && ("backdrop" in root.effects) ? root.effects.backdrop : null
             }
 
-            Binding { target: backdrop.item; property: "theme"; value: swatch }
+            Binding { target: backdrop.item; property: "theme"; value: root.swatch }
 
             Rectangle {
                 id: buttonBox
@@ -167,9 +151,9 @@ Item {
                 width: 38
                 height: 38
                 radius: 3
-                color: Qt.rgba(swatch.accent.r, swatch.accent.g, swatch.accent.b, root.previewTime >= 3.0 ? 0.12 : 0)
+                color: Qt.rgba(root.swatch.accent.r, root.swatch.accent.g, root.swatch.accent.b, root.previewTime >= 3.0 ? 0.12 : 0)
                 border.width: 1
-                border.color: Qt.rgba(swatch.accent.r, swatch.accent.g, swatch.accent.b, root.previewTime >= 3.0 ? 0.45 : 0)
+                border.color: Qt.rgba(root.swatch.accent.r, root.swatch.accent.g, root.swatch.accent.b, root.previewTime >= 3.0 ? 0.45 : 0)
                 Rectangle {
                     anchors.centerIn: parent
                     width: 18
@@ -177,7 +161,7 @@ Item {
                     radius: 4
                     color: "transparent"
                     border.width: 2
-                    border.color: root.previewTime >= 3.0 ? swatch.accent : swatch.subtext
+                    border.color: root.previewTime >= 3.0 ? root.swatch.accent : root.swatch.subtext
                 }
             }
 
@@ -185,7 +169,7 @@ Item {
                 x: 76
                 y: 22
                 text: "Output"
-                color: swatch.subtext
+                color: root.swatch.subtext
                 font.pixelSize: 12
             }
 
@@ -201,7 +185,7 @@ Item {
                     width: 320
                     height: 30
                     radius: 4
-                    color: row.on ? Qt.rgba(swatch.accent.r, swatch.accent.g, swatch.accent.b, 0.1) : "transparent"
+                    color: row.on ? Qt.rgba(root.swatch.accent.r, root.swatch.accent.g, root.swatch.accent.b, 0.1) : "transparent"
                     Component.onCompleted: if (index === 1) root.deviceRow = row
                     Rectangle {
                         x: 10
@@ -210,14 +194,14 @@ Item {
                         height: 14
                         radius: 7
                         border.width: 2
-                        border.color: swatch.accent
-                        color: row.on ? swatch.accent : "transparent"
+                        border.color: root.swatch.accent
+                        color: row.on ? root.swatch.accent : "transparent"
                     }
                     Text {
                         x: 34
                         anchors.verticalCenter: parent.verticalCenter
                         text: row.modelData
-                        color: swatch.text
+                        color: root.swatch.text
                         font.pixelSize: 12
                     }
                 }
@@ -231,7 +215,7 @@ Item {
             sourceComponent: root.effects && ("interactions" in root.effects) ? root.effects.interactions : null
         }
 
-        Binding { target: fxLayer.item; property: "theme"; value: swatch }
+        Binding { target: fxLayer.item; property: "theme"; value: root.swatch }
 
         // The pointer, pressing.
         Canvas {

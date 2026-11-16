@@ -32,8 +32,12 @@ Singleton {
         : ""
 
     // Coordinates for root.location, kept until it changes: { latitude, longitude, place }.
+    // Those the IP address gives are looked up again with each refresh, since a laptop
+    // moves.
     property var spot: null
     property int requestId: 0
+    // The request waiting for an answer, which requestTimer gives up on.
+    property var request: null
 
     // WMO weather codes: a condition and the kind of sky its icon shows.
     readonly property var conditions: ({
@@ -71,7 +75,13 @@ Singleton {
         const id = root.requestId;
         const request = new XMLHttpRequest();
         request.onreadystatechange = () => {
-            if (request.readyState !== XMLHttpRequest.DONE || id !== root.requestId)
+            if (request.readyState !== XMLHttpRequest.DONE)
+                return;
+            if (root.request === request) {
+                root.request = null;
+                requestTimer.stop();
+            }
+            if (id !== root.requestId)
                 return;
             let body = null;
             try {
@@ -83,6 +93,8 @@ Singleton {
         };
         request.open("GET", url);
         request.send();
+        root.request = request;
+        requestTimer.restart();
     }
 
     // Fetches the forecast, finding the location's coordinates first if needed.
@@ -92,11 +104,11 @@ Singleton {
         root.requestId++;
         if (root.status !== "ready")
             root.status = "loading";
-        if (root.spot) {
+        const name = root.location.trim();
+        if (root.spot && name !== "") {
             root.fetchForecast();
             return;
         }
-        const name = root.location.trim();
         if (name === "") {
             root.get("https://ipinfo.io/json", body => {
                 const coordinates = body && body.loc ? String(body.loc).split(",").map(Number) : [];
@@ -197,13 +209,13 @@ Singleton {
             retryTimer.restart();
     }
 
-    // Refreshes a reading older than a quarter hour, as after waking from sleep.
     // Saved to config.ini, which `location` follows.
     function setLocation(location) {
         if (location !== root.location)
             ConfigService.setProperty("Weather", "location", location);
     }
 
+    // Refreshes a reading older than a quarter hour, as after waking from sleep.
     function refreshIfStale() {
         if (root.enabled && Date.now() - root.fetchedAt > 15 * 60 * 1000)
             root.refresh();
@@ -235,6 +247,13 @@ Singleton {
         running: root.enabled
         repeat: true
         onTriggered: root.refresh()
+    }
+
+    // An answer that doesn't come counts as offline.
+    Timer {
+        id: requestTimer
+        interval: 20000
+        onTriggered: if (root.request) root.request.abort()
     }
 
     Timer {

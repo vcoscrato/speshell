@@ -68,13 +68,8 @@ Item {
         preferredRendererType: Shape.CurveRenderer
 
         ShapePath {
-            strokeWidth: 2
-            strokeColor: Qt.rgba(
-                Theme.surface2.r * 0.88 + Theme.overlay.r * 0.12,
-                Theme.surface2.g * 0.88 + Theme.overlay.g * 0.12,
-                Theme.surface2.b * 0.88 + Theme.overlay.b * 0.12,
-                1
-            )
+            strokeWidth: Theme.outlineWidth
+            strokeColor: Theme.surfaceFrame
             fillColor: root.fillColor
             fillItem: material.visible ? materialTexture : null
             joinStyle: ShapePath.MiterJoin
@@ -110,7 +105,7 @@ Item {
         visible: root.edge !== ""
         x: root.edge === "left" ? 0 : root.width - width
         y: inset
-        width: 2
+        width: Theme.outlineWidth
         height: Math.max(0, root.height - inset * 2)
 
         gradient: Gradient {

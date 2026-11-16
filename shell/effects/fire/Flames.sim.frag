@@ -13,7 +13,8 @@ layout(std140, binding = 0) uniform buf {
     float dt;
     float emit;        // 0..1 strength of the simmering rim around the panel
     float frontFuel;   // 0..1 strength of flames along the burn front
-    vec2 resolution;   // screen size in px
+    vec2 offset;       // px, where this item's top left lies in the screen
+    vec2 resolution;   // this item's size in px
     vec4 panel;        // panel rect in px
     float radius;
     vec2 origin;
@@ -27,7 +28,7 @@ layout(binding = 1) uniform sampler2D state;
 
 void main() {
     vec2 uv = qt_TexCoord0;
-    vec2 p = uv * u.resolution;
+    vec2 p = u.offset + uv * u.resolution;
     vec2 c = u.panel.xy + u.panel.zw * 0.5;
 
     vec4 here = texture(state, uv);

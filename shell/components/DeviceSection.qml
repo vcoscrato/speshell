@@ -11,8 +11,9 @@ Item {
     property string status: ""
     property bool statusActive: false
 
-    width: parent ? parent.width : 300
-    implicitHeight: Math.max(22, sectionRow.implicitHeight + Theme.spacingTiny) + Theme.spacingTiny
+    width: parent?.width ?? 0
+    // As tall with the count as without.
+    implicitHeight: Math.max(countPill.implicitHeight, titleLabel.implicitHeight) + Theme.spacingTiny * 2
     height: implicitHeight
 
     Row {
@@ -23,12 +24,14 @@ Item {
         spacing: Theme.spacingSmall
 
         Label {
+            id: titleLabel
             role: "section"
             text: root.title
             anchors.verticalCenter: parent.verticalCenter
         }
 
         Pill {
+            id: countPill
             visible: root.count > 0
             anchors.verticalCenter: parent.verticalCenter
             text: root.count

@@ -7,10 +7,10 @@ import "CalculatorProvider.js" as CalculatorProvider
 import "BangProvider.js" as BangProvider
 import "Shell.js" as Shell
 
-// The launcher's state and results: apps, open windows and apps hidden in the tray, the
-// calculator, bangs, web searches, its own commands (the theme gallery, mirroring,
-// applying and updating the system), and what activating each does. Launch counts order
-// the apps.
+// The launcher's state and results: apps, open windows and apps hidden in the tray,
+// themes, the calculator, bangs, web searches, its own commands (the theme gallery,
+// mirroring, applying and updating the system), and what activating each does. Launch
+// counts order the apps. Results are searched only while it shows.
 Singleton {
     id: root
 
@@ -80,6 +80,27 @@ Singleton {
         })));
     }
 
+    // The themes, as buildExtraIndex() items; one opens the gallery at it.
+    function themeItems() {
+        return ThemeService.themes.map(theme => ({
+            id: "theme:" + theme.id,
+            title: theme.name,
+            detail: "",
+            keywords: "theme " + theme.id + " " + theme.effects,
+            result: {
+                id: "theme:" + theme.id,
+                kind: "theme",
+                title: theme.name,
+                subtitle: theme.id === ThemeService.themeId ? "Theme in use" : theme.description || "Theme",
+                iconName: "palette",
+                iconSource: "",
+                badge: "THEME",
+                activatable: true,
+                payload: { theme: theme.id }
+            }
+        }));
+    }
+
     function close() {
         root.shown = false;
     }
@@ -147,7 +168,7 @@ Singleton {
                 && ThemeService.wallpapers.filter(wallpaper => wallpaper.theme === ThemeService.themeId).length > 1)
             commands.push(BangProvider.commandResult("wallpaper", "Wallpapers", "Pick another wallpaper of " + ThemeService.theme.name,
                 "photo", "background picture image appearance"));
-        if (!FeatureSupport.supportsDisplayControl || !DisplayService.canMirror)
+        if (!HyprlandService.running || !DisplayService.canMirror)
             return commands;
         return commands.concat([DisplayService.mirrored
             ? BangProvider.commandResult("mirror", "Stop mirroring", "Extend the displays again", "display", "display monitor screen")
@@ -155,6 +176,8 @@ Singleton {
     }
 
     function rebuild() {
+        if (!root.shown)
+            return;
         const trimmed = root.query.trim();
         if (trimmed.indexOf("!") === 0) {
             root.results = BangProvider.bangResults(trimmed, root.launcherConfig, root.commandResults());
@@ -173,8 +196,8 @@ Singleton {
         const extras = root.commandResults().map(command => {
             return { id: command.id, title: command.title, keywords: command.bang + " " + command.keywords, result: command };
         });
-        const apps = AppProvider.search(root.appIndex.concat(AppProvider.buildExtraIndex(extras.concat(root.windowItems()))),
-            trimmed, root.usage, 100);
+        const apps = AppProvider.search(root.appIndex.concat(AppProvider.buildExtraIndex(
+            extras.concat(root.windowItems(), root.themeItems()))), trimmed, root.usage, 100);
         root.results = apps.length === 0 && trimmed !== ""
             ? BangProvider.searchResult("?" + trimmed, root.launcherConfig)
             : apps;
@@ -247,6 +270,10 @@ Singleton {
         }
         if (result.kind === "command" && payload.command === "theme") {
             ThemeService.openGallery();
+            return true;
+        }
+        if (result.kind === "theme") {
+            ThemeService.openGallery("themes", payload.theme);
             return true;
         }
         // In a terminal, which stays for the result: `speshell system` asks as pacman and sudo do.
@@ -353,19 +380,26 @@ Singleton {
         root.readUsage();
     }
     onUsageChanged: root.rebuild()
-    // Titles aren't followed as they change, so they are read again for each opening.
-    onShownChanged: if (root.shown) WorkspaceService.refresh()
+    // Searched again for each opening, from the state of things now. Window titles aren't
+    // followed as they change, so they are read again too.
+    onShownChanged: {
+        if (!root.shown)
+            return;
+        WorkspaceService.refresh();
+        root.rebuild();
+    }
 
     Connections {
         target: WindowService
-        function onWindowsChanged() { if (root.shown) root.rebuild(); }
-        function onHiddenAppsChanged() { if (root.shown) root.rebuild(); }
+        function onWindowsChanged() { root.rebuild(); }
+        function onHiddenAppsChanged() { root.rebuild(); }
     }
 
     Connections {
         target: ThemeService
         function onWallpapersChanged() { root.rebuild(); }
         function onThemeIdChanged() { root.rebuild(); }
+        function onThemesChanged() { root.rebuild(); }
     }
 
     Connections {

@@ -14,7 +14,7 @@ Item {
     readonly property real controlNaturalWidth: root.controlItem ? root.controlItem.implicitWidth : 0
     readonly property bool stacked: root.controlNaturalWidth + Theme.spacingMedium > root.width * 0.6
 
-    width: parent ? parent.width : 300
+    width: parent?.width ?? 0
     implicitHeight: root.stacked
         ? labelRow.height + Theme.spacingSmall + controlSlot.height
         : Math.max(Theme.controlHeight, labelRow.height, controlSlot.height)
@@ -45,11 +45,34 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
         }
 
-        InfoTip {
+        // An info icon that shows `info` while hovered.
+        Item {
             id: infoTip
             visible: root.info !== ""
-            text: root.info
             anchors.verticalCenter: parent.verticalCenter
+            implicitWidth: Theme.iconSizeTiny + Theme.spacingTiny * 2
+            implicitHeight: implicitWidth
+
+            Accessible.role: Accessible.StaticText
+            Accessible.name: root.info
+
+            HoverHandler {
+                id: infoHover
+                cursorShape: Qt.WhatsThisCursor
+            }
+
+            AppIcon {
+                anchors.centerIn: parent
+                name: "info"
+                size: Theme.iconSizeTiny
+                iconColor: infoHover.hovered ? Theme.text : Theme.overlay
+            }
+
+            Tooltip {
+                visible: infoHover.hovered
+                delay: 150
+                text: root.info
+            }
         }
     }
 

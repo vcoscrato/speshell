@@ -1,7 +1,9 @@
 """speshell-system's reading of the modules, its edits, and its plan, in a scratch home."""
 
+import contextlib
 import importlib.machinery
 import importlib.util
+import io
 import os
 import tempfile
 import unittest
@@ -30,10 +32,17 @@ class Installed:
 class Machine:
     """pacman's database as the plan reads it."""
 
-    def __init__(self, explicit=(), dependencies=(), needed_by=None):
+    def __init__(self, explicit=(), dependencies=(), needed_by=None, owners=None, cached=()):
         needed_by = needed_by or {}
         self.installed = {name: Installed(needed_by.get(name, ())) for name in [*explicit, *dependencies]}
         self.explicit = set(explicit)
+        self.owners, self.cached = owners or {}, set(cached)
+
+    def owner(self, path):
+        return self.owners.get(path, "")
+
+    def archive(self, name):
+        return f"/var/cache/pacman/pkg/{name}.pkg.tar.zst" if name in self.cached else None
 
 
 def write(path, text):
@@ -83,7 +92,7 @@ class Reading(SystemTest):
             (base.groups, base.linger, base.triggers, base.runs),
             (["docker"], True, [("/etc/x*", "reload x")], ["make it so"]),
         )
-        self.assertEqual(base.files, [("/etc/x.conf", base.dir / "x.conf", "600", 8)])
+        self.assertEqual(base.files, [system.Placed("/etc/x.conf", base.dir / "x.conf", "600", 8, "base")])
 
     def test_file_lines_name_their_file_or_take_the_path_s(self):
         write("base.conf", "file ~/.bashrc\nfile ~/.config/app\nfile /etc/one.conf shared\nfile /etc/two.conf shared\n")
@@ -91,7 +100,7 @@ class Reading(SystemTest):
             write(f"files/base/{name}", name)
         base = system.Config().require().modules["base"]
         self.assertEqual(
-            [(target, str(source.relative_to(base.dir))) for target, source, _, _ in base.files],
+            [(placed.target, str(placed.source.relative_to(base.dir))) for placed in base.files],
             [
                 (str(HOME / ".bashrc"), "bashrc"),
                 (str(HOME / ".config/app/a"), "app/a"),
@@ -134,6 +143,28 @@ class Reading(SystemTest):
         write("desk.conf", "use base\n")
         self.assertEqual(len(system.Config().problems), 1)
 
+    def test_a_comment_starts_after_a_space_outside_quotes(self):
+        for raw, parts in (
+            ("# all of it", ("", "all of it")),
+            ("git  # the one", ("git", "the one")),
+            ("run sed s#a#b#", ("run sed s#a#b#", "")),
+            ('run sed "s #a# b"  # gone', ('run sed "s #a# b"', "gone")),
+            ("run echo '# kept' #gone", ("run echo '# kept'", "gone")),
+        ):
+            self.assertEqual(system.split_comment(raw), parts)
+
+    def test_a_directory_places_what_its_links_lead_to_once(self):
+        write("base.conf", "file ~/.config/app\n")
+        write("shared/b", "b")
+        write("files/base/app/a", "a")
+        (SYSTEM / "files/base/app/shared").symlink_to(SYSTEM / "shared")
+        (SYSTEM / "files/base/app/up").symlink_to(SYSTEM / "files/base/app")
+        base = system.Config().require().modules["base"]
+        self.assertEqual(
+            [placed.target for placed in base.files],
+            [str(HOME / ".config/app/a"), str(HOME / ".config/app/shared/b")],
+        )
+
 
 class Editing(SystemTest):
     def test_add_goes_after_the_last_package(self):
@@ -165,6 +196,42 @@ class Editing(SystemTest):
         self.assertEqual(machine.read_text(), "")
         system.switch("on", ["base"])
         self.assertEqual(machine.read_text(), "use base\n")
+
+    def test_an_edit_keeps_a_linked_module_linked(self):
+        kept = HOME / "dotfiles/base.conf"
+        kept.parent.mkdir()
+        kept.write_text("git\n")
+        (SYSTEM / "base.conf").unlink()
+        (SYSTEM / "base.conf").symlink_to(kept)
+        system.add(["base", "vim"])
+        self.assertTrue((SYSTEM / "base.conf").is_symlink())
+        self.assertEqual(kept.read_text(), "git\nvim\n")
+
+    def test_adopt_takes_the_home_file_into_its_module(self):
+        write("base.conf", "file ~/.bashrc\n")
+        source = write("files/base/bashrc", "theirs")
+        (HOME / ".bashrc").write_text("mine")
+        system.adopt(["~/.bashrc"])
+        self.assertEqual(os.readlink(HOME / ".bashrc"), str(source))
+        self.assertEqual(source.read_text(), "mine")
+
+    def test_restore_links_again_keeping_the_file_it_replaces(self):
+        write("base.conf", "file ~/.bashrc\n")
+        source = write("files/base/bashrc", "theirs")
+        (HOME / ".bashrc").write_text("mine")
+        with contextlib.redirect_stdout(io.StringIO()):
+            system.restore(["~/.bashrc"])
+        self.assertEqual(os.readlink(HOME / ".bashrc"), str(source))
+        self.assertEqual(source.read_text(), "theirs")
+        [kept] = (HOME / ".local/share/speshell/system/replaced").glob("*/.bashrc")
+        self.assertEqual(kept.read_text(), "mine")
+
+    def test_adopt_refuses_a_link(self):
+        write("base.conf", "file ~/.bashrc\n")
+        write("files/base/bashrc", "theirs")
+        (HOME / ".bashrc").symlink_to(SYSTEM / "files/base/bashrc")
+        with self.assertRaises(system.Stop):
+            system.adopt(["~/.bashrc"])
 
     def test_switch_refuses_what_comes_with_another(self):
         write("base.conf", "use extra\n")
@@ -201,8 +268,70 @@ class Planning(SystemTest):
             self.kinds(plan),
             [("link", str(HOME / "new")), ("link", str(HOME / "same")), ("unlink", str(HOME / "left"))],
         )
-        self.assertEqual([step.detail for step in plan.steps[:2]], ["new", "same"])
+        self.assertEqual([step.changes for step in plan.steps[:2]], [True, False])
         self.assertEqual(plan.drift, [("base", str(HOME / "differs"), "changed")])
+
+    def test_a_link_of_yours_stays_and_a_dangling_one_goes(self):
+        write("base.conf", "file ~/mine\nfile ~/dangling\n")
+        write("files/base/mine", "a")
+        write("files/base/dangling", "b")
+        (HOME / "dotfiles").mkdir()
+        (HOME / "dotfiles/mine").write_text("a")
+        (HOME / "mine").symlink_to(HOME / "dotfiles/mine")
+        (HOME / "dangling").symlink_to(HOME / "nowhere")
+        plan = self.plan(Machine())
+        self.assertEqual(self.kinds(plan), [("link", str(HOME / "dangling"))])
+        self.assertEqual(plan.drift, [("base", str(HOME / "mine"), "blocked")])
+
+    def test_a_root_copy_keeps_what_it_first_replaces(self):
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        write("base.conf", "".join(f"file {root}/{name}\n" for name in ("new", "there", "recorded", "same")))
+        for name in ("new", "there", "recorded", "same"):
+            write(f"files/base/{name}", name)
+        (root / "there").write_text("before")
+        (root / "recorded").write_text("before")
+        (root / "same").write_text("same")
+        record = {"module": "base", "kind": "copy", "sha": "", "size": 0, "mtime": 0}
+        plan = self.plan(Machine(), {"files": {str(root / "recorded"): record}})
+        self.assertEqual(
+            [(s.kind, s.subject, s.keep) for s in plan.steps],
+            [
+                ("copy", str(root / "new"), False),
+                ("copy", str(root / "there"), True),
+                ("copy", str(root / "recorded"), False),
+                ("mode", str(root / "same"), True),
+            ],
+        )
+
+    def test_a_root_copy_whose_line_goes_puts_back_what_was_there(self):
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        for name in ("kept", "owned", "uncached", "plain", "older"):
+            (root / name).write_text(name)
+        older = {"module": "base", "kind": "copy", "sha": "", "size": 0, "mtime": 0}
+        record = {**older, "original": False}
+        files = {str(root / name): record for name in ("owned", "uncached", "plain", "gone")}
+        files[str(root / "kept")] = {**record, "original": True}
+        files[str(root / "older")] = older
+        machine = Machine(owners={str(root / "owned"): "one", str(root / "uncached"): "two"}, cached=["one"])
+        plan = self.plan(machine, {"files": files})
+        self.assertEqual(
+            [(s.kind, s.subject) for s in plan.steps],
+            [
+                ("delete", str(root / "plain")),
+                ("restore", str(root / "kept")),
+                ("reinstate", str(root / "owned")),
+                ("forget", str(root / "older")),
+                ("forget", str(root / "uncached")),
+            ],
+        )
+        self.assertTrue(plan.leaves())
+
+    def test_removing_a_package_apply_wouldn_t_remove_is_a_problem(self):
+        write("base.conf", "git\n")
+        machine = Machine(explicit=["git", "loose"], dependencies=["lib"])
+        plan = system.Plan(system.Config().require(), machine, system.load_state(), ["git", "lib", "none", "loose"])
+        self.assertEqual(len(plan.problems), 3)
+        self.assertEqual(self.kinds(plan), [("remove", "loose")])
 
     def test_an_on_line_hears_every_module_once(self):
         write("base.conf", "file ~/conf/a a\non ~/conf/*: reload\n")
@@ -211,7 +340,7 @@ class Planning(SystemTest):
         write("files/desk/b", "b")
         plan = self.plan(Machine())
         self.assertEqual(
-            [(s.kind, s.subject, s.detail) for s in plan.steps if s.kind == "trigger"], [("trigger", "reload", "user")]
+            [(s.kind, s.subject, s.user) for s in plan.steps if s.kind == "trigger"], [("trigger", "reload", True)]
         )
 
     def test_a_file_from_two_modules_is_a_problem(self):

@@ -51,14 +51,26 @@ openconnect_up() {
   exec 3<&-
   kill "$feeder" 2>/dev/null
   [ "$status" -eq 0 ] || exit 1
-  local COOKIE='' HOST='' CONNECT_URL='' FINGERPRINT='' RESOLVE=''
-  # openconnect --authenticate prints shell assignments of these.
-  eval "$login"
+  # openconnect --authenticate prints KEY='value' lines, quoted for a shell; they are
+  # read here, never run.
+  local key value cookie='' host='' url='' fingerprint='' resolve=''
+  while IFS='=' read -r key value; do
+    value=${value#\'}
+    value=${value%\'}
+    value=${value//\'\\\'\'/\'}
+    case "$key" in
+      COOKIE) cookie=$value ;;
+      HOST) host=$value ;;
+      CONNECT_URL) url=$value ;;
+      FINGERPRINT) fingerprint=$value ;;
+      RESOLVE) resolve=$value ;;
+    esac
+  done <<<"$login"
   {
-    printf 'vpn.secrets.cookie:%s\n' "$COOKIE"
-    printf 'vpn.secrets.gateway:%s\n' "${CONNECT_URL:-$HOST}"
-    printf 'vpn.secrets.gwcert:%s\n' "$FINGERPRINT"
-    [ -z "$RESOLVE" ] || printf 'vpn.secrets.resolve:%s\n' "$RESOLVE"
+    printf 'vpn.secrets.cookie:%s\n' "$cookie"
+    printf 'vpn.secrets.gateway:%s\n' "${url:-$host}"
+    printf 'vpn.secrets.gwcert:%s\n' "$fingerprint"
+    [ -z "$resolve" ] || printf 'vpn.secrets.resolve:%s\n' "$resolve"
   } | nmcli connection up uuid "$uuid" passwd-file /dev/stdin
 }
 

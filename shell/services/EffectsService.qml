@@ -15,9 +15,11 @@ Singleton {
     // Effects directory, from the active theme. "" disables effects.
     readonly property string dir: ThemeService.activeEffectsDir
 
-    property var current: null
-    // Other themes' effects by directory; see effectsIn().
-    readonly property var previews: ({})
+    // Effects objects by directory, each loaded once and kept: the active theme's, and
+    // those the theme gallery previews. A transition from the last active ones may still
+    // be playing, such as the launcher's exit after picking a theme.
+    readonly property var loaded: ({})
+    readonly property var current: root.effectsIn(root.dir)
 
     // Power saver turns every moving part off; the still backdrop and clock face stay.
     readonly property bool enabled: PowerService.mode !== "saver"
@@ -81,14 +83,6 @@ Singleton {
         return root.current && root.current[name] || null;
     }
 
-    // A transition from the old effects may still be playing, for example the launcher
-    // exit after picking a theme, so the old effects outlive their replacement briefly.
-    function unload() {
-        if (root.current)
-            root.current.destroy(5000);
-        root.current = null;
-    }
-
     function fail(message) {
         NotificationService.addInternalNotification("effects", "Effects unavailable", message);
     }
@@ -121,23 +115,14 @@ Singleton {
         return effectsObject;
     }
 
-    function load() {
-        root.unload();
-        if (root.dir !== "")
-            root.current = root.create(root.dir);
-    }
-
-    // The effects in `dir`: the active ones, or another theme's, loaded once for the
-    // theme gallery's preview. null for none, or ones that failed.
+    // The effects in `dir`, loaded the first time they are asked for, so a wallpaper change
+    // sees its new effects' transition at once. null for none, or ones that failed.
     function effectsIn(dir) {
-        if (dir === "" || dir === root.dir)
-            return dir === "" ? null : root.current;
+        if (dir === "")
+            return null;
         // Filled in place, so reading it from a binding does not loop.
-        if (!(dir in root.previews))
-            root.previews[dir] = root.create(dir);
-        return root.previews[dir];
+        if (!(dir in root.loaded))
+            root.loaded[dir] = root.create(dir);
+        return root.loaded[dir];
     }
-
-    // Load synchronously so a wallpaper change sees its new effects' transition.
-    onDirChanged: root.load()
 }

@@ -42,12 +42,14 @@ Singleton {
             OsdService.show("airplane", root.airplaneMode ? "Airplane mode on" : "Airplane mode off");
     }
 
-    Process {
-        running: FeatureSupport.supportsAirplaneMode
+    // It starts again when it stops, and lists the radios anew.
+    Watcher {
+        watching: FeatureSupport.supportsAirplaneMode
         // A pipe would hold the events in rfkill's buffer.
         command: ["stdbuf", "-oL", "rfkill", "event"]
         stdout: SplitParser {
             onRead: line => root.readEvent(line)
         }
+        onStarted: root.radios = ({})
     }
 }

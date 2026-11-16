@@ -6,8 +6,8 @@ import Quickshell.Services.Notifications
 import qs.services
 
 // What runs whether or not config.ini is valid: the notification server, so no app's
-// notification is lost, the IPC targets behind the laptop's keys, and one that tells
-// `speshell` whether config.ini is valid. Runtime holds the rest.
+// notification is lost, the IPC targets behind the lock and the laptop's keys, and one
+// that tells `speshell` whether config.ini is valid. Runtime holds the rest.
 Scope {
     id: root
 
@@ -39,18 +39,30 @@ Scope {
         function status(): string { return ConfigService.status; }
     }
 
+    IpcHandler {
+        target: "lock"
+
+        function lock(): void { LockService.lock(); }
+        function get(): string { return LockService.locked ? "locked" : "unlocked"; }
+    }
+
     // For laptop keys: each change shows the OSD. `state` is on, off, or toggle.
     IpcHandler {
         target: "brightness"
 
         function up(): void { BrightnessService.stepFromKey(1); }
         function down(): void { BrightnessService.stepFromKey(-1); }
-        function set(percent: int): void {
+        function set(percent: int): string {
+            if (!BrightnessService.available)
+                return "error: no backlight here";
             BrightnessService.setPercent(percent);
             BrightnessService.commit();
             OsdService.showLevel("brightness");
+            return "";
         }
-        function get(): string { return BrightnessService.available ? String(BrightnessService.percent) : ""; }
+        function get(): string {
+            return BrightnessService.available ? String(BrightnessService.percent) : "error: no backlight here";
+        }
         function keyboard(): void { BrightnessService.cycleKeyboard(); }
     }
 

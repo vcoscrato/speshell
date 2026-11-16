@@ -1,14 +1,13 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
-import Quickshell.Io
 import Quickshell.Wayland
 import qs.components
 import qs.services
 
 // The session lock: every screen covered by the gate, each with a password field
 // (what is typed shows in all), until PAM takes the password. Outside Runtime, so the
-// session still locks while config.ini is invalid. `speshell lock` locks.
+// session still locks while config.ini is invalid.
 Scope {
     id: root
 
@@ -36,7 +35,9 @@ Scope {
 
                 GatePassword {
                     draft: LockService.draft
-                    placeholder: LockService.checking ? "Checking…" : "Password"
+                    phase: LockService.phase
+                    prompt: LockService.prompt
+                    promptVisible: LockService.promptVisible
                     message: LockService.message
                     messageIsError: LockService.messageIsError
                     onDraftEdited: text => LockService.draft = text
@@ -63,12 +64,5 @@ Scope {
             LauncherService.close();
             ThemeService.closeGallery();
         }
-    }
-
-    IpcHandler {
-        target: "lock"
-
-        function lock(): void { LockService.lock(); }
-        function get(): string { return LockService.locked ? "locked" : "unlocked"; }
     }
 }

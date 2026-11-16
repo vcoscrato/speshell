@@ -14,7 +14,7 @@ layout(std140, binding = 0) uniform buf {
     float hourTurn;     // each hand's turns from twelve, clockwise
     float minuteTurn;
     float secondTurn;
-    float seconds;      // 1 shows the bolt
+    float ticking;      // 1 shows the bolt
     float secondIndex;  // the whole second, 0..59, so each bolt takes its own shape
     float time;         // s, for the crackle
     vec4 cAsphalt;
@@ -28,21 +28,6 @@ layout(std140, binding = 0) uniform buf {
     vec4 cEdge;
 } u;
 #include "../common/common.glsl"
-
-const float TAU = 6.2831853;
-
-vec2 at(float turn, float r) {
-    float a = turn * TAU;
-    return vec2(sin(a), -cos(a)) * r;
-}
-
-float turnOf(vec2 p) {
-    return fract(atan(p.x, -p.y) / TAU + 1.0);
-}
-
-vec2 handFrame(vec2 p, float turn) {
-    return rot(p, -turn * TAU) * vec2(1.0, -1.0);
-}
 
 // A needle from a little behind the center out to `len`, `w` wide at its base,
 // tapering to a narrow tip. Negative inside.
@@ -88,7 +73,7 @@ void main() {
     o = over(o, tickCol, cover(-tick));
 
     // ── The bolt: struck from the cap to the second's tick, crackling till the next ──
-    if (u.seconds > 0.5) {
+    if (u.ticking > 0.5) {
         vec2 bq = handFrame(p, u.secondTurn);
         // Along the bolt in x, across it in y.
         vec2 q = vec2(bq.y, bq.x);

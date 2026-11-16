@@ -26,7 +26,7 @@ Row {
         size: root.itemSize
         labelAbove: root.labelAbove
         label: MediaService.playing ? "Pause" : "Play"
-        onClicked: if (root.player) root.player.togglePlaying()
+        onClicked: MediaService.togglePlaying()
 
         AppIcon {
             anchors.centerIn: parent

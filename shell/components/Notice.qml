@@ -16,7 +16,7 @@ Rectangle {
     default property alias content: extra.data
     property alias trailing: trailingRow.data
 
-    width: parent ? parent.width : 0
+    width: parent?.width ?? 0
     implicitHeight: Math.max(noticeText.implicitHeight, trailingRow.height) + Theme.spacingSmall * 2
     radius: Theme.borderRadius
     color: Theme.alpha(root.toneColor, Theme.tintSubtle)

@@ -46,7 +46,9 @@ run rustup default stable
 - `run COMMAND` runs COMMAND once on each machine, and again when the line changes.
 - `#` starts a comment at the start of a line or after a space, outside quotes, as in a shell, so `run sed "s#a#b#"` keeps its `#`.
 
-A file under `~/` is linked, so editing either one edits the module. One under `/` is copied as root, since `/etc` and the login screen can't read your home: mode 644, 755 when the module's file is executable, and 440 under `/etc/sudoers.d`, unless the line gives MODE. A sudoers file visudo rejects never goes in, so a typo can't lock sudo out.
+A file under `~/` is linked, so editing either one edits the module; a link of your own already there, into a dotfiles repository say, is left alone and reported. One under `/` is copied as root, since `/etc` and the login screen can't read your home: mode 644, 755 when the module's file is executable, and 440 under `/etc/sudoers.d`, unless the line gives MODE. A sudoers file visudo rejects never goes in, so a typo can't lock sudo out.
+
+The first copy to a path under `/` that already has a file keeps that file, as root, under `/var/lib/speshell/system/originals/`: outside `/etc`, where a directory such as `/etc/pam.d` would read a copy kept beside the file as one of its own, and root's alone, since the file may be a secret. When the line goes, or its module does, apply puts that original back. A copy that replaced nothing is deleted. A package's file comes back from pacman's cache instead, and when its package isn't there, the file stays as it is, as does a file an apply placed before originals were kept, since nothing says whether it replaced one. The plan says which of these each file gets.
 
 `on` lines hear the files of every module the machine uses, so a module can drop a file into another's directory, a firewall rule into `/etc/nftables.d`, say, and the `on` line that reloads the firewall hears it. Their paths are globs, and their `*` matches across `/` too.
 
@@ -63,7 +65,7 @@ A `run` line is for what no other line can say, since what it does stays when th
 5. Puts you in the modules' groups, starts your services at boot when a module asks, and enables the services that aren't enabled.
 6. Runs the `run` lines this machine hasn't.
 
-One apply or update runs at a time. `update` updates the whole system and then applies. Packages installed but never declared are only reported: declare them, or remove them with `apply --remove PACKAGE`.
+One apply or update runs at a time. `update` updates the whole system and then applies, going on unasked unless the plan takes something away (disables a service, leaves a group, removes or demotes a package, or unlinks, deletes, or puts back a file), which it asks about as apply does. Packages installed but never declared are only reported: declare them, or remove them with `apply --remove PACKAGE`, which stops when a module declares the package or it isn't explicitly installed.
 
 `apply` and `update` ask as pacman, paru, and sudo always do, so they run in a terminal. What the last apply left is in `~/.local/share/speshell/system/state.json`.
 
@@ -81,3 +83,5 @@ speshell system init                            this machine's module, from what
 ```
 
 `--yes` skips the question before applying, and `--hold` waits for Enter before the terminal closes.
+
+A directory a module places takes the files under it through the directories it links to, once each. Every edit to a `.conf` follows its link, so a module kept elsewhere and linked here stays linked.

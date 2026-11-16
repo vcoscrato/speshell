@@ -1,5 +1,5 @@
 #!/bin/sh
-# usage: preview/shot.sh THEME [SHOT...]  (SHOT: a panel id, `launcher`, `themes`, `wallpapers`, `osd`, or `bar`;
+# usage: preview/shot.sh THEME [SHOT...]  (SHOT: a panel id, `launcher`, `themes`, `wallpapers`, `osd`, `toasts`, or `bar`;
 # none: every panel this machine has, the launcher, and the OSD)
 # Renders the real bar offscreen in THEME, with each panel open in turn, into
 # ~/.cache/speshell-preview/shots/THEME/<shot>.png, cropped to the panel, and a contact
@@ -24,11 +24,6 @@ OUT="$PREVIEW_OUT/shots/$THEME"
 rm -rf "$WORK" "$OUT" && mkdir -p "$WORK/tree" "$WORK/config/speshell" "$WORK/data/speshell" "$WORK/bin" "$OUT/full"
 tar -C "$SPESHELL_DIR" -cf - . | tar -C "$WORK/tree" -xf -
 cp "$SCENES/../shot.qml" "$WORK/tree/shot.qml"
-# The bar's window is never mapped, so its dropdowns and effects are told they show.
-for binding in "shown: root.visible" "presented: root.visible"; do
-    grep -q "$binding" "$WORK/tree/bar/Bar.qml" || { echo "shot.sh: Bar.qml no longer has '$binding'" >&2; exit 1; }
-done
-sed -i -e "s/shown: root.visible/shown: true/" -e "s/presented: root.visible/presented: true/" "$WORK/tree/bar/Bar.qml"
 [ -f "$SHOT_CONFIG" ] && cp "$SHOT_CONFIG" "$WORK/config/speshell/config.ini"
 printf '{"theme":"%s"}\n' "$THEME" > "$WORK/data/speshell/theme.json"
 # A theme change sets the desktop's light or dark; keep it from reaching the session.

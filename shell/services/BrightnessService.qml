@@ -18,14 +18,12 @@ Singleton {
     property int percent: root.minimumPercent
 
     property int pendingPercent: root.minimumPercent
-    property bool writeQueued: false
 
     // The keyboard backlight, in the firmware's steps: 0 is off.
     readonly property bool keyboardAvailable: FeatureSupport.supportsKeyboardBacklight
     readonly property string keyboardDevice: FeatureSupport.keyboardBacklightDeviceName
     property int keyboardLevel: 0
     property int keyboardMax: 0
-    property bool keyboardWriteQueued: false
     readonly property int keyboardPercent: root.keyboardMax > 0 ? Math.round(root.keyboardLevel * 100 / root.keyboardMax) : 0
 
     // While idle: the levels to return to, or -1.
@@ -60,11 +58,6 @@ Singleton {
     }
 
     // Moves brightness by one wheel step; direction is positive or negative.
-    // The brightness to dim to on battery, 0 to leave it alone; saved to config.ini.
-    function setBatteryPercent(percent) {
-        return ConfigService.setProperty("Backlight", "batteryPercent", percent);
-    }
-
     function stepPercent(direction) {
         if (direction)
             root.setPercent(root.percent + (direction > 0 ? 5 : -5));
@@ -91,13 +84,7 @@ Singleton {
         if (!root.available)
             return;
         OsdService.quiet("brightness");
-        if (writeProc.running) {
-            root.writeQueued = true;
-            return;
-        }
-        root.writeQueued = false;
-        writeProc.command = ["brightnessctl", "-d", root.device, "set", root.pendingPercent + "%"];
-        writeProc.running = true;
+        writeProc.request();
     }
 
     function updateFromFiles() {
@@ -111,7 +98,7 @@ Singleton {
 
         const pct = Math.max(0, Math.min(100, Math.round((current / max) * 100)));
         root.percent = pct;
-        if (!writeProc.running && !writeDebounce.running)
+        if (!writeProc.running && !writeProc.queued && !writeDebounce.running)
             root.pendingPercent = pct;
         if (OsdService.changed("brightness", pct))
             OsdService.showLevel("brightness");
@@ -122,13 +109,7 @@ Singleton {
             return;
         root.keyboardLevel = Math.max(0, Math.min(root.keyboardMax, Math.round(Number(level) || 0)));
         OsdService.quiet("keyboard");
-        if (keyboardWriteProc.running) {
-            root.keyboardWriteQueued = true;
-            return;
-        }
-        root.keyboardWriteQueued = false;
-        keyboardWriteProc.command = ["brightnessctl", "-d", root.keyboardDevice, "set", String(root.keyboardLevel)];
-        keyboardWriteProc.running = true;
+        keyboardWriteProc.request();
     }
 
     // From a keybinding: the next step, wrapping to off, shown in the OSD.
@@ -147,7 +128,7 @@ Singleton {
         if (isNaN(level) || isNaN(max) || max <= 0)
             return;
         root.keyboardMax = max;
-        if (!keyboardWriteProc.running)
+        if (!keyboardWriteProc.running && !keyboardWriteProc.queued)
             root.keyboardLevel = Math.max(0, Math.min(max, level));
         if (OsdService.changed("keyboard", root.keyboardLevel))
             OsdService.showLevel("keyboard");
@@ -260,27 +241,17 @@ Singleton {
         onLoaded: root.updateKeyboardFromFiles()
     }
 
-    Process {
+    // Each write sets the latest level; the files are read again after the last.
+    QueuedProcess {
         id: writeProc
-        running: false
-        onExited: {
-            if (root.writeQueued) {
-                root.write();
-                return;
-            }
-            root.refresh();
-        }
+        command: ["brightnessctl", "-d", root.device, "set", root.pendingPercent + "%"]
+        onExited: if (!writeProc.queued) root.refresh()
     }
 
-    Process {
+    QueuedProcess {
         id: keyboardWriteProc
-        running: false
-        onExited: {
-            if (root.keyboardWriteQueued)
-                root.setKeyboardLevel(root.keyboardLevel);
-            else
-                keyboardFile.reload();
-        }
+        command: ["brightnessctl", "-d", root.keyboardDevice, "set", String(root.keyboardLevel)]
+        onExited: if (!keyboardWriteProc.queued) keyboardFile.reload()
     }
 
     Timer {

@@ -3,6 +3,7 @@
 #   watch                  stores each copy, printing a line once it is stored
 #   list COUNT             the newest COUNT entries
 #   copy ID                copies entry ID back
+#   delete ID...           deletes the entries ID
 #   thumbnails DIR NAME... keeps DIR to the image entries NAME, each "<id>.<extension>",
 #                          decoding the missing ones, and prints the NAMEs it has
 
@@ -18,6 +19,10 @@ list)
   ;;
 copy)
   cliphist decode "$2" | wl-copy
+  ;;
+delete)
+  shift
+  for id; do printf '%s\t\n' "$id"; done | cliphist delete
   ;;
 thumbnails)
   dir=$2

@@ -7,7 +7,9 @@ import qs.components
 import qs.services
 
 // The window shown instead of the shell while config.ini is invalid: what is wrong,
-// with buttons to open the file, copy a report, retry, or quit.
+// with buttons to open the file, copy a report, retry, or quit. Once the file is open in
+// an editor, it steps behind the windows, so the editor shows over it; saving a fixed file
+// reloads the shell, which takes this window away.
 ModalWindow {
     id: root
 
@@ -16,24 +18,24 @@ ModalWindow {
     targetScreen: HyprlandService.focusedScreen()
     visible: root.active && root.targetScreen !== null
     color: Theme.crust
-    focusGrabActive: root.visible
+    focusTarget: reportArea
 
     WlrLayershell.namespace: "speshell-config-error"
 
-    onVisibleChanged: {
-        if (root.visible)
-            reportArea.forceActiveFocus();
-    }
+    // In front again the next time the configuration breaks.
+    onVisibleChanged: if (!root.visible) root.behind = false
 
     // The palette of the last theme applied, or Cosmos's before any.
     Dialog {
-        width: Math.min(720, parent.width - Theme.spacingXL * 2)
+        width: Math.min(Theme.panelWidth * 2, parent.width - Theme.spacingXL * 2)
         edge: "left"
         edgeColor: Theme.error
         iconName: "alert"
         toneColor: Theme.error
         title: "Configuration invalid"
-        detail: "Speshell is stopped until the configuration is corrected."
+        detail: root.behind
+            ? "Speshell is stopped until the configuration is corrected, and starts again once it is saved."
+            : "Speshell is stopped until the configuration is corrected."
 
         Rectangle {
             width: parent.width
@@ -57,7 +59,7 @@ ModalWindow {
         Rectangle {
             width: parent.width
             // The report, up to half the screen.
-            height: Math.max(160, Math.min(reportArea.implicitHeight + Theme.borderWidth * 2, root.height / 2))
+            height: Math.max(Theme.controlHeight * 5, Math.min(reportArea.implicitHeight + Theme.borderWidth * 2, root.height / 2))
             radius: Theme.borderRadius
             color: Theme.mantle
             border.width: Theme.borderWidth
@@ -101,8 +103,8 @@ ModalWindow {
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
                 width: Math.max(0, parent.width - actionRow.width - Theme.spacingMedium)
-                text: ConfigService.operationMessage
-                color: ConfigService.operationFailed ? Theme.error : Theme.success
+                text: ConfigService.feedback.text
+                color: Theme.toneColor(ConfigService.feedback.tone)
                 elide: Text.ElideRight
             }
 
@@ -120,7 +122,10 @@ ModalWindow {
                 ActionButton {
                     text: "Open config"
                     iconName: "folder-open"
-                    onClicked: ConfigService.openConfig()
+                    onClicked: {
+                        root.behind = true;
+                        ConfigService.openConfig();
+                    }
                 }
 
                 ActionButton {

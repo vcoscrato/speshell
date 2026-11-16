@@ -1,15 +1,19 @@
 import QtQuick
 import QtQuick.Controls as Controls
 import qs.services
+import "Keyboard.js" as Keyboard
 
-// A themed slider: the theme's knob, and the effects that follow the hand on it.
+// A themed slider: the theme's knob, and the effects that follow the hand on it. The
+// wheel and the arrow keys step it by `stepSize` through `stepped`, leaving `value` to
+// whoever binds it.
 Controls.Slider {
     id: root
 
     property color progressColor: Theme.accent
-    property real trackHeight: 8
-    property real handleSize: 18
-    signal wheelAdjusted(real nextValue)
+    property real trackHeight: Theme.spacingSmall
+    property real handleSize: Theme.iconSizeMedium
+    // Scrolled or keyed a step, to `nextValue`.
+    signal stepped(real nextValue)
 
     // Where the knob was when last reported to the theme effects.
     property real reportedKnobX: 0
@@ -17,6 +21,14 @@ Controls.Slider {
     function reportKnob(dx) {
         if (dx !== 0)
             EffectsService.knobMoved(root.handle, dx);
+    }
+
+    function step(direction) {
+        const next = Math.max(root.from, Math.min(root.to, root.value + direction * (root.stepSize > 0 ? root.stepSize : 5)));
+        if (next === root.value)
+            return;
+        root.reportKnob((next - root.value) / (root.to - root.from) * (root.availableWidth - root.handle.width));
+        root.stepped(next);
     }
 
     onPressedChanged: {
@@ -33,7 +45,16 @@ Controls.Slider {
     to: 100
     stepSize: 1
     height: Theme.controlHeight
-    focusPolicy: Qt.ClickFocus
+    focusPolicy: Qt.TabFocus
+
+    // Before the slider's own handling, which would set `value` and break its binding.
+    Keys.onPressed: event => {
+        const direction = Keyboard.arrowStep(event);
+        if (direction !== 0) {
+            event.accepted = true;
+            root.step(direction);
+        }
+    }
 
     MouseArea {
         id: hoverMouse
@@ -42,18 +63,10 @@ Controls.Slider {
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         onPositionChanged: mouse => EffectsService.pointKnob(knob.item, hoverMouse, mouse)
-        onWheel: wheel => {
-            if (wheel.angleDelta.y === 0)
-                return;
-            const step = root.stepSize > 0 ? root.stepSize : 5;
-            const delta = wheel.angleDelta.y > 0 ? step : -step;
-            const newVal = Math.max(root.from, Math.min(root.to, root.value + delta));
-            if (newVal !== root.value) {
-                root.reportKnob((newVal - root.value) / (root.to - root.from) * (root.availableWidth - root.handle.width));
-                root.wheelAdjusted(newVal);
-            }
-            wheel.accepted = true;
-        }
+    }
+
+    WheelSteps {
+        onStepped: direction => root.step(direction)
     }
 
     background: Rectangle {
@@ -62,7 +75,7 @@ Controls.Slider {
         width: root.availableWidth
         height: root.trackHeight
         radius: height / 2
-        color: Theme.alpha(Theme.surface2, 0.5)
+        color: Theme.trackFill
         clip: true
 
         Rectangle {
@@ -72,7 +85,7 @@ Controls.Slider {
             color: root.progressColor
 
             Behavior on width {
-                NumberAnimation { duration: Theme.motion ? 60 : 0; easing.type: Theme.animEasing }
+                NumberAnimation { duration: Theme.animDurationFast; easing.type: Theme.animEasing }
             }
 
             Behavior on color {
@@ -82,13 +95,16 @@ Controls.Slider {
     }
 
     handle: Rectangle {
+        // A touch larger under the hand.
+        readonly property real size: sliderMouse.containsMouse || root.pressed ? root.handleSize + Theme.spacingMicro : root.handleSize
+
         x: root.leftPadding + root.visualPosition * (root.availableWidth - width)
         y: root.topPadding + root.availableHeight / 2 - height / 2
-        width: sliderMouse.containsMouse || root.pressed ? 20 : root.handleSize
-        height: sliderMouse.containsMouse || root.pressed ? 20 : root.handleSize
+        width: size
+        height: size
         radius: height / 2
         color: knob.status === Loader.Ready ? "transparent" : Theme.bg
-        border.width: knob.status === Loader.Ready ? 0 : 2
+        border.width: knob.status === Loader.Ready ? 0 : Theme.outlineWidth
         border.color: Theme.accent
 
         Behavior on width {
@@ -121,6 +137,12 @@ Controls.Slider {
             hoverEnabled: true
             acceptedButtons: Qt.NoButton
             onPositionChanged: mouse => EffectsService.pointKnob(knob.item, sliderMouse, mouse)
+        }
+
+        FocusRing {
+            control: root
+            anchors.margins: -Theme.outlineWidth
+            radius: height / 2
         }
     }
 }

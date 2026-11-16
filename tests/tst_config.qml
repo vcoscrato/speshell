@@ -42,18 +42,6 @@ TestCase {
         ];
     }
 
-    // A laptop's defaults: warnings at 20 and 10%, the brightness left alone on battery,
-    // no night light, and idling, on battery only, that dims, locks, turns the screen
-    // off, and sleeps.
-    function test_laptopDefaults() {
-        const config = Config.defaults();
-        compare(config.battery.lowLevel, 20);
-        compare(config.battery.criticalLevel, 10);
-        compare(config.backlight.batteryPercent, 0);
-        compare([config.nightLight.enabled, config.nightLight.temperature], [false, 4000]);
-        compare([config.idle.dimAfter, config.idle.lockAfter, config.idle.screenOffAfter, config.idle.sleepAfter], [2, 5, 6, 15]);
-    }
-
     function test_idleTakesFractionsAndZero() {
         const result = Config.parseAndValidate("[Idle]\ndimAfter = 0.5\nsleepAfter = 0\n");
         verify(result.ok, messages(result));

@@ -10,7 +10,7 @@ import Quickshell.Bluetooth
 import Quickshell.Services.UPower
 
 // What this machine has for Speshell: a battery, a backlight and a keyboard
-// backlight, Bluetooth, radios, display control, and the commands Speshell runs; and
+// backlight, Bluetooth, radios, and the commands Speshell runs; and
 // the setup problems worth telling the user about.
 Singleton {
     id: root
@@ -55,8 +55,6 @@ Singleton {
     readonly property bool supportsKeyboardBacklight: root.keyboardBacklightDeviceName !== "" && root.brightnessHelperAvailable
     readonly property bool supportsAirplaneMode: root.hasCommand("rfkill")
     readonly property bool supportsBluetooth: Bluetooth.defaultAdapter !== null
-    // Displays are arranged through Hyprland.
-    readonly property bool supportsDisplayControl: HyprlandService.running
     readonly property bool issuesReady: ConfigService.valid
         && root.backlightProbeComplete
         && root.commandsKnown
@@ -88,13 +86,7 @@ Singleton {
 
     // Looks for the wanted commands again, so one installed since shows up.
     function probeCommands() {
-        if (commandProbe.running) {
-            commandProbe.queued = true;
-            return;
-        }
-        commandProbe.looking = root.wantedCommands.join(" ");
-        commandProbe.command = Shell.script("feature.sh", ["commands"].concat(root.wantedCommands));
-        commandProbe.running = true;
+        commandProbe.request();
     }
 
     onWantedCommandsChanged: root.probeCommands()
@@ -115,20 +107,18 @@ Singleton {
         }
     }
 
-    Process {
+    QueuedProcess {
         id: commandProbe
 
+        // The list this run looks for.
         property string looking: ""
-        property bool queued: false
 
+        command: Shell.script("feature.sh", ["commands"].concat(root.wantedCommands))
         stdout: StdioCollector { id: commandOutput }
+        onStarted: commandProbe.looking = root.wantedCommands.join(" ")
         onExited: {
             root.installedCommands = commandOutput.text.split("\n").filter(line => line !== "");
             root.probedCommands = commandProbe.looking;
-            if (commandProbe.queued) {
-                commandProbe.queued = false;
-                root.probeCommands();
-            }
         }
     }
 }

@@ -28,16 +28,16 @@ Singleton {
     property double nowMs: Date.now()
     readonly property bool isScanning: scanProc.running
 
-    // The password prompt, on the row of the network named; the last connection error
-    // and the network it's for.
-    property string passwordRowName: ""
-    property string passwordText: ""
-    property string connectErrorName: ""
-    property string connectError: ""
-    // A saved network connecting through Quickshell, and a new one being joined.
-    property var pendingNetwork: null
-    property string pendingNetworkName: ""
-    readonly property string joiningName: joinProc.running ? joinProc.ssid : ""
+    // What the user is doing with the network `name`, or null: { kind, name, network,
+    // secured, error }. `kind` is "password" (its row asks for one, `error` saying why
+    // when it was rejected), "connect" (the saved `network` connects through
+    // Quickshell), "join" (a new network is being added, `secured` with a password), or
+    // "failed" (`error` says why).
+    property var operation: null
+    readonly property string passwordRowName: root.operationName("password")
+    readonly property string joiningName: root.operationName("join")
+    readonly property string connectErrorName: root.operation && root.operation.error ? root.operation.name : ""
+    readonly property string connectError: root.operation && root.operation.error ? root.operation.error : ""
 
     readonly property bool wifiOn: Networking.wifiEnabled
     readonly property var wifiDevice: root.findWifiDevice()
@@ -55,6 +55,17 @@ Singleton {
     function disconnectWifi() {
         if (root.connectedWifi)
             root.connectedWifi.disconnect();
+    }
+
+    // The network `operation` is about, when it is of `kind`; else "".
+    function operationName(kind) {
+        return root.operation && root.operation.kind === kind ? root.operation.name : "";
+    }
+
+    // Drops a nearby network's saved connection, password and all.
+    function forget(item) {
+        if (item.network)
+            item.network.forget();
     }
 
     function findWifiDevice() {
@@ -140,8 +151,8 @@ Singleton {
 
     // NetworkManager's list as it stands; it never scans.
     function refreshList() {
-        if (root.wifiDevice && root.wifiOn && !listProc.running && !scanProc.running)
-            listProc.running = true;
+        if (root.wifiDevice && root.wifiOn && !scanProc.running)
+            listProc.request();
     }
 
     function scan() {
@@ -248,28 +259,23 @@ Singleton {
             return;
         }
         if (kind === "") {
-            root.cancelPasswordPrompt();
-            root.connectErrorName = item.name;
-            root.connectError = "This network needs settings that Speshell cannot request. Configure it in NetworkManager first.";
+            root.operation = { kind: "failed", name: item.name,
+                error: "This network needs settings that Speshell cannot request. Configure it in NetworkManager first." };
             return;
         }
-        const opening = root.passwordRowName !== item.name;
-        root.cancelPasswordPrompt();
-        if (opening)
-            root.passwordRowName = item.name;
+        root.operation = root.passwordRowName !== item.name ? { kind: "password", name: item.name } : null;
     }
 
     function connectWithPassword(item, psk) {
         const password = String(psk || "");
         const sae = item.network ? item.network.security === WifiSecurityType.Sae : root.joinKind(item.security) === "sae";
         if (item.network && !root.supportsPsk(item.network.security)) {
-            root.connectErrorName = item.name;
-            root.connectError = "Password entry is not supported for this network type.";
+            root.operation = { kind: "password", name: item.name, error: "Password entry is not supported for this network type." };
             return;
         }
         if (password.length < (sae ? 1 : 8)) {
-            root.connectErrorName = item.name;
-            root.connectError = sae ? "Enter the network password." : "Enter a password with at least 8 characters.";
+            root.operation = { kind: "password", name: item.name,
+                error: sae ? "Enter the network password." : "Enter a password with at least 8 characters." };
             return;
         }
         if (item.network)
@@ -278,11 +284,10 @@ Singleton {
             root.join(item.name, root.joinKind(item.security), password);
     }
 
+    // Closes the password prompt, or forgets the last failure.
     function cancelPasswordPrompt() {
-        root.passwordRowName = "";
-        root.passwordText = "";
-        root.connectErrorName = "";
-        root.connectError = "";
+        if (root.operation && (root.operation.kind === "password" || root.operation.kind === "failed"))
+            root.operation = null;
     }
 
     function supportsPsk(security) {
@@ -292,24 +297,19 @@ Singleton {
     }
 
     function beginConnection(network, psk) {
-        root.pendingNetwork = network;
-        root.pendingNetworkName = network.name || "Network";
-        root.connectErrorName = "";
-        root.connectError = "";
+        root.operation = { kind: "connect", name: network.name || "Network", network: network };
         if (psk !== "")
             network.connectWithPsk(psk);
         else
             network.connect();
-        root.passwordText = "";
     }
 
+    // nmcli reads the password from stdin.
     function join(ssid, kind, psk) {
-        if (joinProc.running)
+        if (root.joiningName !== "")
             return;
-        root.cancelPasswordPrompt();
-        joinProc.ssid = ssid;
-        joinProc.secured = psk !== "";
-        joinProc.psk = psk;
+        root.operation = { kind: "join", name: ssid, secured: psk !== "" };
+        joinProc.input = psk !== "" ? psk + "\n" : "";
         joinProc.command = Shell.script("network.sh", ["join", ssid, kind]);
         joinProc.running = true;
     }
@@ -327,12 +327,14 @@ Singleton {
     }
 
     function finishJoin(exitCode, output) {
-        if (exitCode !== 0) {
-            root.connectErrorName = joinProc.ssid;
-            root.connectError = root.joinFailureText(output);
-            if (joinProc.secured)
-                root.passwordRowName = joinProc.ssid;
-        }
+        const joined = root.operation;
+        if (root.joiningName === "")
+            return;
+        if (exitCode !== 0)
+            root.operation = { kind: joined.secured ? "password" : "failed", name: joined.name,
+                error: root.joinFailureText(output) };
+        else
+            root.operation = null;
         root.refreshList();
     }
 
@@ -350,19 +352,17 @@ Singleton {
     }
 
     function handleConnectionFailed(reason) {
-        root.connectErrorName = root.pendingNetworkName;
-        root.connectError = root.connectionFailureText(reason);
-        if (root.pendingNetwork && root.supportsPsk(root.pendingNetwork.security))
-            root.passwordRowName = root.pendingNetworkName;
-        root.pendingNetwork = null;
+        const connecting = root.operation;
+        root.operation = { kind: root.supportsPsk(connecting.network.security) ? "password" : "failed",
+            name: connecting.name, error: root.connectionFailureText(reason) };
     }
 
     onWifiOnChanged: {
         if (!root.wifiOn) {
             root.accessPoints = [];
             root.scannedAtMs = 0;
-            root.pendingNetwork = null;
-            root.cancelPasswordPrompt();
+            if (root.joiningName === "")
+                root.operation = null;
         }
     }
 
@@ -374,21 +374,18 @@ Singleton {
     }
 
     onConnectedWifiChanged: {
-        if (root.connectedWifi !== null && root.pendingNetwork !== null) {
-            root.pendingNetwork = null;
-            root.pendingNetworkName = "";
-            root.cancelPasswordPrompt();
-        }
+        if (root.connectedWifi !== null && root.operationName("connect") !== "")
+            root.operation = null;
     }
 
     Connections {
-        target: root.pendingNetwork
+        target: root.operation && root.operation.kind === "connect" ? root.operation.network : null
         function onConnectionFailed(reason) {
             root.handleConnectionFailed(reason);
         }
     }
 
-    Process {
+    QueuedProcess {
         id: listProc
         command: root.listCommand(false)
         stdout: StdioCollector {
@@ -405,23 +402,10 @@ Singleton {
         }
     }
 
-    Process {
+    QueuedProcess {
         id: joinProc
-        property string ssid: ""
-        property bool secured: false
-        property string psk: ""
-        stdinEnabled: true
         stdout: StdioCollector { id: joinOutput }
-        onStarted: {
-            if (joinProc.secured)
-                joinProc.write(joinProc.psk + "\n");
-            joinProc.psk = "";
-            joinProc.stdinEnabled = false;
-        }
-        onExited: exitCode => {
-            joinProc.stdinEnabled = true;
-            root.finishJoin(exitCode, joinOutput.text);
-        }
+        onExited: exitCode => root.finishJoin(exitCode, joinOutput.text)
     }
 
     Timer {

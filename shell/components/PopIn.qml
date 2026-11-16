@@ -11,7 +11,7 @@ ParallelAnimation {
     // Starts over from the beginning.
     function play() {
         root.card.opacity = 0;
-        root.card.scale = 0.96;
+        root.card.scale = Theme.popScale;
         root.restart();
     }
 
@@ -28,6 +28,6 @@ ParallelAnimation {
         property: "scale"
         to: 1
         duration: Theme.animDuration
-        easing.type: Easing.OutBack
+        easing.type: Theme.animEasingPop
     }
 }

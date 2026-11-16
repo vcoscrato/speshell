@@ -296,6 +296,10 @@ function build(document, errors) {
             searchUrl: urlValue(document, "Launcher", "searchUrl", "https://duckduckgo.com/?q={query}", errors),
             bangs: bangsValue(document, errors)
         },
+        clock: {
+            // "" hides the clock panel's calendar button.
+            calendarUrl: stringValue(document, "Clock", "calendarUrl", "", errors, true)
+        },
         weather: {
             enabled: booleanValue(document, "Weather", "enabled", false, errors),
             location: stringValue(document, "Weather", "location", "", errors, true)

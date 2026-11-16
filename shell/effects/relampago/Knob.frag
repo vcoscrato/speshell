@@ -30,8 +30,6 @@ layout(std140, binding = 0) uniform buf {
 } u;
 #include "../common/common.glsl"
 
-const float TAU = 6.2831853;
-
 // x of the step that starts run k of the decal, px from the track's start.
 float runStart(float k, float P) {
     return (k + 0.35 * (hash(vec2(k, 3.0)) - 0.5)) * P;

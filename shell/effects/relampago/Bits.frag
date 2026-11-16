@@ -26,8 +26,6 @@ layout(std140, binding = 0) uniform buf {
 } u;
 #include "../common/common.glsl"
 
-const float TAU = 6.2831853;
-
 // The outline's width for a particle of radius R.
 float ink(float R) {
     return clamp(R * 0.045, 1.0, 3.5);

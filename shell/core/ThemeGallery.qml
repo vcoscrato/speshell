@@ -1,6 +1,5 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import Quickshell
 import Quickshell.Wayland
 import Quickshell.Widgets
 import qs.components
@@ -23,8 +22,6 @@ ModalWindow {
     // for the wallpaper behind and the desktop to settle, "backdrop" while it fades, and
     // "done".
     property string phase: ""
-    // The interface shows and takes the keyboard.
-    readonly property bool opened: root.phase === "open"
     // Mapped on screen, until both have faded out.
     readonly property bool presenting: root.phase !== ""
     // The wallpaper behind shows, once loaded; it outlives `opened` while an applied
@@ -47,7 +44,6 @@ ModalWindow {
     property real lastMove: 0
     // { theme, wallpaper } to apply once the interface has faded out.
     property var pending: null
-    property real wheelDelta: 0
 
     readonly property string query: filterInput.text.trim().toLowerCase()
     readonly property bool atWallpapers: root.stage === "wallpapers"
@@ -68,18 +64,19 @@ ModalWindow {
         && (!ThemeService.wallpaperEnabled || root.wallpaperPath === ThemeService.wallpaper)
 
     readonly property int margin: Math.round(Math.max(Theme.spacingXL, Math.min(root.width, root.height) * 0.05))
-    readonly property int cardWidth: Math.round(Math.max(168, Math.min(272, (root.width - root.margin * 2) / 7.5)))
+    readonly property int cardWidth: Math.round(Math.max(Theme.panelWidth / 2, Math.min(Theme.panelWidth * 0.8,
+        (root.width - root.margin * 2) / 7.5)))
     readonly property int cardHeight: Math.round(root.cardWidth * 9 / 16)
 
+    // The interface shows and takes the keyboard; click-through while it fades out.
+    opened: root.phase === "open"
+    focusTarget: filterInput
     visible: root.presenting && root.targetScreen !== null
     updatesEnabled: root.visible
 
     WlrLayershell.namespace: "speshell-themes"
-    takesKeyboard: root.visible && root.opened
-    // Click-through while it fades out.
-    mask: root.opened ? null : passThrough
 
-    // Follows ThemeService.galleryShown, starting at the theme in use.
+    // Follows ThemeService.galleryShown, starting at the theme asked for or the one in use.
     function open() {
         PanelService.dismiss();
         LauncherService.close();
@@ -105,12 +102,17 @@ ModalWindow {
         // Once loaded, so it arrives as the desktop under it already looks.
         root.backdropShown = !backdrop.busy;
         root.phase = "open";
+        // Another theme asked for comes in over the desktop as a move to it would.
+        const asked = ThemeService.galleryTheme;
+        if (asked !== "" && asked !== root.selectedId && ThemeProvider.findTheme(ThemeService.themes, asked)) {
+            root.select(asked);
+            root.showSelection();
+        }
     }
 
     // Closing without applying lets the wallpaper behind go with the interface.
     function close() {
         root.phase = "chrome";
-        root.focusGrabActive = false;
         if (root.pending === null)
             root.backdropShown = false;
         fadeTimer.restart();
@@ -228,15 +230,6 @@ ModalWindow {
         root.moved(repeated);
     }
 
-    // A wheel or touchpad steps once per notch's worth of scrolling.
-    function scroll(event) {
-        root.wheelDelta += event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x;
-        while (Math.abs(root.wheelDelta) >= 120) {
-            root.move(root.wheelDelta > 0 ? -1 : 1);
-            root.wheelDelta -= root.wheelDelta > 0 ? 120 : -120;
-        }
-    }
-
     // Another theme at random, and one of its wallpapers; at the wallpapers, another of
     // those.
     function surprise() {
@@ -268,10 +261,6 @@ ModalWindow {
         ThemeService.closeGallery();
     }
 
-    function sentenceCase(text) {
-        return text.charAt(0).toUpperCase() + text.substring(1);
-    }
-
     // The selection, once filtering leaves it out, moves to the first that matches.
     onThemesChanged: {
         // From the list itself: selectedIndex may not have caught up yet.
@@ -290,14 +279,6 @@ ModalWindow {
     }
     onSelectedIndexChanged: if (root.selectedIndex >= 0) dock.positionViewAtIndex(root.selectedIndex, ListView.Contain)
     onWallpaperIndexChanged: if (root.wallpaperIndex >= 0) wallpaperDock.positionViewAtIndex(root.wallpaperIndex, ListView.Contain)
-    onVisibleChanged: {
-        if (root.visible) {
-            focusTimer.restart();
-        } else {
-            focusTimer.stop();
-            root.focusGrabActive = false;
-        }
-    }
 
     Connections {
         target: ThemeService
@@ -341,8 +322,6 @@ ModalWindow {
         }
     }
 
-    Region { id: passThrough }
-
     // Each layer's fade out.
     Timer {
         id: fadeTimer
@@ -360,16 +339,6 @@ ModalWindow {
         onTriggered: root.showSelection()
     }
 
-    Timer {
-        id: focusTimer
-        interval: 60
-        onTriggered: {
-            if (!root.visible || !root.opened)
-                return;
-            filterInput.focusInput();
-            root.focusGrabActive = true;
-        }
-    }
 
     // The clock face hides during a quick run of moves, and swaps faces out of sight.
     NumberAnimation {
@@ -434,9 +403,9 @@ ModalWindow {
             NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasing }
         }
 
-        WheelHandler {
-            target: null
-            onWheel: event => root.scroll(event)
+        WheelSteps {
+            sideways: true
+            onStepped: direction => root.move(-direction)
         }
 
         // Scrims, so the text reads over any wallpaper.
@@ -533,7 +502,7 @@ ModalWindow {
                 Field {
                     id: filterInput
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Math.max(160, contentWidth + padding * 3 + Theme.iconSizeSmall)
+                    width: Math.max(Theme.panelWidth / 2, contentWidth + padding * 3 + Theme.iconSizeSmall)
                     opacity: text !== "" ? 1 : 0
                     iconName: "search"
                     placeholder: root.atWallpapers ? "Filter wallpapers" : "Filter themes"
@@ -581,7 +550,7 @@ ModalWindow {
                 id: info
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.min(Math.round(root.width * 0.42), 680)
+                width: Math.min(Math.round(root.width * 0.42), Theme.panelWidth * 2)
                 spacing: Theme.spacingLarge
 
                 Column {
@@ -607,7 +576,7 @@ ModalWindow {
                         text: {
                             const wallpaper = root.wallpapers[root.wallpaperIndex];
                             if (root.atWallpapers)
-                                return wallpaper ? root.sentenceCase(wallpaper.title) : "";
+                                return wallpaper ? wallpaper.title : "";
                             return root.selected ? root.selected.name : "";
                         }
                         elide: Text.ElideRight
@@ -645,7 +614,8 @@ ModalWindow {
                                 required property color modelData
 
                                 anchors.verticalCenter: parent.verticalCenter
-                                width: index === 0 ? 30 : 20
+                                // The accent half again as large as the hues.
+                                width: index === 0 ? Math.round(Theme.iconSizeMedium * 1.5) : Theme.iconSizeMedium
                                 height: width
                                 radius: width / 2
                                 color: modelData
@@ -662,7 +632,7 @@ ModalWindow {
                     ClippingRectangle {
                         anchors.verticalCenter: parent.verticalCenter
                         width: ramp.width
-                        height: 14
+                        height: Theme.iconSizeSmall
                         radius: height / 2
                         color: "transparent"
                         border.width: Theme.borderWidth
@@ -678,8 +648,8 @@ ModalWindow {
                                 delegate: Rectangle {
                                     required property color modelData
 
-                                    width: 22
-                                    height: 14
+                                    width: Theme.iconSizeMedium + Theme.spacingTiny
+                                    height: Theme.iconSizeSmall
                                     color: modelData
 
                                     Behavior on color {
@@ -702,10 +672,10 @@ ModalWindow {
                         if (theme.effects === "")
                             parts.push("No effects");
                         else if (theme.effects !== theme.id)
-                            parts.push(root.sentenceCase(theme.effects) + " effects");
+                            parts.push(theme.effects.charAt(0).toUpperCase() + theme.effects.substring(1) + " effects");
                         const wallpaper = root.wallpapers[root.wallpaperIndex];
                         if (wallpaper)
-                            parts.push(root.sentenceCase(wallpaper.title));
+                            parts.push(wallpaper.title);
                         if (root.themeWallpapers.length > 1)
                             parts.push(root.themeWallpapers.length + " wallpapers");
                         return parts.join("  ·  ");
@@ -741,7 +711,7 @@ ModalWindow {
 
             ClockFace {
                 id: clock
-                readonly property real side: Math.round(Math.min(root.height * 0.34, root.width * 0.24, 400))
+                readonly property real side: Math.round(Math.min(root.height * 0.34, root.width * 0.24, Theme.panelWidth * 1.2))
 
                 anchors.right: parent.right
                 anchors.rightMargin: Math.round(root.width * 0.06)
@@ -761,7 +731,7 @@ ModalWindow {
         GalleryDock {
             id: dock
             // Room for the selection ring.
-            readonly property int ring: 5
+            readonly property int ring: Theme.spacingTiny + Theme.borderWidth
 
             shown: !root.atWallpapers
             anchors.bottom: hints.top
@@ -812,7 +782,7 @@ ModalWindow {
                 pixelRatio: root.devicePixelRatio
                 colors: Theme
                 image: wallpaperCard.modelData.path
-                title: root.sentenceCase(wallpaperCard.modelData.title)
+                title: wallpaperCard.modelData.title
                 chosen: wallpaperCard.modelData.path === root.wallpaperPath
                 inUse: root.selectedActive && wallpaperCard.modelData.path === ThemeService.wallpaper
                 onPicked: {
@@ -931,7 +901,7 @@ ModalWindow {
             anchors.fill: parent
             radius: Theme.borderRadius + card.ring
             color: "transparent"
-            border.width: 2
+            border.width: Theme.borderWidth * 2
             border.color: card.colors.accent
             opacity: card.chosen ? 1 : 0
 
@@ -996,8 +966,8 @@ ModalWindow {
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
                 anchors.margins: Theme.spacingSmall
-                anchors.bottomMargin: Theme.spacingSmall + 4
-                spacing: 3
+                anchors.bottomMargin: Theme.spacingSmall + Theme.spacingTiny
+                spacing: Theme.spacingMicro
 
                 Repeater {
                     model: card.swatches
@@ -1005,9 +975,9 @@ ModalWindow {
                     delegate: Rectangle {
                         required property color modelData
 
-                        width: 8
-                        height: 8
-                        radius: 4
+                        width: Theme.spacingSmall
+                        height: width
+                        radius: width / 2
                         color: modelData
                     }
                 }
@@ -1017,9 +987,10 @@ ModalWindow {
                 anchors.top: parent.top
                 anchors.right: parent.right
                 anchors.margins: Theme.spacingSmall
-                width: 20
-                height: 20
-                radius: 10
+                // The check, with room around it.
+                width: Theme.iconSizeTiny + Theme.spacingSmall
+                height: width
+                radius: width / 2
                 color: card.colors.accent
                 visible: card.inUse
 

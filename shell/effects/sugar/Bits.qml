@@ -1,4 +1,5 @@
 import QtQuick
+import "common/Colors.js" as Colors
 import "common"
 import "Sugar.js" as Sugar
 
@@ -7,22 +8,12 @@ import "Sugar.js" as Sugar
 Particles {
     id: root
 
-    property var theme: null
+    property var theme: Colors.fallback
 
     readonly property int sparkle: 0
     readonly property int sift: 1        // falls from the item's top over its height
     readonly property int puff: 2
     readonly property int crumb: 3
-
-    function rnd(a, b) {
-        return a + Math.random() * (b - a);
-    }
-
-    // Starts a particle of `kind` (see spawn() in common/Particles.qml for `p`).
-    function emit(kind, p) {
-        p.props = { kind: kind, seed: Math.random() };
-        root.spawn(p);
-    }
 
     delegate: Component {
         ShaderEffect {

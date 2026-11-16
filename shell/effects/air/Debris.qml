@@ -26,12 +26,12 @@ ShaderEffect {
     property real turbulence: 12
     property rect mask
     property real maskRadius: 10
-    property var theme: null
-    property color cLeaf: theme ? theme.accent : "#f0a03c"
-    property color cLeafBack: theme ? Colors.mix(theme.accent, theme.crust, 0.25) : "#c9711f"
-    property color cOutline: theme ? Colors.mix(theme.crust, theme.accent, 0.3) : "#5a3417"
-    property color cDust: theme ? theme.rosewater : "#e9f2fa"
-    property color cGlint: theme ? theme.text : "#f4ead8"
+    property var theme: Colors.fallback
+    property color cLeaf: theme.accent
+    property color cLeafBack: Colors.mix(theme.accent, theme.crust, 0.25)
+    property color cOutline: Colors.mix(theme.crust, theme.accent, 0.3)
+    property color cDust: theme.rosewater
+    property color cGlint: theme.text
     vertexShader: Qt.resolvedUrl("qsb/Debris.vert.qsb")
     fragmentShader: Qt.resolvedUrl("qsb/Debris.qsb")
 }

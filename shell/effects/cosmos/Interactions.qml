@@ -1,6 +1,7 @@
 import QtQuick
 import "common"
 import "common/Colors.js" as Colors
+import "Cosmos.js" as Cosmos
 
 // Cosmos's effects on Speshell's controls. A knob dragged along a slider leaves a
 // trail of star dust that twinkles out, with now and then a glint; let go, a star
@@ -11,37 +12,33 @@ Item {
     id: root
 
     // ── Speshell effects API v1: interactions ───────────────
-    property var theme: null
+    property var theme: Colors.fallback
 
     // Travel not yet paid out in dust and glints, px.
     property real dustOwed: 0
     property real glintOwed: 0
     property real glintEvery: 60
 
-    function rnd(a, b) {
-        return a + Math.random() * (b - a);
-    }
-
     function mote(x, y, vx, vy) {
-        bits.spawn({ x: x, y: y, vx: vx, vy: vy, drag: 2, life: rnd(0.5, 0.9), size: Math.round(rnd(4, 7)),
-                     props: { kind: 0, seed: Math.random(), z: 1 } });
+        bits.emit(0, { x: x, y: y, vx: vx, vy: vy, drag: 2, life: bits.rnd(0.5, 0.9), size: Math.round(bits.rnd(4, 7)),
+                       props: { z: 1 } });
     }
 
     function glint(x, y, size) {
-        bits.spawn({ x: x, y: y, life: 0.4, size: size, props: { kind: 1, seed: Math.random(), z: 2 } });
+        bits.emit(1, { x: x, y: y, life: 0.4, size: size, props: { z: 2 } });
     }
 
     // Stars strung out from (x, y) one by one; `room` px above it to lean into, and
     // `area` (if any) the control to keep off.
     function constellation(x, y, size, life, room, area) {
         const keepOff = area ? Qt.vector4d(area.x - x, area.y - y, area.width, area.height) : Qt.vector4d(0, 0, 0, 0);
-        bits.spawn({ x: x, y: y, life: life, size: size, props: { kind: 2, seed: Math.random(), room: room, keepOff: keepOff, z: 1 } });
+        bits.emit(2, { x: x, y: y, life: life, size: size, props: { room: room, keepOff: keepOff, z: 1 } });
     }
 
     function burst(x, y, count, speed) {
         for (let i = 0; i < count; i++) {
             const a = (i + Math.random() * 0.8) / count * 2 * Math.PI;
-            const v = rnd(0.5, 1) * speed;
+            const v = bits.rnd(0.5, 1) * speed;
             root.mote(x, y, Math.cos(a) * v, Math.sin(a) * v);
         }
     }
@@ -51,13 +48,13 @@ Item {
         root.dustOwed = Math.min(root.dustOwed + Math.abs(dx), 30);
         while (root.dustOwed >= 5) {
             root.dustOwed -= 5;
-            root.mote(at.x + back * rnd(2, 8), at.y + rnd(-7, 7), back * rnd(5, 35), rnd(-20, 20));
+            root.mote(at.x + back * bits.rnd(2, 8), at.y + bits.rnd(-7, 7), back * bits.rnd(5, 35), bits.rnd(-20, 20));
         }
         root.glintOwed += Math.abs(dx);
         if (root.glintOwed >= root.glintEvery) {
             root.glintOwed = 0;
-            root.glintEvery = rnd(40, 90);
-            root.glint(at.x + back * rnd(6, 14), at.y + rnd(-8, 8), Math.round(rnd(14, 20)));
+            root.glintEvery = bits.rnd(40, 90);
+            root.glint(at.x + back * bits.rnd(6, 14), at.y + bits.rnd(-8, 8), Math.round(bits.rnd(14, 20)));
         }
     }
 
@@ -91,10 +88,10 @@ Item {
                 property real seed: 0
                 property real kind: 0
                 property real size: width
-                property color cStar: root.theme ? root.theme.text : "#ebdbb2"
-                property color cHot: root.theme ? Qt.lighter(Colors.mix(root.theme.text, root.theme.yellow, 0.15), 1.2) : "#fbf1c7"
-                property color cGlow: root.theme ? root.theme.accent : "#fe8019"
-                property color cHaze: root.theme ? root.theme.pink : "#d3869b"
+                property color cStar: root.theme.text
+                property color cHot: Cosmos.hot(root.theme)
+                property color cGlow: root.theme.accent
+                property color cHaze: root.theme.pink
                 property real room: 10000
                 property vector4d keepOff: Qt.vector4d(0, 0, 0, 0)
                 fragmentShader: Qt.resolvedUrl("qsb/Interactions.qsb")

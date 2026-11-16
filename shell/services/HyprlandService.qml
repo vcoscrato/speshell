@@ -52,6 +52,23 @@ Singleton {
             Quickshell.execDetached(["hyprctl", "--batch", dispatchers.map(line => "dispatch " + line).join(" ; ")]);
     }
 
+    // Runs hyprctl with `args`.
+    function hyprctl(args) {
+        if (root.running)
+            Quickshell.execDetached(["hyprctl"].concat(args));
+    }
+
+    // The hyprctl arguments that change a setting at runtime, written for each config
+    // syntax: `lua` evaluated under a Lua config, else `keyword` set to `value`.
+    function configArgs(lua, keyword, value) {
+        return root.usingLua ? ["eval", lua] : ["keyword", keyword, String(value)];
+    }
+
+    // Changes a setting at runtime, as configArgs() writes it.
+    function configure(lua, keyword, value) {
+        root.hyprctl(root.configArgs(lua, keyword, value));
+    }
+
     // Has Quickshell's monitor model follow a change Hyprland made.
     function refreshMonitors() {
         if (root.running)
@@ -60,8 +77,7 @@ Singleton {
 
     // Switches every keyboard to the layout at `index` of keyboardLayoutList.
     function switchKeyboardLayout(index) {
-        if (root.running)
-            Quickshell.execDetached(["hyprctl", "switchxkblayout", "all", String(index)]);
+        root.hyprctl(["switchxkblayout", "all", String(index)]);
     }
 
     // A Lua string literal, for Lua dispatchers and `hyprctl eval`.

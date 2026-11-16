@@ -229,8 +229,18 @@ awk -v gpu="$GPU" -v heat="$heat" -v runs="$RUNS" -v ref="$REF" -v budget="$BUDG
     }' "$WORK/results"
 
 if [ -n "$MARKDOWN" ]; then
-    awk -v phases="$PHASES" '
-        function name(e) { return e == "relampago" ? "Relâmpago" : toupper(substr(e, 1, 1)) substr(e, 2) }
+    awk -v phases="$PHASES" -v themes="$ROOT/shell/themes" '
+        # The name of the theme the effects share their name with, from its theme.ini.
+        function name(e,   ini, line, n) {
+            ini = themes "/" e "/theme.ini"
+            while ((getline line < ini) > 0)
+                if (n == "" && line ~ /^[ \t]*name[ \t]*=/) {
+                    sub(/^[^=]*=[ \t]*/, "", line)
+                    n = line
+                }
+            close(ini)
+            return n != "" ? n : toupper(substr(e, 1, 1)) substr(e, 2)
+        }
         function head(p) {
             return p == "open" ? "Launcher open" : p == "motion" ? "Launcher entrance and exit" \
                 : p == "wallpaper" ? "Wallpaper" : p == "controls" ? "Controls" : "Clock face"

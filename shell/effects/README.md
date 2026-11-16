@@ -15,12 +15,12 @@ Every effect here has these files; a part that draws with a shader another part 
 ├── Clock.qml/.frag               the clock panel's face
 ├── <Part>.qml/.frag              pieces the transitions use (Flames, Wind, Whip, ...)
 ├── <Name>.glsl                   GLSL the shaders of one part share: uniforms, placement, constants
-├── <Name>.js                     color recipes several parts share (Flame, Water, Stone, Bolt)
-├── common -> ../common           symlink that gives QML `import "common"` (EffectClock, ClockTime, Particles) and `common/Colors.js`
+├── <Name>.js                     color recipes several parts share (Cosmos, Flame, Water, Stone, Bolt, Sugar)
+├── common -> ../common           symlink that gives QML `import "common"` (the types below) and `common/Colors.js`
 └── qsb/                          git-ignored: `just shaders` compiles each `<Name>.frag` to `qsb/<Name>.qsb`, and each `<Name>.vert` to `qsb/<Name>.vert.qsb`
 ```
 
-A QML file that draws more than one shader names the others `<Qml>.<piece>.frag` (`LauncherTransition.ground.frag`); a shader several parts share is named for what it draws (`Portal.frag`, `Burn.frag`). Shaders include the shared library by relative path: `#include "../common/common.glsl"`. A part loads its shader as `Qt.resolvedUrl("qsb/<Name>.qsb")`. A vertex shader defines `VERTEX_SHADER` before its includes, which leaves out the helpers that need derivatives (`band`, `cover`).
+A QML file that draws more than one shader names the others `<Qml>.<piece>.frag` (`LauncherTransition.ground.frag`); a shader several parts share is named for what it draws (`Portal.frag`, `Burn.frag`). Shaders include the shared library by relative path: `#include "../common/common.glsl"`, which defines `PI` and `TAU`, noise, distances, and a clock face's angles (`at`, `turnOf`, `handFrame`). A part loads its shader as `Qt.resolvedUrl("qsb/<Name>.qsb")`. A vertex shader defines `VERTEX_SHADER` before its includes, which leaves out the helpers that need derivatives (`band`, `cover`).
 
 Speshell must run smoothly on an integrated GPU, so a shader that fills the screen must not loop over every piece of the effect for every pixel. Work that does not depend on the pixel goes where it runs once:
 
@@ -48,7 +48,13 @@ QtObject {
 }
 ```
 
-**Colors.** Every part receives `theme`, the active palette as `Theme.qml` names it (`bg`, `crust`, `text`, `accent`, `peach`, `sky`, ...). Any theme may use any effects, so take every color from it, picking slots by meaning: fire from the warm colors, water from the blues, stone from the neutrals. Blend with `mix` and `alpha` from `common/Colors.js`, brighten with `Qt.lighter` where light burns brighter than any theme color (a flame's core, foam), and take a glint or sheen from `text`, the lightest color, never pure white. `theme` is null for a moment after creation, so each color falls back to a literal until it arrives: `root.theme ? root.theme.accent : "#fe8019"`.
+**Colors.** Every part receives `theme`, the active palette as `Theme.qml` names it (`bg`, `crust`, `text`, `accent`, `peach`, `sky`, ...). Any theme may use any effects, so take every color from it, picking slots by meaning: fire from the warm colors, water from the blues, stone from the neutrals. Blend with `mix` and `alpha` from `common/Colors.js`, brighten with `Qt.lighter` where light burns brighter than any theme color (a flame's core, foam), and take a glint or sheen from `text`, the lightest color, never pure white. Speshell sets `theme` just after creating a part, before it draws; declare it as `property var theme: Colors.fallback`, Cosmos's palette by the same names, so colors read from it from the start. The stages below declare it already.
+
+**Stages.** Three types in `common/` carry what parts of a kind share, so a part declares only its own:
+
+- `LauncherStage`: the launcher transition's API, an `EffectClock` as `clock`, the panel captured as `panelTexture` while `capturing` (by default while it comes and goes), and the usual timing. While `active`, `enter` runs 0..1 over `enterTime`, once a reopen mid-exit has run `leave` back to 0; once not, `leave` runs 0..1 over `exitTime`, and `tailTime` after it ends, and while nothing is `lingering`, it emits `closingFinished()`. `advanced(dt)` follows each step, for the part's own.
+- `WallpaperStage`: the wallpaper transition's API, `clock`, the old wallpaper captured once as `outgoingTexture`, and `finished()` once `clock.clock` reaches `duration`; progress is a binding on `clock.clock`.
+- `Face`: a clock face drawn by one shader, which gets the time as uniforms: `area`, its size; `hourTurn`, `minuteTurn`, and `secondTurn`, from `ClockTime`; `ticking`, 1 while the second hand runs; `sinceTick`; and `time`. A face sets its colors and `fragmentShader`.
 
 **Launcher transition.** Created when the launcher opens and destroyed after it hides. It fills the launcher's full-screen surface above the panel and receives:
 
@@ -56,6 +62,7 @@ QtObject {
 |---|---|
 | `panel` | The launcher panel. Capture it with a `ShaderEffectSource` (`hideSource: true`) to draw it yourself. |
 | `panelRect` | The panel's geometry. It changes as the result list grows or shrinks. |
+| `panelRadius` | The panel's corner radius. |
 | `active` | `false` once the launcher closes; `true` again if it reopens during the exit. |
 | `theme` | The active palette. |
 
@@ -82,7 +89,7 @@ Emit `finished()` when done; Speshell removes it after 5 s otherwise. Without a 
 | `pick(rect area, point at)` | The user picked something: an audio device (its radio dot), a segment, a menu choice, a theme, a workspace, a bar button. `at` is where the pointer clicked, which may lie outside `area` (a device row clicked on its name picks its radio dot), or the middle of `area` for a keyboard pick or a menu choice; start the effect there, since a wide control's middle can be far from the pointer. |
 | `toggle(rect area, bool on)` | The user turned a switch on or off; its thumb ends at the right end of `area` when on and the left when off. |
 
-Keep each effect brief (under a second) and small around the control; the panel stays usable under it. Draw nothing and run nothing while idle: `common/Particles.qml` is a pool of short-lived particles whose clock runs only while one lives. Its clock follows `[Appearance] controlEffectsSpeed`, and with that at 0 Speshell does not create interactions.
+Keep each effect brief (under a second) and small around the control; the panel stays usable under it. Draw nothing and run nothing while idle: `common/Particles.qml` is a pool of short-lived particles whose clock runs only while one lives; `emit(kind, p)` starts one of a kind with a random `seed`, and `rnd(a, b)` picks a number for it. Its clock follows `[Appearance] controlEffectsSpeed`, and with that at 0 Speshell does not create interactions.
 
 **Knob.** The thumb of Speshell's sliders and switches, filling the thumb's square; it may draw outside it. It receives `theme`, `pressed`, `hovered`, `checked` (a switch's state; always `true` on a slider), and `travel`, the thumb's position along its track in px, which moves only under the user's hand: roll or spin it by that. A knob that declares `property point pointer` is also told where the pointer is while it moves over the control, in the knob's own coordinates. A knob that declares `property rect switchArea` is told, on a switch, the whole switch in its own coordinates, so it can draw the switch's body as well as its thumb; it stays empty on a slider. Like the backdrop, it stays with transitions off, so animate it only while held or hovered.
 

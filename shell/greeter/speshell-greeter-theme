@@ -9,7 +9,12 @@ home=$(getent passwd "$user" | cut -d: -f6)
 cd /
 as_user() { setpriv --reuid="$user" --regid="$(id -g "$user")" --init-groups -- "$@"; }
 
-state=$(as_user cat -- "$home/.local/share/speshell/theme.json")
+# Like the wallpaper below: a regular file, read no further than 1 MiB and for no longer
+# than ten seconds.
+theme_file=$home/.local/share/speshell/theme.json
+as_user test -f "$theme_file" || { echo "speshell-greeter-theme: no $theme_file" >&2; exit 1; }
+state=$(timeout 10 setpriv --reuid="$user" --regid="$(id -g "$user")" --init-groups -- \
+    head -c $((1024 * 1024)) -- "$theme_file")
 out=/var/lib/speshell/theme/$user
 install -d -m 0755 "$out"
 tmp=$(mktemp -d "$out/.next.XXXXXX")

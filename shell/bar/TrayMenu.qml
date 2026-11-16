@@ -1,7 +1,9 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import QtQuick.Templates as T
 import Quickshell
 import qs.components
+import qs.services
 
 // A tray item's menu, from its `menu` handle, as a PopupMenu. The app's entries load
 // only while the menu shows; submenus cascade and load when they open.
@@ -37,9 +39,21 @@ PopupMenu {
         }
     }
 
+    // A rule between groups of entries.
     Component {
         id: separatorComponent
-        PopupMenuSeparator {}
+
+        T.MenuSeparator {
+            implicitWidth: implicitContentWidth + leftPadding + rightPadding
+            implicitHeight: implicitContentHeight + topPadding + bottomPadding
+            horizontalPadding: Theme.spacingSmall
+            verticalPadding: Theme.spacingTiny
+
+            contentItem: Rectangle {
+                implicitHeight: Theme.separatorThickness
+                color: Theme.separator
+            }
+        }
     }
 
     Instantiator {

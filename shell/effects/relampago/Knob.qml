@@ -11,7 +11,7 @@ Item {
     id: root
 
     // ── Speshell effects API v1: knob ───────────────────────
-    property var theme: null
+    property var theme: Colors.fallback
     property bool pressed: false
     property bool hovered: false
     property bool checked: true
@@ -50,7 +50,7 @@ Item {
         property real dim: root.checked ? 0 : 1
         property real time: crackle.item ? crackle.item.clock : 0
         property color cTire: Bolt.rubber(root.theme)
-        property color cWall: root.theme ? Colors.mix(root.theme.crust, root.theme.text, 0.22) : "#3a3638"
+        property color cWall: Colors.mix(root.theme.crust, root.theme.text, 0.22)
         property color cGold: Bolt.glow(root.theme)
         property color cPaint: Bolt.paint(root.theme)
         property color cCore: Bolt.core(root.theme)

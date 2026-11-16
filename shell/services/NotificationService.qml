@@ -108,7 +108,7 @@ Singleton {
     // The desktop entry of the app that sent `notification`, a toast or a history
     // entry; none for Speshell's own notices.
     function entryOf(notification) {
-        if (String(notification.id).indexOf("internal:") === 0)
+        if (root.isInternal(notification))
             return null;
         return WindowService.entryFor(notification.desktopEntry) ?? WindowService.entryFor(notification.appName);
     }

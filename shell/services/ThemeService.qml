@@ -37,8 +37,8 @@ Singleton {
     // "loading" theme.json, "waiting" for the scan and config.ini, or "launched" once
     // the selection is checked and the launch's shuffle picked.
     property string phase: "loading"
-    property bool saving: false
-    property bool saveQueued: false
+    // theme.json's write: "idle", "saving", or "queued" when another save follows it.
+    property string savePhase: "idle"
     property string reported: ""
 
     property string themeId: ThemeProvider.defaultTheme
@@ -62,6 +62,8 @@ Singleton {
     // whose colors the shell wears meanwhile. Its effects stay the active theme's.
     property bool galleryShown: false
     property string galleryStart: "themes"
+    // The theme the gallery opens at, "" for the one in use.
+    property string galleryTheme: ""
     property string previewId: ""
     readonly property var previewTheme: root.previewId !== "" ? ThemeProvider.findTheme(root.themes, root.previewId) : null
     readonly property var shownColors: root.previewTheme ? root.previewTheme.colors : root.colors
@@ -78,8 +80,9 @@ Singleton {
     // wallpaper tools keep working; themes still set colors and effects.
     readonly property bool wallpaperEnabled: ConfigService.settings.appearance.drawWallpaper
     // [Appearance] shuffleAtLaunch: off, wallpaper, theme, or both, picked at
-    // random once the themes are known; "" until config.ini loads, which may ask for one.
-    readonly property string launchShuffle: ConfigService.config ? ConfigService.config.appearance.shuffleAtLaunch : ""
+    // random once the themes are known and config.ini, which may ask for one, is read.
+    readonly property bool configRead: ConfigService.status === "valid" || ConfigService.status === "invalid"
+    readonly property string launchShuffle: ConfigService.settings.appearance.shuffleAtLaunch
     // The wallpaper to draw: held back until the launch pick, so startup does not
     // show the saved one only to replace it.
     readonly property string shownWallpaper: root.phase === "launched" ? root.wallpaper : ""
@@ -93,10 +96,12 @@ Singleton {
         : null
 
     // Rescans on opening, so new themes and wallpapers show up. `start`: the step
-    // it opens on, "themes" by default.
-    function openGallery(start) {
+    // it opens on, "themes" by default; `themeId`: the theme it opens at, as the
+    // launcher's theme results ask, else the one in use.
+    function openGallery(start, themeId) {
         if (!root.galleryShown)
             root.scan();
+        root.galleryTheme = themeId || "";
         root.galleryStart = start || "themes";
         root.galleryShown = true;
     }
@@ -169,24 +174,23 @@ Singleton {
         if (root.statePath === "")
             return;
         // FileView drops a write that starts while another is in flight, so queue it.
-        if (root.saving) {
-            root.saveQueued = true;
+        if (root.savePhase !== "idle") {
+            root.savePhase = "queued";
             return;
         }
         const theme = root.theme;
         root.snapshot = { id: theme.id, name: theme.name, effects: theme.effects, effectsDir: theme.effectsDir,
                           colors: theme.colors, errors: [] };
-        root.saving = true;
+        root.savePhase = "saving";
         stateFile.setText(JSON.stringify({ theme: root.themeId, wallpaper: root.wallpaper, wallpapers: root.chosen,
                                            snapshot: root.snapshot }));
     }
 
     function finishSave() {
-        root.saving = false;
-        if (root.saveQueued) {
-            root.saveQueued = false;
+        const queued = root.savePhase === "queued";
+        root.savePhase = "idle";
+        if (queued)
             root.save();
-        }
     }
 
     function finishStateLoad(text) {
@@ -230,7 +234,7 @@ Singleton {
     }
 
     function reconcile() {
-        if (root.scannedDirs !== root.scanDirs || root.phase === "loading" || root.launchShuffle === "")
+        if (root.scannedDirs !== root.scanDirs || root.phase === "loading" || !root.configRead)
             return;
         const before = root.themeId + "\n" + root.wallpaper;
         const chosenBefore = root.chosen;
@@ -340,7 +344,7 @@ Singleton {
 
     onThemeIdChanged: root.report()
     onAppPaletteChanged: root.exportPalette()
-    onLaunchShuffleChanged: root.reconcile()
+    onConfigReadChanged: root.reconcile()
     onThemesDirChanged: root.scan()
     onUserEffectsDirChanged: root.scan()
     // The folder may already be known when the service is first used.

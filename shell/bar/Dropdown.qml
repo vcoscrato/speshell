@@ -2,12 +2,12 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Templates as T
 import qs.components
-import qs.panels
 import qs.services
 
 // One panel under the bar button that opened it, or over it on a bottom bar, kept on
 // screen. The panel sets its own width (a Card is Theme.panelWidth wide) and scrolls
-// when it is taller than the screen allows.
+// when it is taller than the screen allows. Tab walks the panel's controls, then the
+// bar's buttons; Escape closes it.
 Item {
     id: root
 
@@ -15,11 +15,9 @@ Item {
     // the top.
     property rect barRect: Qt.rect(0, 0, 0, 0)
     property bool atTop: true
-    // The window shows.
-    property bool shown: true
-    // The panel shown, by PanelService id; "" while closed.
+    // The panel shown, by PanelService id, "" while closed, and the button it hangs
+    // from, null to center it on the bar; both set through show().
     property string panel: ""
-    // The button it hangs from; null centers it on the bar.
     property Item button: null
     // Untyped, for the properties only some panels have.
     readonly property var panelItem: panelLoader.item
@@ -42,23 +40,64 @@ Item {
             : root.barRect.y)
         - Theme.spacingSmall * 2
 
-    readonly property var components: ({
-        audio: audioPanel,
-        battery: batteryPanel,
-        bluetooth: bluetoothPanel,
-        clipboard: clipboardPanel,
-        clock: clockPanel,
-        display: displayPanel,
-        media: mediaPanel,
-        microphone: microphonePanel,
-        network: networkPanel,
-        notes: notesPanel,
-        notifications: notificationsPanel,
-        power: powerPanel,
-        timer: timerPanel,
-        tools: toolsPanel,
-        weather: weatherPanel
-    })
+    // Shows `panel` from `button`, or closes with "". Opening fades and slides the
+    // dropdown in; switching panels swaps the content at once, in the surface's new
+    // place and size, and fades it in.
+    function show(panel, button) {
+        if (panel === root.panel && button === root.button)
+            return;
+        const opening = root.panel === "";
+        root.followsContent = false;
+        resize.complete();
+        root.button = button;
+        root.panel = panel;
+        // Cleared first, so another timer's panel loads anew.
+        panelLoader.source = "";
+        if (panel !== "") {
+            panelLoader.setSource(Qt.resolvedUrl("../panels/" + root.fileFor(panel) + ".qml"), root.propertiesFor(panel));
+            flickable.contentY = 0;
+            // Tab starts at the panel again.
+            focusScope.forceActiveFocus();
+            if (opening)
+                entrance.restart();
+            else
+                swap.restart();
+        }
+        Qt.callLater(() => root.followsContent = true);
+    }
+
+    // The speaker and the microphone share a panel.
+    function fileFor(panel) {
+        const name = panel === "microphone" ? "audio" : panel;
+        return name.charAt(0).toUpperCase() + name.slice(1) + "Panel";
+    }
+
+    // What a panel takes beyond its file: the microphone's side of the audio panel, and
+    // the timer of the chip it hangs from.
+    function propertiesFor(panel) {
+        if (panel === "audio" || panel === "microphone")
+            return { output: panel === "audio" };
+        if (panel === "timer")
+            return { timer: (root.button as TimerChip)?.timer ?? null };
+        return {};
+    }
+
+    // Moves the keyboard to the next control, or the one before.
+    function tab(forward) {
+        const from = root.Window.activeFocusItem ?? focusScope;
+        const next = from.nextItemInFocusChain(forward);
+        if (next)
+            next.forceActiveFocus(forward ? Qt.TabFocusReason : Qt.BacktabFocusReason);
+    }
+
+    // Whether `item` is part of the panel.
+    function holds(item) {
+        for (let parentItem = item; parentItem; parentItem = parentItem.parent) {
+            if (parentItem === panelLoader)
+                return true;
+        }
+        return false;
+    }
 
     visible: root.panel !== ""
     x: Math.round(Math.max(Theme.spacingSmall,
@@ -68,7 +107,6 @@ Item {
         : root.barRect.y - Theme.spacingSmall - root.height
     width: panelLoader.width + root.padding * 2
     height: Math.min(root.maxHeight, panelLoader.height + root.padding * 2)
-    opacity: 0
 
     // Follows its panel's content as it grows and shrinks. A panel arriving takes its
     // size at once, whichever of it and this handler sees the change first.
@@ -81,15 +119,6 @@ Item {
             duration: Theme.animDuration
             easing.type: Theme.animEasing
         }
-    }
-
-    // Each panel enters, whether the dropdown opens with it or switches to it.
-    onPanelChanged: {
-        root.followsContent = false;
-        resize.complete();
-        if (root.panel !== "")
-            entrance.restart();
-        Qt.callLater(() => root.followsContent = true);
     }
 
     ParallelAnimation {
@@ -112,6 +141,15 @@ Item {
         }
     }
 
+    NumberAnimation {
+        id: swap
+        target: flickable
+        property: "opacity"
+        from: 0
+        to: 1
+        duration: Theme.animDurationFast
+    }
+
     transform: Translate { id: slide }
 
     // Keeps clicks from reaching the bar's closing area behind.
@@ -119,22 +157,26 @@ Item {
         anchors.fill: parent
     }
 
-    // Rounded on the corners away from the bar.
+    // A spacing off the bar, so rounded all round, as a surface away from the
+    // screen's edges is.
     Surface {
         anchors.fill: parent
         backdrop: true
-        roundTopLeft: !root.atTop
-        roundTopRight: !root.atTop
-        roundBottomLeft: root.atTop
-        roundBottomRight: root.atTop
+        rounded: true
     }
 
     FocusScope {
+        id: focusScope
+
         anchors.fill: parent
         anchors.margins: root.padding
         focus: root.visible
 
         Keys.onEscapePressed: root.closeRequested()
+        // From the start of the panel, or from a control Tab doesn't stop at, into the
+        // panel's controls rather than back to the bar's.
+        Keys.onTabPressed: root.tab(true)
+        Keys.onBacktabPressed: root.tab(false)
 
         Flickable {
             id: flickable
@@ -159,100 +201,35 @@ Item {
 
             Loader {
                 id: panelLoader
-
                 width: root.panelItem ? root.panelItem.implicitWidth : 0
-                active: root.panel !== ""
-                sourceComponent: root.components[root.panel] ?? null
-
-                onLoaded: {
-                    flickable.contentY = 0;
-                    if ("presented" in root.panelItem)
-                        root.panelItem.presented = Qt.binding(() => root.visible && root.shown);
-                }
             }
         }
     }
 
-    Component {
-        id: audioPanel
-        AudioPanel {
-            output: true
+    // A timer's panel closes the dropdown once it's set.
+    Connections {
+        target: root.panelItem
+        ignoreUnknownSignals: true
+
+        function onDone() {
+            root.closeRequested();
         }
     }
 
-    Component {
-        id: microphonePanel
-        AudioPanel {
-            output: false
+    // Scrolls the panel to the control the keyboard moves to.
+    Connections {
+        target: root.Window.window
+        enabled: root.visible && flickable.scrolls
+
+        function onActiveFocusItemChanged() {
+            const item = root.Window.activeFocusItem;
+            if (!item || item === focusScope || !root.holds(item))
+                return;
+            const area = item.mapToItem(flickable.contentItem, 0, 0, item.width, item.height);
+            if (area.y < flickable.contentY)
+                flickable.contentY = Math.max(0, area.y);
+            else if (area.y + area.height > flickable.contentY + flickable.height)
+                flickable.contentY = Math.min(flickable.contentHeight - flickable.height, area.y + area.height - flickable.height);
         }
-    }
-
-    Component {
-        id: batteryPanel
-        BatteryPanel {}
-    }
-
-    Component {
-        id: bluetoothPanel
-        BluetoothPanel {}
-    }
-
-    Component {
-        id: clipboardPanel
-        ClipboardPanel {}
-    }
-
-    Component {
-        id: clockPanel
-        ClockPanel {}
-    }
-
-    Component {
-        id: displayPanel
-        DisplayPanel {}
-    }
-
-    Component {
-        id: mediaPanel
-        MediaPanel {}
-    }
-
-    Component {
-        id: networkPanel
-        NetworkPanel {}
-    }
-
-    Component {
-        id: notesPanel
-        NotesPanel {}
-    }
-
-    Component {
-        id: notificationsPanel
-        NotificationsPanel {}
-    }
-
-    Component {
-        id: powerPanel
-        PowerPanel {}
-    }
-
-    // The timer of the chip it hangs from.
-    Component {
-        id: timerPanel
-        TimerPanel {
-            timer: (root.button as TimerChip)?.timer ?? null
-            onDone: root.closeRequested()
-        }
-    }
-
-    Component {
-        id: toolsPanel
-        ToolsPanel {}
-    }
-
-    Component {
-        id: weatherPanel
-        WeatherPanel {}
     }
 }

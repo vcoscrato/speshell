@@ -10,27 +10,20 @@ import "common"
 // chips each on a quad of its own, so that a pixel pays only for the pieces over it.
 // Everything about a shard or a point of the screen that does not change as it plays
 // is worked out once, into the float tables and maps below.
-Item {
+WallpaperStage {
     id: root
 
-    // ── Speshell effects API v1 ────────────────────────────────
-    property Item outgoing: null
-    // The active palette, as Theme.qml names it.
-    property var theme: null
-    signal finished()
-
     // The last shards break loose at about 1.65 s and take up to 0.75 s to fall and settle.
-    readonly property real duration: 2.4
+    duration: 2.4
 
-    property real elapsed: 0
-    property bool done: false
+    readonly property real elapsed: root.clock.clock
     readonly property point center: Qt.point(width * 0.5, height * 0.56)
     readonly property real reach: Math.sqrt(Math.pow(width * 0.5, 2) + Math.pow(height * 0.56, 2))
 
-    readonly property color cCrack: Stone.tone(root.theme, "crust", 0.15, "#2a2219")
-    readonly property color cLip: Stone.tone(root.theme, "text", 0.3, "#d8c8a8")
-    readonly property color cDust: Stone.tone(root.theme, "subtextBright", 0.3, "#cdbb9a")
-    readonly property color cDustShade: Stone.tone(root.theme, "subtext", 0.45, "#9c8a6c")
+    readonly property color cCrack: Stone.tone(root.theme, "crust", 0.15)
+    readonly property color cLip: Stone.tone(root.theme, "text", 0.3)
+    readonly property color cDust: Stone.tone(root.theme, "subtextBright", 0.3)
+    readonly property color cDustShade: Stone.tone(root.theme, "subtext", 0.45)
 
     // The sizes follow Shatter.glsl: KX cells along a ray by N around the impact, CELL
     // texels each, and the chip grid's CHIP_G px squares, from two before the screen
@@ -39,30 +32,12 @@ Item {
     readonly property size chipGrid: Qt.size(Math.ceil(root.width / 64) + 4, Math.ceil(root.height / 64) + 4)
 
     // For the pieces, which cannot see these ids.
-    readonly property var outgoingTable: outgoingTex
+    readonly property var outgoingTable: root.outgoingTexture
     readonly property var cellsTable: cellsTex
     readonly property var chipsTable: chipsTex
     readonly property var cellMapTable: cellMapTex
     readonly property var crackMapTable: crackMapTex
     readonly property var orderTable: orderTex
-
-    EffectClock {
-        onAdvanced: dt => {
-            root.elapsed += dt;
-            if (!root.done && root.elapsed >= root.duration) {
-                root.done = true;
-                // Speshell may destroy this item inside the signal, so nothing may follow it.
-                root.finished();
-            }
-        }
-    }
-
-    ShaderEffectSource {
-        id: outgoingTex
-        sourceItem: root.outgoing
-        hideSource: true
-        live: false
-    }
 
     // ── Worked out once ──
 
@@ -96,7 +71,7 @@ Item {
         width: root.chipGrid.width * 3
         height: root.chipGrid.height
         blending: false
-        property var source: outgoingTex
+        property var source: root.outgoingTexture
         property size resolution: Qt.size(root.width, root.height)
         property point center: root.center
         property real reach: root.reach
@@ -192,7 +167,7 @@ Item {
     // What still stands, with its cracks.
     ShaderEffect {
         anchors.fill: parent
-        property var source: outgoingTex
+        property var source: root.outgoingTexture
         property var cells: cellsTex
         property var cellMap: cellMapTex
         property var crackMap: crackMapTex

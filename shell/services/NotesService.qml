@@ -16,8 +16,9 @@ Singleton {
     // could not be read.
     property string phase: ""
     // The file operation running, or null: { kind: "create", "delete", "restore", or
-    // "purge"; note; next, the note that opens after a create or delete; and index,
-    // where a deleted note was in the list }.
+    // "purge"; note; next, the note that opens after a create or delete; index, where a
+    // deleted note was in the list; and purge, the note a delete's Undo replaces, which
+    // goes for good once it's done }.
     property var operation: null
     // The write in flight, or null: { note, text }.
     property var writing: null
@@ -232,13 +233,13 @@ Singleton {
 
     function deleteNote(name) {
         const index = root.noteList.indexOf(name);
-        if (!root.managementEnabled || root.pendingDeleteNote !== "" || root.noteList.length <= 1 || index === -1)
+        if (!root.managementEnabled || root.noteList.length <= 1 || index === -1)
             return false;
         if (name === root.currentNote && !root.flush(true))
             return false;
         const rest = root.noteList.filter(note => note !== name);
         const next = name === root.currentNote ? rest[Math.min(index, rest.length - 1)] : root.currentNote;
-        root.run({ kind: "delete", note: name, next: next, index: index },
+        root.run({ kind: "delete", note: name, next: next, index: index, purge: root.pendingDeleteNote },
             ["mv", "--", root.notePath(name), root.trashPath(name)]);
         return true;
     }
@@ -252,10 +253,13 @@ Singleton {
         return true;
     }
 
+    // Once Undo's time is up; an operation running then purges it when it finishes.
     function commitPendingDelete() {
-        if (root.pendingDeleteNote === "" || root.mutating)
-            return;
-        const name = root.pendingDeleteNote;
+        if (root.pendingDeleteNote !== "" && !root.mutating)
+            root.purge(root.pendingDeleteNote);
+    }
+
+    function purge(name) {
         root.run({ kind: "purge", note: name }, ["rm", "-f", "--", root.trashPath(name)]);
     }
 
@@ -280,12 +284,11 @@ Singleton {
         root.operation = null;
         catalogRefreshTimer.restart();
         if (!succeeded) {
-            root.errorText = operation.kind === "purge"
-                ? "Could not finish deleting " + operation.note + ". You can still undo the deletion."
-                : "Could not " + operation.kind + " " + operation.note + "." + (detail !== "" ? " " + detail : "");
-            return;
-        }
-        if (operation.kind === "create") {
+            root.errorText = operation.kind !== "purge"
+                ? "Could not " + operation.kind + " " + operation.note + "." + (detail !== "" ? " " + detail : "")
+                : "Could not finish deleting " + operation.note + "."
+                    + (operation.note === root.pendingDeleteNote ? " You can still undo the deletion." : "");
+        } else if (operation.kind === "create") {
             if (!root.noteList.includes(operation.note))
                 root.noteList = root.noteList.concat([operation.note]);
             root.loadNote(operation.next, true);
@@ -301,9 +304,14 @@ Singleton {
             restored.splice(Math.min(Math.max(0, root.pendingDeleteIndex), restored.length), 0, operation.note);
             root.noteList = restored;
             root.clearPendingDelete();
-        } else {
+        } else if (operation.note === root.pendingDeleteNote) {
             root.clearPendingDelete();
         }
+        // The note whose Undo a delete replaced, or one whose time ran out meanwhile.
+        if (succeeded && operation.kind === "delete" && operation.purge !== "")
+            root.purge(operation.purge);
+        else if (root.pendingDeleteNote !== "" && operation.note !== root.pendingDeleteNote && !deleteCommitTimer.running)
+            root.commitPendingDelete();
     }
 
     function setText(next) {

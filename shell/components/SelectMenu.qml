@@ -2,9 +2,11 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Templates as T
 import qs.services
+import "Keyboard.js" as Keyboard
 
 // Dropdown button that shows the current option's label ({ value, label }) and opens
-// a menu of the rest. Unlisted values show fallbackLabel.
+// a menu of the rest, also with Space, Enter, or Down, where the arrows and Enter pick.
+// Unlisted values show fallbackLabel.
 Rectangle {
     id: root
 
@@ -13,7 +15,8 @@ Rectangle {
     property string fallbackLabel: currentValue === undefined || currentValue === null
         ? ""
         : String(currentValue)
-    property int maxWidth: 200
+    // Half a panel, so it shares a row with its label.
+    property int maxWidth: Theme.panelWidth / 2
 
     signal valueSelected(var selectedValue)
 
@@ -35,6 +38,7 @@ Rectangle {
     height: implicitHeight
     radius: Theme.borderRadius
     opacity: root.enabled ? 1.0 : Theme.disabledOpacity
+    activeFocusOnTab: true
     color: root.hovered || selectMenu.opened ? Theme.cardHover : Theme.controlFill
     border.width: Theme.borderWidth
     border.color: selectMenu.opened ? Theme.selectedBorder : Theme.controlBorder
@@ -44,6 +48,12 @@ Rectangle {
     Accessible.onPressAction: {
         if (root.enabled)
             selectMenu.open();
+    }
+    Keys.onPressed: event => {
+        if (Keyboard.presses(event) || event.key === Qt.Key_Down) {
+            event.accepted = true;
+            selectMenu.open();
+        }
     }
 
     Label {
@@ -98,7 +108,6 @@ Rectangle {
 
             delegate: PopupMenuItem {
                 required property var modelData
-                focusPolicy: Qt.ClickFocus
 
                 text: String(modelData.label)
                 selectable: true
@@ -119,4 +128,6 @@ Rectangle {
             }
         }
     }
+
+    FocusRing {}
 }

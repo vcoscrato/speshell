@@ -7,6 +7,7 @@ layout(std140, binding = 0) uniform buf {
     mat4 qt_Matrix;
     float qt_Opacity;
     float time;
+    vec2 offset;
     vec2 resolution;
     vec4 cCore;
     vec4 cMid;
@@ -17,7 +18,7 @@ layout(binding = 1) uniform sampler2D state;
 #include "../common/common.glsl"
 
 void main() {
-    vec2 p = qt_TexCoord0 * u.resolution;
+    vec2 p = u.offset + qt_TexCoord0 * u.resolution;
     vec4 s = texture(state, qt_TexCoord0);
     // Fine erosion adds edge detail the low-res sim cannot hold, mostly where flames are thin.
     // It adds at most 0.06, so where there is too little fuel to show it is skipped.

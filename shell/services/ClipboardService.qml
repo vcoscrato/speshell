@@ -15,12 +15,13 @@ Singleton {
     // Whether the clipboard panel shows, and whether the history changed since it did.
     property bool viewPresented: false
     property bool historyDirty: true
-    property bool refreshQueued: false
     // The copy running, or null: { id }, an entry's, or "" for text.
     property var copying: null
-    property string feedbackText: ""
-    property string feedbackTone: "neutral"
+    // What the last action says, as { text, tone }.
+    property var feedback: ({ text: "", tone: "neutral" })
     property string lastCopiedId: ""
+    // The ids remove() dropped that wait for the delete running to end.
+    property var deleting: []
 
     readonly property bool installed: FeatureSupport.hasCommand("cliphist") && FeatureSupport.hasCommand("wl-paste")
     // Assumed until the first look for commands says otherwise.
@@ -31,9 +32,6 @@ Singleton {
     readonly property string thumbnailDir: Quickshell.env("XDG_RUNTIME_DIR")
         ? Quickshell.env("XDG_RUNTIME_DIR") + "/speshell/clipboard"
         : ""
-
-    onInstalledChanged: root.watch()
-    Component.onCompleted: root.watch()
 
     // cliphist lists binary entries as "[[ binary data 33 KiB png 349x118 ]]".
     function parseEntry(id, preview) {
@@ -65,19 +63,13 @@ Singleton {
         return entry.id + "." + entry.format;
     }
 
-    function watch() {
-        if (root.installed && !watchProc.running)
-            watchProc.running = true;
-    }
-
     function warnUnwatched() {
         if (root.viewPresented && root.installed && !root.watching)
             root.setFeedback("Live clipboard updates are unavailable.", "warning");
     }
 
     function setFeedback(text, tone) {
-        root.feedbackText = text;
-        root.feedbackTone = tone;
+        root.feedback = { text: text, tone: tone };
     }
 
     function setViewPresented(presented) {
@@ -96,12 +88,8 @@ Singleton {
     function refresh() {
         if (!root.installed)
             return;
-        if (listProc.running) {
-            root.refreshQueued = true;
-            return;
-        }
         root.historyDirty = false;
-        listProc.running = true;
+        listProc.request();
     }
 
     function finishList(exitCode, output) {
@@ -124,23 +112,15 @@ Singleton {
                 });
             root.decodeThumbnails();
         }
-        if (root.refreshQueued) {
-            root.refreshQueued = false;
-            root.refresh();
-        }
     }
 
-    // Decodes the listed images; a list that changes meanwhile decodes again after.
+    // Decodes the listed images.
     function decodeThumbnails() {
         if (root.thumbnailDir === "")
             return;
-        if (thumbnailProc.running) {
-            thumbnailProc.queued = true;
-            return;
-        }
         const names = root.history.filter(entry => entry.kind === "image").map(root.thumbnailName);
         thumbnailProc.command = Shell.script("clipboard.sh", ["thumbnails", root.thumbnailDir].concat(names));
-        thumbnailProc.running = true;
+        thumbnailProc.request();
     }
 
     // The names clipboard.sh decoded, of the images listed when it started.
@@ -149,10 +129,6 @@ Singleton {
         root.history = root.history.map(entry => entry.kind === "image" && decoded.includes(root.thumbnailName(entry))
             ? Object.assign({}, entry, { thumbnail: root.thumbnailDir + "/" + root.thumbnailName(entry) })
             : entry);
-        if (thumbnailProc.queued) {
-            thumbnailProc.queued = false;
-            root.decodeThumbnails();
-        }
     }
 
     function copy(id, command, input) {
@@ -191,6 +167,22 @@ Singleton {
         }
     }
 
+    // Drops one entry from the history at once, and from cliphist's after.
+    function remove(entry) {
+        root.history = root.history.filter(other => other.id !== entry.id);
+        root.deleting = root.deleting.concat([entry.id]);
+        root.deleteNext();
+    }
+
+    // Deletes the entries gathered since the last delete started.
+    function deleteNext() {
+        if (deleteProc.running || root.deleting.length === 0)
+            return;
+        deleteProc.command = Shell.script("clipboard.sh", ["delete"].concat(root.deleting));
+        root.deleting = [];
+        deleteProc.running = true;
+    }
+
     function clearHistory() {
         clearProc.running = true;
     }
@@ -202,17 +194,12 @@ Singleton {
         onTriggered: root.refresh()
     }
 
-    // A watcher that stopped, as when the compositor restarted, starts again.
-    Timer {
-        id: watchRetry
-        interval: 30000
-        onTriggered: root.watch()
-    }
-
     // Speshell owns the cliphist writer, so the history needs no session service of
-    // its own. It prints a line once each copy is stored.
-    Process {
+    // its own. It prints a line once each copy is stored, and starts again when it
+    // stops, as when the compositor restarted.
+    Watcher {
         id: watchProc
+        watching: root.installed
         command: Shell.script("clipboard.sh", ["watch"])
         stdout: SplitParser {
             onRead: {
@@ -222,44 +209,41 @@ Singleton {
             }
         }
         onStarted: {
-            if (root.feedbackTone === "warning")
+            if (root.feedback.tone === "warning")
                 root.setFeedback("", "neutral");
         }
-        onExited: {
-            root.warnUnwatched();
-            if (root.installed)
-                watchRetry.restart();
-        }
+        onExited: root.warnUnwatched()
     }
 
-    Process {
+    // A refresh during a list lists again after it.
+    QueuedProcess {
         id: listProc
         command: Shell.script("clipboard.sh", ["list", String(root.maxItems)])
         stdout: StdioCollector { id: listOutput }
         onExited: exitCode => root.finishList(exitCode, listOutput.text)
     }
 
-    Process {
+    // A list that changes while it decodes decodes again after.
+    QueuedProcess {
         id: thumbnailProc
-        property bool queued: false
         stdout: StdioCollector { id: thumbnailOutput }
         onExited: root.finishThumbnails(thumbnailOutput.text)
     }
 
-    Process {
+    QueuedProcess {
         id: copyProc
-        property string input: ""
-        stdinEnabled: true
-        onStarted: {
-            if (copyProc.input !== "")
-                copyProc.write(copyProc.input);
-            copyProc.input = "";
-            // Closes stdin, the end of the text.
-            copyProc.stdinEnabled = false;
-        }
+        onExited: exitCode => root.finishCopy(exitCode)
+    }
+
+    Process {
+        id: deleteProc
         onExited: exitCode => {
-            copyProc.stdinEnabled = true;
-            root.finishCopy(exitCode);
+            if (exitCode !== 0)
+                root.setFeedback("Failed to delete from history.", "error");
+            if (root.deleting.length > 0)
+                Qt.callLater(root.deleteNext);
+            else
+                root.refresh();
         }
     }
 

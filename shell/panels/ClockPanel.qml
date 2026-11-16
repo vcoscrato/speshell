@@ -8,7 +8,6 @@ import "../components/Format.js" as Format
 Item {
     id: root
 
-    property bool presented: false
     readonly property int columnGap: Theme.spacingXL
 
     implicitWidth: content.implicitWidth
@@ -27,7 +26,7 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: calendar.height - dateText.height - clockColumn.spacing
                 height: width
-                ticking: root.presented
+                ticking: true
             }
 
             Label {

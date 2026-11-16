@@ -49,7 +49,8 @@ Item {
             ClockFace {
                 id: face
                 anchors.horizontalCenter: parent.horizontalCenter
-                width: Math.round(Math.min(360, root.height * 0.32))
+                // As wide as the card under it, on a screen tall enough.
+                width: Math.round(Math.min(Theme.panelWidth, root.height * 0.32))
                 height: width
                 ticking: root.visible
             }

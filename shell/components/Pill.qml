@@ -10,7 +10,8 @@ Rectangle {
     property color textColor: root.toneColor
 
     implicitWidth: label.implicitWidth + Theme.spacingSmall * 2
-    implicitHeight: Math.max(18, label.implicitHeight + Theme.spacingTiny)
+    // At least an icon's height, so it sits level with the icons beside it.
+    implicitHeight: Math.max(Theme.iconSizeMedium, label.implicitHeight + Theme.spacingTiny)
     radius: Theme.borderRadius
     color: Theme.alpha(root.toneColor, Theme.tintSubtle)
     border.width: Theme.borderWidth

@@ -55,11 +55,11 @@ Singleton {
     // Watts in or out, or 0 when unknown or a mere trickle, as when full.
     readonly property real watts: root.ready && Math.abs(root.device.changeRate) >= 0.1 ? Math.abs(root.device.changeRate) : 0
 
-    // [Battery] lowLevel and criticalLevel, and whether each was told this discharge.
+    // [Battery] lowLevel and criticalLevel, and the warning given this discharge: "",
+    // "low", or "critical".
     readonly property int lowLevel: ConfigService.settings.battery.lowLevel
     readonly property int criticalLevel: ConfigService.settings.battery.criticalLevel
-    property bool lowNotified: false
-    property bool criticalNotified: false
+    property string warned: ""
 
     // The laptop's own battery, as BAT0: the display device is UPower's sum of them.
     readonly property var laptopBattery: root.upowerDevices().find(device => device.isLaptopBattery && device.isPresent) || null
@@ -109,21 +109,19 @@ Singleton {
         if (!root.available || !root.ready)
             return;
         if (root.pluggedIn) {
-            if (root.lowNotified)
+            if (root.warned !== "")
                 NotificationService.dismissInternal("battery");
-            root.lowNotified = false;
-            root.criticalNotified = false;
+            root.warned = "";
             return;
         }
         const percent = Math.round(root.percent);
         const left = root.duration(root.device.timeToEmpty);
         const body = percent + "% left" + (left !== "" ? ", about " + left : "") + ". Plug in soon.";
-        if (percent <= root.criticalLevel && !root.criticalNotified) {
-            root.criticalNotified = true;
-            root.lowNotified = true;
+        if (percent <= root.criticalLevel && root.warned !== "critical") {
+            root.warned = "critical";
             NotificationService.addInternalNotification("battery", "Battery critically low", body, true, 2);
-        } else if (percent <= root.lowLevel && !root.lowNotified) {
-            root.lowNotified = true;
+        } else if (percent <= root.lowLevel && root.warned === "") {
+            root.warned = "low";
             NotificationService.addInternalNotification("battery", "Battery low", body);
         }
     }

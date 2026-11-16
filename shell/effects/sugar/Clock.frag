@@ -14,7 +14,7 @@ layout(std140, binding = 0) uniform buf {
     float hourTurn;     // each hand's turns from twelve, clockwise
     float minuteTurn;
     float secondTurn;
-    float seconds;      // 1 shows the thread of coulis
+    float ticking;      // 1 shows the thread of coulis
     vec4 cCrust;
     vec4 cCrustDeep;
     vec4 cCrustLight;
@@ -29,23 +29,7 @@ layout(std140, binding = 0) uniform buf {
 } u;
 #include "../common/common.glsl"
 
-const float TAU = 6.2831853;
-const float PI = 3.1415927;
 const vec2 LIGHT = vec2(-0.6, -0.8);    // toward the light, up and to the left
-
-vec2 at(float turn, float r) {
-    float a = turn * TAU;
-    return vec2(sin(a), -cos(a)) * r;
-}
-
-float turnOf(vec2 p) {
-    return fract(atan(p.x, -p.y) / TAU + 1.0);
-}
-
-// p in a hand's frame: x across it, y out along it.
-vec2 handFrame(vec2 p, float turn) {
-    return rot(p, -turn * TAU) * vec2(1.0, -1.0);
-}
 
 // A raspberry of radius rr at c, seen from above with its hollow up: a small dark
 // hollow, six plump drupelets round it and ten more round them, which make its edge
@@ -152,7 +136,7 @@ void main() {
     o = over(o, mix(u.cChocolateDark.rgb, u.cChocolate.rgb, 0.8 * step(handFrame(p, u.hourTurn).x, 0.0)), cover(-hd));
 
     // ── A thread of coulis with the seconds ──
-    if (u.seconds > 0.5) {
+    if (u.ticking > 0.5) {
         vec2 q = handFrame(p, u.secondTurn);
         float d = max(abs(q.x) - max(0.6, R * 0.008), max(-q.y - R * 0.16, q.y - R * 0.8));
         d = min(d, length(q + vec2(0.0, R * 0.16)) - R * 0.03);

@@ -9,7 +9,6 @@ import "../components/Format.js" as Format
 Card {
     id: root
 
-    property bool presented: false
     // The location field shows under the header.
     property bool editingLocation: false
     // The time, so passing hours drop off between refreshes.
@@ -37,6 +36,12 @@ Card {
     }
     readonly property real weekLow: Math.min.apply(null, root.days.map(day => day.low))
     readonly property real weekHigh: Math.max.apply(null, root.days.map(day => day.high))
+    // Each column of the days as wide as its widest entry, so the ranges line up at any
+    // text scale.
+    readonly property real dayNameWidth: root.widest(root.days.map((day, index) => index === 0 ? "Today" : Format.weekday(day.date)))
+        + Theme.spacingSmall
+    readonly property real dayLowWidth: root.widest(root.days.map(day => WeatherService.temperatureText(day.low)))
+    readonly property real dayHighWidth: root.widest(root.days.map(day => WeatherService.temperatureText(day.high)))
 
     panel: "weather"
 
@@ -116,6 +121,10 @@ Card {
         }
     }
 
+    function widest(texts) {
+        return Math.max(0, ...texts.map(text => Math.ceil(dayMetrics.advanceWidth(text))));
+    }
+
     // Types a new location into the field under the header, starting from the saved one.
     function editLocation() {
         locationField.text = WeatherService.location;
@@ -128,16 +137,26 @@ Card {
         WeatherService.setLocation(location);
     }
 
-    onPresentedChanged: {
-        root.now = new Date();
-        if (root.presented)
-            WeatherService.refreshIfStale();
+    Component.onCompleted: WeatherService.refreshIfStale()
+
+    // The days' text at its boldest, Today's, to measure their columns.
+    FontMetrics {
+        id: dayMetrics
+        font.family: Theme.fontFamily
+        font.pixelSize: Theme.fontSizeSmall
+        font.weight: Font.DemiBold
+    }
+
+    FontMetrics {
+        id: rainMetrics
+        font.family: Theme.fontFamily
+        font.pixelSize: Theme.fontSizeCaption
     }
 
     Timer {
         interval: 60 * 1000
         repeat: true
-        running: root.presented
+        running: true
         onTriggered: root.now = new Date()
     }
 
@@ -172,7 +191,8 @@ Card {
             AppIcon {
                 anchors.verticalCenter: parent.verticalCenter
                 name: WeatherService.current.icon
-                size: 44
+                // As tall as the temperature beside it.
+                size: Math.round(Theme.fontSizeHuge * 1.1)
                 iconColor: Theme.accent
             }
 
@@ -325,7 +345,7 @@ Card {
                 Label {
                     id: dayName
                     anchors.verticalCenter: parent.verticalCenter
-                    width: 48
+                    width: root.dayNameWidth
                     text: day.index === 0 ? "Today" : Format.weekday(day.modelData.date)
                     font.weight: day.index === 0 ? Font.DemiBold : Font.Normal
                     color: day.index === 0 ? Theme.accent : Theme.text
@@ -346,7 +366,7 @@ Card {
                     anchors.left: dayIcon.right
                     anchors.leftMargin: Theme.spacingTiny
                     anchors.verticalCenter: parent.verticalCenter
-                    width: 30
+                    width: Math.ceil(rainMetrics.advanceWidth("100%"))
                     opacity: day.modelData.rain >= 20 ? 1 : 0
                     text: Math.round(day.modelData.rain) + "%"
                     font.features: { "tnum": 1 }
@@ -356,8 +376,9 @@ Card {
                 Label {
                     id: dayLow
                     anchors.left: dayRain.right
+                    anchors.leftMargin: Theme.spacingSmall
                     anchors.verticalCenter: parent.verticalCenter
-                    width: 32
+                    width: root.dayLowWidth
                     horizontalAlignment: Text.AlignRight
                     text: WeatherService.temperatureText(day.modelData.low)
                     font.features: { "tnum": 1 }
@@ -371,7 +392,7 @@ Card {
                     anchors.right: dayHigh.left
                     anchors.rightMargin: Theme.spacingSmall
                     anchors.verticalCenter: parent.verticalCenter
-                    height: 4
+                    height: Theme.spacingTiny
 
                     Rectangle {
                         anchors.fill: parent
@@ -398,7 +419,7 @@ Card {
                     id: dayHigh
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    width: 32
+                    width: root.dayHighWidth
                     horizontalAlignment: Text.AlignRight
                     text: WeatherService.temperatureText(day.modelData.high)
                     font.weight: Font.DemiBold

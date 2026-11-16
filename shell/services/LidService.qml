@@ -6,9 +6,9 @@ import Quickshell.Io
 
 // The laptop's own display and its lid: with the lid closed and another display on, the
 // laptop's display turns off, and it comes back as it was once the lid opens or the last
-// other display goes. Waits while a change in the Displays panel awaits Keep. How the
-// display was is kept in <dataDir>/lid.json, so a Speshell started with it off by the lid
-// still brings it back.
+// other display goes. Waits while the Displays panel applies a change or has one to apply
+// or keep. How the display was is kept in <dataDir>/lid.json, so a Speshell started with
+// it off by the lid still brings it back.
 Singleton {
     id: root
 
@@ -38,7 +38,7 @@ Singleton {
     }
 
     function apply(monitor) {
-        Quickshell.execDetached(["hyprctl"].concat(DisplayService.commandFor(monitor)));
+        HyprlandService.hyprctl(DisplayService.commandFor(monitor));
         DisplayService.queueRefresh();
     }
 
@@ -63,6 +63,9 @@ Singleton {
         target: DisplayService
 
         function onMonitorsChanged() { Qt.callLater(root.follow); }
+        // What waited for the panel follows once it's done.
+        function onBusyChanged() { Qt.callLater(root.follow); }
+        function onHasPendingChanged() { Qt.callLater(root.follow); }
     }
 
     FileView {

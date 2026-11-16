@@ -16,7 +16,7 @@ layout(std140, binding = 0) uniform buf {
     float hourTurn;     // each hand's turns from twelve, clockwise
     float minuteTurn;
     float secondTurn;
-    float seconds;      // 1 shows the pebble
+    float ticking;      // 1 shows the pebble
     vec4 cStone;
     vec4 cStoneLight;
     vec4 cRock;
@@ -29,22 +29,8 @@ layout(std140, binding = 0) uniform buf {
 } u;
 #include "../common/common.glsl"
 
-const float TAU = 6.2831853;
 // Toward the light, at the top left.
 const vec2 LIGHT = vec2(-0.6, -0.8);
-
-vec2 at(float turn, float r) {
-    float a = turn * TAU;
-    return vec2(sin(a), -cos(a)) * r;
-}
-
-float turnOf(vec2 p) {
-    return fract(atan(p.x, -p.y) / TAU + 1.0);
-}
-
-vec2 handFrame(vec2 p, float turn) {
-    return rot(p, -turn * TAU) * vec2(1.0, -1.0);
-}
 
 float sdHexagon(vec2 p, float r) {
     const vec3 k = vec3(-0.866025404, 0.5, 0.577350269);
@@ -121,7 +107,7 @@ void main() {
     float side = (r - rS) / gw * lit;
     vec3 groove = mix(mix(u.cStone.rgb, u.cShade.rgb, 0.35), mix(u.cStone.rgb, u.cLight.rgb, 0.18), band(side, 0.1));
     o = over(o, groove, inGroove * 0.85);
-    if (u.seconds > 0.5) {
+    if (u.ticking > 0.5) {
         vec2 c = at(u.secondTurn, rS);
         float pr = max(gw * 1.7, 2.6);
         float d = length(p - c) - pr;

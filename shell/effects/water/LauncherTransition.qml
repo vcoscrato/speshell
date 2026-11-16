@@ -7,30 +7,16 @@ import "common"
 // launcher, and two streams keep circling it while it is open, among orbs, currents,
 // and mist held in the air. Closing turns it back to water, draws it into an orb,
 // and whips away.
-Item {
+LauncherStage {
     id: root
 
-    // ── Speshell effects API v1 ────────────────────────────────
-    property Item panel: null
-    property rect panelRect
-    property bool active: false
-    // The active palette, as Theme.qml names it.
-    property var theme: null
-    signal closingFinished()
-
     // ── Choreography (seconds) ──────────────────────────────
-    readonly property real enterTime: 1.0
-    readonly property real exitTime: 0.65
-    readonly property real tailTime: 0.1
-
-    property real enter: 0
-    property real leave: 0
-    property real tailStart: 0
-    property bool exitDone: false
+    enterTime: 1.0
+    exitTime: 0.65
+    tailTime: 0.1
 
     readonly property point center: Qt.point(panelRect.x + panelRect.width / 2, panelRect.y + panelRect.height / 2)
     readonly property real reach: Math.sqrt(panelRect.width * panelRect.width + panelRect.height * panelRect.height) / 2
-    readonly property bool capturing: enter < 1 || leave > 0
     readonly property real pad: 40
 
     function ease(x) { return 1 - Math.pow(1 - Math.max(0, Math.min(1, x)), 3); }
@@ -43,28 +29,6 @@ Item {
     readonly property real flow: leave > 0 ? 1 - span(leave, 0, 0.3) : ease(span(enter, 0.7, 1))
     readonly property real settle: leave > 0 ? 1 - ease(span(leave, 0, 0.35)) : ease(span(enter, 0.62, 1))
 
-    onActiveChanged: exitDone = false
-
-    EffectClock {
-        id: clock
-        onAdvanced: dt => {
-            if (root.active) {
-                if (root.leave > 0) {
-                    root.leave = Math.max(0, root.leave - dt / root.exitTime);
-                    return;
-                }
-                root.enter = Math.min(1, root.enter + dt / root.enterTime);
-            } else if (root.leave < 1) {
-                root.leave = Math.min(1, root.leave + dt / root.exitTime);
-                root.tailStart = clock.clock;
-            } else if (!root.exitDone && clock.clock - root.tailStart >= root.tailTime) {
-                root.exitDone = true;
-                // Speshell may destroy this item inside the signal, so nothing may follow it.
-                root.closingFinished();
-            }
-        }
-    }
-
     // ── Arriving whip: spirals in to the middle, then its tail drains in after it ──
     Whip {
         theme: root.theme
@@ -74,7 +38,7 @@ Item {
         readonly property real fullLen: 5
         anchors.fill: parent
         visible: root.leave === 0 && root.enter < 0.7
-        time: clock.simTime
+        time: root.clock.simTime
         center: root.center
         r0: startR
         k: k0
@@ -91,7 +55,7 @@ Item {
         theme: root.theme
         anchors.fill: parent
         visible: root.leave > 0.55
-        time: clock.simTime
+        time: root.clock.simTime
         center: root.center
         r0: 22
         k: -0.2
@@ -104,24 +68,17 @@ Item {
     }
 
     // ── The panel as a sheet of water; otherwise the real panel shows ──
-    ShaderEffectSource {
-        id: panelTex
-        sourceItem: root.panel
-        hideSource: root.capturing
-        live: root.capturing
-    }
-
     ShaderEffect {
         visible: root.capturing && root.panel !== null && root.grow > 0
         x: root.panelRect.x - root.pad
         y: root.panelRect.y - root.pad
         width: root.panelRect.width + 2 * root.pad
         height: root.panelRect.height + 2 * root.pad
-        property var source: panelTex
-        property real time: clock.simTime
+        property var source: root.panelTexture
+        property real time: root.clock.simTime
         property rect rect: Qt.rect(x, y, width, height)
         property rect panel: root.panelRect
-        property real radius: 10
+        property real radius: root.panelRadius
         property real grow: root.grow
         property real settle: root.settle
         property color cDeep: Water.deep(root.theme)
@@ -138,9 +95,9 @@ Item {
         width: 31
         height: 2
         blending: false
-        property real time: clock.simTime
+        property real time: root.clock.simTime
         property rect panel: root.panelRect
-        property real radius: 10
+        property real radius: root.panelRadius
         property real flow: root.flow
         fragmentShader: Qt.resolvedUrl("qsb/LauncherTransition.motes.qsb")
     }
@@ -162,10 +119,10 @@ Item {
         y: root.panelRect.y - margin
         width: root.panelRect.width + 2 * margin
         height: root.panelRect.height + 2 * margin
-        property real time: clock.simTime
+        property real time: root.clock.simTime
         property rect rect: Qt.rect(x, y, width, height)
         property rect panel: root.panelRect
-        property real radius: 10
+        property real radius: root.panelRadius
         property real flow: root.flow
         property var motes: motesTex
         property color cDeep: Water.deep(root.theme)
@@ -182,9 +139,9 @@ Item {
         width: 36
         height: 2
         blending: false
-        property real time: clock.simTime
+        property real time: root.clock.simTime
         property rect panel: root.panelRect
-        property real radius: 10
+        property real radius: root.panelRadius
         property real gap: 15
         property real flow: root.flow
         property real speed: 170
@@ -208,10 +165,10 @@ Item {
         y: root.panelRect.y - margin
         width: root.panelRect.width + 2 * margin
         height: root.panelRect.height + 2 * margin
-        property real time: clock.simTime
+        property real time: root.clock.simTime
         property rect rect: Qt.rect(x, y, width, height)
         property rect panel: root.panelRect
-        property real radius: 10
+        property real radius: root.panelRadius
         property real gap: 15
         property real flow: root.flow
         property real speed: 170

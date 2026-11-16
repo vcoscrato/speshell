@@ -28,14 +28,16 @@ layout(binding = 3) uniform sampler2D embers;   // WallpaperTransition.embers.fr
 #include "../common/common.glsl"
 #include "Tear.glsl"
 
-const float TAU = 6.2831853;
 const float STRIKE = 0.1;       // the bolt reaching the bottom
 const float SPLIT = 0.16;       // the halves starting to move
 
 // Where the bolt crosses height y (px), from its table: exact at each row's middle,
 // and straight between them.
 float tearX(float y) {
-    return texture(tear, vec2(y / u.columns, 0.25)).x;
+    float i = floor(y - 0.5);
+    float a = texture(tear, vec2((i + 0.5) / u.columns, 0.25)).x;
+    float b = texture(tear, vec2((i + 1.5) / u.columns, 0.25)).x;
+    return mix(a, b, y - 0.5 - i);
 }
 
 // Texel i of the table's second row.

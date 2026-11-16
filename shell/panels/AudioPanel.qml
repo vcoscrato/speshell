@@ -7,7 +7,6 @@ import qs.services
 Card {
     id: root
 
-    property bool presented: false
     property bool output: true
     readonly property var endpoint: root.output ? AudioService.output : AudioService.input
 
@@ -22,7 +21,7 @@ Card {
         spacing: Theme.spacingTiny
 
         Repeater {
-            model: root.presented ? root.endpoint.devices() : []
+            model: root.endpoint.devices()
 
             delegate: DeviceRow {
                 id: deviceRow

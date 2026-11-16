@@ -10,30 +10,16 @@ import "common"
 // Boulders rise after it and hover around the launcher while it is open. Closing
 // drops them, pulls the stone back over the panel, and sinks the slab back into the
 // ground.
-Item {
+LauncherStage {
     id: root
 
-    // ── Speshell effects API v1 ────────────────────────────────
-    property Item panel: null
-    property rect panelRect
-    property bool active: false
-    // The active palette, as Theme.qml names it.
-    property var theme: null
-    signal closingFinished()
-
     // ── Choreography (seconds) ──────────────────────────────
-    readonly property real enterTime: 1.0
-    readonly property real exitTime: 0.7
-    readonly property real tailTime: 0.25
-
-    property real enter: 0
-    property real leave: 0
-    property real tailStart: 0
-    property bool exitDone: false
+    enterTime: 1.0
+    exitTime: 0.7
+    tailTime: 0.25
 
     readonly property real ground: panelRect.y + panelRect.height
     readonly property real depth: panelRect.height + 24
-    readonly property bool capturing: enter < 1 || leave > 0
     readonly property real pad: 30
 
     function span(x, a, b) { return Math.max(0, Math.min(1, (x - a) / (b - a))); }
@@ -63,52 +49,27 @@ Item {
     readonly property real dust: leave > 0 ? span(leave, 0.22, 1) : span(enter, 0.08, 1)
 
     // The slab's stone: one ramp of the theme's neutrals, warmed a little.
-    readonly property color slabLight: Stone.tone(root.theme, "subtextBright", 0.2, "#c9c0a0")
-    readonly property color slabMid: root.theme ? Colors.mix(Colors.mix(root.theme.surface2, root.theme.subtext, 0.42), root.theme.peach, 0.12) : "#6e705a"
-    readonly property color slabDark: Stone.tone(root.theme, "cardHover", 0.12, "#343527")
+    readonly property color slabLight: Stone.tone(root.theme, "subtextBright", 0.2)
+    readonly property color slabMid: Colors.mix(Colors.mix(root.theme.surface2, root.theme.subtext, 0.42), root.theme.peach, 0.12)
+    readonly property color slabDark: Stone.tone(root.theme, "cardHover", 0.12)
 
-    onActiveChanged: exitDone = false
-
-    EffectClock {
-        id: clock
-        onAdvanced: dt => {
-            if (root.active) {
-                if (root.leave > 0) {
-                    root.leave = Math.max(0, root.leave - dt / root.exitTime);
-                    return;
-                }
-                root.enter = Math.min(1, root.enter + dt / root.enterTime);
-                if (root.enter >= root.burstAt)
-                    root.burst = root.burst < 0 ? 0 : root.burst + dt;
-            } else if (root.leave < 1) {
-                root.leave = Math.min(1, root.leave + dt / root.exitTime);
-                root.tailStart = clock.clock;
-            } else if (!root.exitDone && clock.clock - root.tailStart >= root.tailTime) {
-                root.exitDone = true;
-                // Speshell may destroy this item inside the signal, so nothing may follow it.
-                root.closingFinished();
-            }
-        }
+    // The burst's age, from when the slab starts up.
+    onAdvanced: dt => {
+        if (root.active && root.leave === 0 && root.enter >= root.burstAt)
+            root.burst = root.burst < 0 ? 0 : root.burst + dt;
     }
 
     // ── The panel as a rising slab; otherwise the real panel shows ──
-    ShaderEffectSource {
-        id: panelTex
-        sourceItem: root.panel
-        hideSource: root.capturing
-        live: root.capturing
-    }
-
     ShaderEffect {
         visible: root.capturing && root.panel !== null
         x: root.panelRect.x - root.pad
         y: root.panelRect.y - root.pad
         width: root.panelRect.width + 2 * root.pad
         height: root.panelRect.height + 2 * root.pad
-        property var source: panelTex
+        property var source: root.panelTexture
         property rect rect: Qt.rect(x, y, width, height)
         property rect panel: root.panelRect
-        property real radius: 10
+        property real radius: root.panelRadius
         property real ground: root.ground
         property point offset: Qt.point(root.jolt, root.rise)
         property real cracks: root.cracks
@@ -116,7 +77,7 @@ Item {
         property color cLight: root.slabLight
         property color cMid: root.slabMid
         property color cDark: root.slabDark
-        property color cEdge: Stone.tone(root.theme, "crust", 0.1, "#15130e")
+        property color cEdge: Stone.tone(root.theme, "crust", 0.1)
         fragmentShader: Qt.resolvedUrl("qsb/LauncherTransition.qsb")
     }
 
@@ -138,7 +99,7 @@ Item {
         property color cDust: Colors.mix(root.slabMid, root.slabLight, 0.55)
         property color cDustShade: root.slabMid
         property color cRock: root.slabMid
-        property color cDark: Stone.tone(root.theme, "bg", 0.1, "#2e261d")
+        property color cDark: Stone.tone(root.theme, "bg", 0.1)
         fragmentShader: Qt.resolvedUrl("qsb/LauncherTransition.ground.qsb")
     }
 
@@ -149,7 +110,7 @@ Item {
         y: root.panelRect.y - margin
         width: root.panelRect.width + 2 * margin
         height: root.panelRect.height + 2 * margin
-        time: clock.simTime
+        time: root.clock.simTime
         panel: root.panelRect
         ground: root.ground
         lift: root.lift
@@ -157,6 +118,6 @@ Item {
         cLight: root.slabLight
         cMid: root.slabMid
         cDark: root.slabDark
-        cEdge: Stone.tone(root.theme, "crust", 0.1, "#15130e")
+        cEdge: Stone.tone(root.theme, "crust", 0.1)
     }
 }

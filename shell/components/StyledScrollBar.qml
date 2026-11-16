@@ -13,8 +13,8 @@ T.ScrollBar {
     minimumSize: root.orientation === Qt.Horizontal ? root.height / root.width : root.width / root.height
 
     contentItem: Rectangle {
-        implicitWidth: 4
-        implicitHeight: 4
+        implicitWidth: Theme.spacingTiny
+        implicitHeight: Theme.spacingTiny
         radius: width / 2
         color: root.pressed ? Theme.subtext : Theme.overlay
         opacity: root.size < 1.0 ? (root.active ? 0.75 : 0.5) : 0.0

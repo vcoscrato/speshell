@@ -72,6 +72,18 @@ Item {
         root.live++;
     }
 
+    // Starts a particle of `kind`, a delegate property, with a random `seed` (0..1),
+    // the other props `p` gives kept.
+    function emit(kind, p) {
+        p.props = Object.assign({ kind: kind, seed: Math.random() }, p.props || {});
+        root.spawn(p);
+    }
+
+    // A random number from a to b.
+    function rnd(a, b) {
+        return a + Math.random() * (b - a);
+    }
+
     function place(part) {
         const item = part.item;
         item.visible = part.age >= 0;

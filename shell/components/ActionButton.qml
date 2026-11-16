@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Shapes
 import qs.services
+import "Keyboard.js" as Keyboard
 
 // Speshell's text button, in one of four kinds:
 // "secondary", the default, on the control fill; "primary", the one action a panel or
@@ -38,6 +39,7 @@ Item {
         labelMetrics.height + (root.compact ? Theme.spacingTiny : Theme.spacingSmall) * 2)
     opacity: root.enabled ? 1 : Theme.disabledOpacity
     scale: root.pressed ? Theme.pressScale : 1
+    activeFocusOnTab: true
 
     Behavior on scale {
         NumberAnimation { duration: Theme.animDurationFast; easing.type: Theme.animEasing }
@@ -48,6 +50,13 @@ Item {
     Accessible.checkable: root.checked
     Accessible.checked: root.checked
     Accessible.onPressAction: if (root.enabled) root.clicked()
+    Keys.onPressed: event => {
+        if (root.enabled && Keyboard.presses(event)) {
+            event.accepted = true;
+            EffectsService.picked(root, null);
+            root.clicked();
+        }
+    }
 
     FontMetrics {
         id: labelMetrics
@@ -61,14 +70,15 @@ Item {
         preferredRendererType: Shape.CurveRenderer
 
         ShapePath {
-            fillColor: root.primary ? (root.hovered ? Qt.lighter(Theme.accent, 1.08) : Theme.accent)
+            // A hovered primary lifts toward the text, as far as a hovered tint goes.
+            fillColor: root.primary ? (root.hovered ? Theme.mix(Theme.accent, Theme.text, Theme.tintSubtle) : Theme.accent)
                 : root.danger ? Theme.alpha(Theme.error, root.hovered ? Theme.tintStrong : Theme.tintSubtle)
                 : root.checked ? Theme.selectedFill
                 : root.hovered ? Theme.cardHover
                 : root.flat ? "transparent"
                 : Theme.controlFill
             strokeWidth: Theme.borderWidth
-            strokeColor: root.primary ? Theme.alpha(Qt.darker(Theme.accent, 1.6), 0.6)
+            strokeColor: root.primary ? Theme.alpha(Theme.crust, Theme.tintOutline)
                 : root.danger ? Theme.alpha(Theme.error, root.hovered ? Theme.tintOutlineStrong : Theme.tintOutline)
                 : root.checked ? Theme.selectedBorder
                 : root.hovered ? Theme.alpha(Theme.accent, Theme.tintOutline)
@@ -99,16 +109,15 @@ Item {
             iconColor: root.labelColor
         }
 
-        Text {
+        Label {
             id: label
             anchors.verticalCenter: parent.verticalCenter
             visible: root.text !== ""
             width: Math.min(implicitWidth,
                 root.width - root.padding * 2 - (icon.visible ? icon.width + content.spacing : 0))
             text: root.text
-            textFormat: Text.PlainText
             elide: Text.ElideRight
-            font: labelMetrics.font
+            font.weight: Font.DemiBold
             color: root.labelColor
         }
     }
@@ -126,7 +135,9 @@ Item {
     }
 
     Tooltip {
-        visible: root.tooltipText !== "" && mouse.containsMouse
+        visible: root.tooltipText !== "" && (mouse.containsMouse || root.activeFocus)
         text: root.tooltipText
     }
+
+    FocusRing {}
 }

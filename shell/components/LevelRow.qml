@@ -16,7 +16,7 @@ Item {
     property string valueText: ""
     property bool adjustable: true
 
-    // Dragged or wheeled to `nextValue`.
+    // Dragged, scrolled, or keyed to `nextValue`.
     signal adjusted(real nextValue)
     // Let go after a drag.
     signal released()
@@ -40,7 +40,7 @@ Item {
         value: root.value
         enabled: root.adjustable
         onMoved: root.adjusted(value)
-        onWheelAdjusted: nextValue => root.adjusted(nextValue)
+        onStepped: nextValue => root.adjusted(nextValue)
         onPressedChanged: if (!pressed) root.released()
     }
 
@@ -49,10 +49,16 @@ Item {
         id: valueLabel
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
-        width: Math.round(40 * Math.max(1, Theme.textScale))
+        width: Math.ceil(mutedMetrics.advanceWidth)
         horizontalAlignment: Text.AlignRight
         text: root.valueText
         color: Theme.subtext
         font.features: { "tnum": 1 }
+
+        TextMetrics {
+            id: mutedMetrics
+            font: valueLabel.font
+            text: "Muted"
+        }
     }
 }

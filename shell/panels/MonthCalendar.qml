@@ -30,16 +30,19 @@ Item {
         root.month = new Date(root.today.getFullYear(), root.today.getMonth(), 1);
     }
 
-    // A new day carries the calendar along when it showed the old one's month.
+    // Today's month as last seen: a new month carries the calendar along when it showed
+    // the old one, and leaves a browsed month alone.
+    property var todayMonth: null
     onTodayChanged: {
-        const previous = new Date(root.today.getTime() - 24 * 3600 * 1000);
-        if (root.month.getFullYear() === previous.getFullYear() && root.month.getMonth() === previous.getMonth())
-            root.goToToday();
+        const month = new Date(root.today.getFullYear(), root.today.getMonth(), 1);
+        if (root.todayMonth !== null && root.todayMonth.getTime() !== month.getTime()
+                && root.month.getTime() === root.todayMonth.getTime())
+            root.month = month;
+        root.todayMonth = month;
     }
 
-    WheelHandler {
-        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-        onWheel: event => root.shift(event.angleDelta.y > 0 ? -1 : 1)
+    WheelSteps {
+        onStepped: direction => root.shift(-direction)
     }
 
     Column {
@@ -86,12 +89,17 @@ Item {
                     onClicked: root.shift(1)
                 }
 
-                // The second signed-in Google account's.
+                // config.ini's [Clock] calendarUrl, when set.
                 HeaderButton {
+                    id: calendarButton
+
+                    readonly property string url: ConfigService.settings.clock.calendarUrl
+
+                    visible: calendarButton.url !== ""
                     iconName: "calendar"
-                    tooltipText: "Open Google Calendar"
+                    tooltipText: "Open the calendar"
                     onClicked: {
-                        Qt.openUrlExternally("https://calendar.google.com/calendar/u/1/r");
+                        Qt.openUrlExternally(calendarButton.url);
                         PanelService.dismiss();
                     }
                 }

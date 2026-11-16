@@ -1,9 +1,11 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import qs.services
+import "Keyboard.js" as Keyboard
 
 // Mutually exclusive choice among a few short options ({ value, label }).
 // Segments share the width equally; nothing is highlighted for an unlisted value.
+// The arrow keys pick the option beside the current one.
 Rectangle {
     id: root
 
@@ -11,6 +13,14 @@ Rectangle {
     property var currentValue: undefined
 
     signal valueSelected(var selectedValue)
+
+    // Picks the option `index`, as a click on it does.
+    function pick(index, target, pointer) {
+        if (index === root.currentIndex || index < 0 || index >= root.options.length)
+            return;
+        EffectsService.picked(target, pointer);
+        root.valueSelected(root.options[index].value);
+    }
 
     readonly property int inset: Theme.spacingMicro
     readonly property int currentIndex: {
@@ -38,11 +48,20 @@ Rectangle {
     height: implicitHeight
     radius: Theme.borderRadius
     opacity: root.enabled ? 1.0 : Theme.disabledOpacity
+    activeFocusOnTab: true
     color: Theme.controlFill
     border.width: Theme.borderWidth
     border.color: Theme.controlBorder
 
     Accessible.role: Accessible.Grouping
+    Keys.onPressed: event => {
+        const direction = Keyboard.arrowStep(event);
+        if (direction !== 0) {
+            event.accepted = true;
+            const index = root.currentIndex < 0 ? 0 : root.currentIndex + direction;
+            root.pick(index, segments.itemAt(index), null);
+        }
+    }
 
     FontMetrics {
         id: segmentMetrics
@@ -68,6 +87,7 @@ Rectangle {
     }
 
     Repeater {
+        id: segments
         model: root.options
 
         delegate: Rectangle {
@@ -94,14 +114,14 @@ Rectangle {
                     root.valueSelected(segment.modelData.value);
             }
 
-            Text {
+            Label {
                 anchors.fill: parent
                 anchors.leftMargin: Theme.spacingTiny
                 anchors.rightMargin: Theme.spacingTiny
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
                 text: String(segment.modelData.label)
-                font: segmentMetrics.font
+                font.bold: true
                 color: segment.selected ? Theme.text : Theme.subtext
                 elide: Text.ElideRight
 
@@ -116,13 +136,10 @@ Rectangle {
                 enabled: root.enabled
                 hoverEnabled: true
                 cursorShape: root.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                onClicked: {
-                    if (segment.selected)
-                        return;
-                    EffectsService.picked(segment, segmentMouse);
-                    root.valueSelected(segment.modelData.value);
-                }
+                onClicked: root.pick(segment.index, segment, segmentMouse)
             }
         }
     }
+
+    FocusRing {}
 }

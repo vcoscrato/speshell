@@ -76,8 +76,9 @@ closest_language() {
   printf '%s' "${languages[0]}"
 }
 
+# Fails when whisper does; its messages go to the log.
 transcribe() {
-  whisper-cli -m "$model_file" -f "$audio_file" -l "$1" -nt --prompt "$vocabulary" 2>>"$debug_dir/whisper.log" || true
+  whisper-cli -m "$model_file" -f "$audio_file" -l "$1" -nt --prompt "$vocabulary" 2>>"$debug_dir/whisper.log"
 }
 
 download_model() {
@@ -134,12 +135,14 @@ mkdir -p "$debug_dir"
 : >"$debug_dir/whisper.log"
 language="auto"
 ((${#languages[@]} == 1)) && language="${languages[0]}"
-transcription="$(transcribe "$language")"
+failed=0
+transcription="$(transcribe "$language")" || failed=1
 detected="$(sed -n 's/.*auto-detected language: \([a-z]*\).*/\1/p' "$debug_dir/whisper.log")"
 
 if ((${#languages[@]} > 1)) && [[ -n "$detected" && " ${languages[*]} " != *" $detected "* ]]; then
   retry="$(closest_language "$detected")"
-  transcription="$(transcribe "$retry")"
+  failed=0
+  transcription="$(transcribe "$retry")" || failed=1
   detected="$detected->$retry"
 fi
 
@@ -150,7 +153,14 @@ mv -f "$audio_file" "$debug_dir/last.wav"
 echo "$(date +%T) lang=$language detected=${detected:--} text=$text" >>"$debug_dir/log"
 tail -n 50 "$debug_dir/log" >"$debug_dir/log.tmp" && mv -f "$debug_dir/log.tmp" "$debug_dir/log"
 
-if [[ -n "$text" ]]; then
-  printf '%s' "$text" | wl-copy 2>/dev/null || true
-  type_text "$text" 2>/dev/null || true
+# Nothing heard is quiet; nothing because whisper failed says why.
+if [[ -z "$text" ]]; then
+  error="$(grep -iE 'error|fail' "$debug_dir/whisper.log" | tail -n1 || true)"
+  if ((failed)) || [[ -n "$error" ]]; then
+    notify "Dictation failed" "$(preview "${error:-whisper-cli stopped with an error.}")"
+    exit 1
+  fi
+  exit 0
 fi
+printf '%s' "$text" | wl-copy 2>/dev/null || true
+type_text "$text" 2>/dev/null || true

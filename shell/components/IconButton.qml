@@ -1,7 +1,9 @@
 import QtQuick
 import qs.services
+import "Keyboard.js" as Keyboard
 
-// A square button that shows only an icon, filled while hovered, and its tooltip.
+// A square button that shows only an icon, filled while hovered, and its tooltip, also
+// while the keyboard is on it.
 Rectangle {
     id: root
 
@@ -22,6 +24,7 @@ Rectangle {
     radius: Theme.borderRadius
     opacity: enabled ? 1.0 : Theme.disabledOpacity
     scale: mouseArea.pressed ? Theme.pressScale : 1
+    activeFocusOnTab: true
     color: mouseArea.containsMouse && root.enabled ? root.hoverColor : "transparent"
 
     Behavior on scale {
@@ -35,6 +38,12 @@ Rectangle {
     Accessible.onPressAction: {
         if (root.enabled)
             root.clicked();
+    }
+    Keys.onPressed: event => {
+        if (root.enabled && Keyboard.presses(event)) {
+            event.accepted = true;
+            root.clicked();
+        }
     }
 
     AppIcon {
@@ -56,7 +65,9 @@ Rectangle {
     }
 
     Tooltip {
-        visible: root.tooltipText !== "" && mouseArea.containsMouse
+        visible: root.tooltipText !== "" && (mouseArea.containsMouse || root.activeFocus)
         text: root.tooltipText
     }
+
+    FocusRing {}
 }

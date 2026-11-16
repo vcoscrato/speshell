@@ -1,4 +1,5 @@
 import QtQuick
+import "common/Colors.js" as Colors
 import "Water.js" as Water
 
 // A water whip along a log spiral. See Whip.frag.
@@ -13,7 +14,7 @@ ShaderEffect {
     property real head: 0
     property real len: 3
     property real tubeWidth: 16
-    property var theme: null
+    property var theme: Colors.fallback
     property color cDeep: Water.deep(theme)
     property color cMid: Water.mid(theme)
     property color cLight: Water.light(theme)

@@ -27,14 +27,12 @@ Singleton {
         tools: { label: "Tools", icon: "tools" },
         weather: { label: "Weather", icon: "cloud" }
     })
-    // Dropdowns open across the bars.
-    property int openDropdowns: 0
 
     // The bar on the screen named `screen` opens `panel`, or closes it when `toggle`
     // and it is open.
     signal requested(string panel, string screen, bool toggle)
-    // The bars close their dropdowns.
-    signal dismissRequested()
+    // The bars close their dropdowns; one that had one open sets `closed.any`.
+    signal dismissRequested(var closed)
 
     function has(panel) {
         return Object.prototype.hasOwnProperty.call(root.panels, panel);
@@ -46,7 +44,7 @@ Singleton {
         if (panel === "bluetooth")
             return FeatureSupport.supportsBluetooth;
         if (panel === "display")
-            return FeatureSupport.supportsDisplayControl;
+            return HyprlandService.running;
         if (panel === "media")
             return MediaService.player !== null;
         if (panel === "weather")
@@ -156,8 +154,8 @@ Singleton {
 
     // Closes every dropdown. Returns whether any was open.
     function dismiss() {
-        const shown = root.openDropdowns > 0;
-        root.dismissRequested();
-        return shown;
+        const closed = { any: false };
+        root.dismissRequested(closed);
+        return closed.any;
     }
 }

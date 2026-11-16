@@ -13,6 +13,8 @@ Item {
     property string panel: ""
     property string title: PanelService.has(root.panel) ? PanelService.panels[root.panel].label : ""
     property string iconName: PanelService.has(root.panel) ? PanelService.panels[root.panel].icon : ""
+    // How many the panel holds, in a pill beside the title; 0 shows none.
+    property int count: 0
 
     implicitWidth: Theme.panelWidth
     implicitHeight: container.implicitHeight
@@ -29,7 +31,8 @@ Item {
         Item {
             visible: root.title !== ""
             width: parent.width
-            height: visible ? Math.max(20, leftTitleRow.height, headerActionsRow.height) : 0
+            // As tall as a header button, whether or not it has one.
+            height: visible ? Math.max(Theme.controlHeightSmall, leftTitleRow.height, headerActionsRow.height) : 0
 
             Row {
                 id: leftTitleRow
@@ -47,7 +50,16 @@ Item {
 
                 Label {
                     role: "section"
+                    anchors.verticalCenter: parent.verticalCenter
                     text: root.title
+                }
+
+                Pill {
+                    visible: root.count > 0
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.count
+                    toneColor: Theme.overlay
+                    textColor: Theme.subtext
                 }
             }
 

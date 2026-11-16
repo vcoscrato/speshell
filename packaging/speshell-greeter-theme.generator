@@ -1,0 +1,14 @@
+#!/bin/sh
+# Points each enabled speshell-greeter-theme@USER.path at USER's theme, in their home
+# wherever it is. systemd runs this at boot and on each reload, before loading units.
+out=${1:?usage: speshell-greeter-theme.generator NORMAL-DIR}
+for link in /etc/systemd/system/*.wants/speshell-greeter-theme@*.path; do
+  [ -L "$link" ] || continue
+  unit=${link##*/}
+  user=${unit#speshell-greeter-theme@}
+  user=${user%.path}
+  home=$(getent passwd "$user" | cut -d: -f6)
+  [ -n "$home" ] || continue
+  mkdir -p "$out/$unit.d"
+  printf '[Path]\nPathChanged=%s/.local/share/speshell/theme.json\n' "$home" >"$out/$unit.d/home.conf"
+done

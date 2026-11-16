@@ -1,11 +1,10 @@
-//@ pragma UseQApplication
 pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.bar
 import qs.services
-import "../services/TimerProvider.js" as TimerProvider
+import "../services/Duration.js" as Duration
 import "../components/Format.js" as Format
 
 // The running shell, once config.ini is valid: the IPC targets behind `speshell` that
@@ -42,9 +41,11 @@ Scope {
         return ok ? "" : "error: " + why;
     }
 
+    readonly property string noWallpaper: "error: Speshell doesn't draw the wallpaper: [Appearance] drawWallpaper is false"
+
     function openWallpapers(toggle) {
         if (!ThemeService.wallpaperEnabled)
-            return "error: Speshell doesn't draw the wallpaper: [Appearance] drawWallpaper is false";
+            return root.noWallpaper;
         if (toggle)
             ThemeService.toggleGallery("wallpapers");
         else
@@ -59,9 +60,9 @@ Scope {
     // Panels save to config.ini as they change; a save that fails says so.
     Connections {
         target: ConfigService
-        function onOperationMessageChanged() {
-            if (ConfigService.operationFailed && ConfigService.operationMessage !== "")
-                NotificationService.addInternalNotification("config", "Speshell config", ConfigService.operationMessage);
+        function onFeedbackChanged() {
+            if (ConfigService.feedback.tone === "error")
+                NotificationService.addInternalNotification("config", "Speshell config", ConfigService.feedback.text);
         }
     }
 
@@ -94,13 +95,13 @@ Scope {
 
         // A length and a name: "25", "10 pasta", "bread at 21:30".
         function start(text: string): string {
-            const parsed = TimerProvider.parseTimer(text);
+            const parsed = Duration.parseTimer(text);
             return root.reply(TimerService.start(parsed.seconds, parsed.name) !== null,
                 "not a length: " + text + " (minutes, or like 1h30 or 90s)");
         }
         // To the timer named, or the one that ends first.
         function add(text: string): string {
-            const parsed = TimerProvider.parseTimer(text);
+            const parsed = Duration.parseTimer(text);
             return root.reply(TimerService.add(TimerService.find(parsed.name), parsed.seconds),
                 "no timer to add to, or not a length: " + text);
         }
@@ -128,22 +129,17 @@ Scope {
     IpcHandler {
         target: "activity"
 
+        // STATE is active or busy, TONE neutral, accent, success, warning, or error.
         function publish(id: string, state: string, label: string, detail: string,
-                         iconName: string, tone: string): void {
-            ActivityService.publish("ipc", {
-                id: id,
-                state: state,
-                label: label,
-                detail: detail,
-                iconName: iconName,
-                tone: tone,
-                priority: 50
-            });
+                         iconName: string, tone: string): string {
+            return root.reply(ActivityService.publish(id, state, label, detail, iconName, tone),
+                "not an activity: the id is letters, digits, and . _ -, the state active or busy, "
+                    + "and the tone neutral, accent, success, warning, or error");
         }
 
-        function clear(id: string): void { ActivityService.clear("ipc", id); }
+        function clear(id: string): void { ActivityService.clear(id); }
         function list(): string { return JSON.stringify(ActivityService.activities); }
-        function refresh(): void { processActivities.refresh(); }
+        function refresh(): void { ToolsService.refresh(); }
     }
 
     IpcHandler {
@@ -185,7 +181,7 @@ Scope {
 
         function set(path: string): string {
             if (!ThemeService.wallpaperEnabled)
-                return "error: Speshell doesn't draw the wallpaper: [Appearance] drawWallpaper is false";
+                return root.noWallpaper;
             return root.reply(ThemeService.setWallpaper(path),
                 path + " is not in a theme folder in " + ThemeService.themesDirs.join(" or "));
         }
@@ -193,10 +189,6 @@ Scope {
         // The theme gallery, at the current theme's wallpapers.
         function open(): string { return root.openWallpapers(false); }
         function toggle(): string { return root.openWallpapers(true); }
-    }
-
-    ActivityProcessAdapter {
-        id: processActivities
     }
 
     Variants {

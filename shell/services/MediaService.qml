@@ -51,6 +51,21 @@ Singleton {
         root.player.position = root.displayedPosition;
     }
 
+    function togglePlaying() {
+        if (root.player)
+            root.player.togglePlaying();
+    }
+
+    function previous() {
+        if (root.player)
+            root.player.previous();
+    }
+
+    function next() {
+        if (root.player)
+            root.player.next();
+    }
+
     function setViewPresented(presented) {
         const next = !!presented;
         if (root.viewPresented === next)

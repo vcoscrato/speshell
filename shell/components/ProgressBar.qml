@@ -9,11 +9,10 @@ Rectangle {
     property real value: 0
     property color fillColor: Theme.accent
 
-    width: parent ? parent.width : 0
+    width: parent?.width ?? 0
     implicitHeight: Theme.spacingTiny
     radius: height / 2
-    // The slider's track.
-    color: Theme.alpha(Theme.surface2, 0.5)
+    color: Theme.trackFill
 
     Rectangle {
         width: parent.width * Math.max(0, Math.min(1, root.value))

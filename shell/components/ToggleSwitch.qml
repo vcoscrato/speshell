@@ -1,8 +1,9 @@
 import QtQuick
 import qs.services
+import "Keyboard.js" as Keyboard
 
 // An on/off switch with the theme's knob. It shows the requested state at once and
-// falls back if the change doesn't happen.
+// falls back if the change doesn't happen. Space or Enter flips it from the keyboard.
 Rectangle {
     id: root
 
@@ -17,16 +18,21 @@ Rectangle {
     property bool requested: false
     readonly property bool on: root.pending ? root.requested : root.checked
 
+    // The thumb, at an inset as wide all round, with as much again to travel.
+    readonly property int thumbSize: Theme.iconSizeSmall
+    readonly property real inset: (root.height - root.thumbSize) / 2
+
     onCheckedChanged: if (root.checked === root.requested) root.pending = false
 
-    implicitWidth: 36
-    implicitHeight: 20
+    implicitHeight: Theme.controlHeightSmall - Theme.spacingTiny
+    implicitWidth: root.implicitHeight + root.thumbSize + Theme.spacingMicro
     radius: height / 2
     opacity: enabled ? 1.0 : Theme.disabledOpacity
+    activeFocusOnTab: true
 
     color: root.on
         ? Theme.accent
-        : Theme.alpha(Theme.surface2, 0.4)
+        : Theme.trackFill
     border.width: Theme.borderWidth
     border.color: root.on
         ? Theme.accent
@@ -47,6 +53,12 @@ Rectangle {
         if (root.enabled)
             root.flip();
     }
+    Keys.onPressed: event => {
+        if (Keyboard.presses(event)) {
+            event.accepted = true;
+            root.flip();
+        }
+    }
 
     function flip() {
         const next = !root.on;
@@ -66,11 +78,11 @@ Rectangle {
 
     Rectangle {
         id: thumb
-        width: switchMouse.pressed ? 16 : 14
-        height: 14
+        width: switchMouse.pressed ? root.thumbSize + Theme.spacingMicro : root.thumbSize
+        height: root.thumbSize
         radius: height / 2
         anchors.verticalCenter: parent.verticalCenter
-        x: root.on ? (root.width - width - 3) : 3
+        x: root.on ? root.width - width - root.inset : root.inset
 
         color: knob.status === Loader.Ready ? "transparent"
             : root.on ? Theme.bg : Theme.subtext
@@ -118,7 +130,11 @@ Rectangle {
     }
 
     Tooltip {
-        visible: root.tooltipText !== "" && switchMouse.containsMouse
+        visible: root.tooltipText !== "" && (switchMouse.containsMouse || root.activeFocus)
         text: root.tooltipText
+    }
+
+    FocusRing {
+        radius: height / 2
     }
 }

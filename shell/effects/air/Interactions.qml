@@ -1,4 +1,5 @@
 import QtQuick
+import "common/Colors.js" as Colors
 import "common"
 
 // Air's effects on Speshell's controls. A knob dragged along a slider is blown
@@ -10,7 +11,7 @@ Item {
     id: root
 
     // ── Speshell effects API v1: interactions ───────────────
-    property var theme: null
+    property var theme: Colors.fallback
 
     // Travel not yet paid out in specks and leaves, px, and time since the last of each, s.
     property real speckOwed: 0
@@ -19,28 +20,24 @@ Item {
     property real sinceSpeck: 1
     property real sinceLeaf: 1
 
-    function rnd(a, b) {
-        return a + Math.random() * (b - a);
-    }
-
     function wisp(x, y, vx, vy, size) {
-        bits.spawn({ x: x, y: y, vx: vx, vy: vy, drag: 2.5, life: rnd(0.4, 0.6), size: size, orient: true,
-                     props: { kind: 0, seed: Math.random(), z: 0 } });
+        bits.emit(0, { x: x, y: y, vx: vx, vy: vy, drag: 2.5, life: bits.rnd(0.4, 0.6), size: size, orient: true,
+                       props: { z: 0 } });
     }
 
     function leaf(x, y, vx, vy) {
-        bits.spawn({ x: x, y: y, vx: vx, vy: vy, gravity: 160, drag: 1.5, life: rnd(0.8, 1.0),
-                     size: Math.round(rnd(12, 16)), angle: rnd(0, 360), spin: rnd(-420, 420),
-                     props: { kind: 1, seed: Math.random(), z: 2 } });
+        bits.emit(1, { x: x, y: y, vx: vx, vy: vy, gravity: 160, drag: 1.5, life: bits.rnd(0.8, 1.0),
+                       size: Math.round(bits.rnd(12, 16)), angle: bits.rnd(0, 360), spin: bits.rnd(-420, 420),
+                       props: { z: 2 } });
     }
 
     function curl(x, y, size) {
-        bits.spawn({ x: x, y: y, life: 0.55, size: size, props: { kind: 2, seed: Math.random(), z: 1 } });
+        bits.emit(2, { x: x, y: y, life: 0.55, size: size, props: { z: 1 } });
     }
 
     function speck(x, y) {
-        bits.spawn({ x: x, y: y, vx: rnd(-25, 25), vy: rnd(10, 40), drag: 1, life: rnd(0.5, 0.8), size: 4,
-                     props: { kind: 3, seed: Math.random(), z: 1 } });
+        bits.emit(3, { x: x, y: y, vx: bits.rnd(-25, 25), vy: bits.rnd(10, 40), drag: 1, life: bits.rnd(0.5, 0.8), size: 4,
+                       props: { z: 1 } });
     }
 
     // A gust from behind blows the knob along: the one blowing its way takes the
@@ -63,16 +60,16 @@ Item {
         if (root.speckOwed >= 40 && root.sinceSpeck > 0.08) {
             root.speckOwed = 0;
             root.sinceSpeck = 0;
-            bits.spawn({ x: at.x - dir * rnd(14, 26 + 30 * s), y: at.y + rnd(-6, 6), vx: dir * rnd(160, 220 + 160 * s),
-                         vy: rnd(-25, 25), drag: 2, life: rnd(0.35, 0.5), size: 6,
-                         props: { kind: 3, seed: Math.random(), z: 1 } });
+            bits.emit(3, { x: at.x - dir * bits.rnd(14, 26 + 30 * s), y: at.y + bits.rnd(-6, 6), vx: dir * bits.rnd(160, 220 + 160 * s),
+                           vy: bits.rnd(-25, 25), drag: 2, life: bits.rnd(0.35, 0.5), size: 6,
+                           props: { z: 1 } });
         }
         root.leafOwed += Math.abs(dx);
         if (root.leafOwed >= root.leafEvery && root.sinceLeaf > 0.35) {
             root.leafOwed = 0;
             root.sinceLeaf = 0;
-            root.leafEvery = rnd(110, 170);
-            root.leaf(at.x - dir * rnd(18, 30), at.y - rnd(2, 8), dir * rnd(200, 280), -rnd(70, 120));
+            root.leafEvery = bits.rnd(110, 170);
+            root.leaf(at.x - dir * bits.rnd(18, 30), at.y - bits.rnd(2, 8), dir * bits.rnd(200, 280), -bits.rnd(70, 120));
         }
     }
 
@@ -86,7 +83,7 @@ Item {
         const cx = at.x, cy = at.y;
         const size = Math.max(44, Math.min(96, Math.max(area.width, area.height) * 2));
         root.curl(cx, cy, size);
-        root.leaf(cx + size * 0.3, cy - size * 0.2, rnd(40, 100), -rnd(80, 140));
+        root.leaf(cx + size * 0.3, cy - size * 0.2, bits.rnd(40, 100), -bits.rnd(80, 140));
         root.wisp(cx - size * 0.4, cy + size * 0.15, 30, -60, 34);
         root.wisp(cx + size * 0.4, cy - size * 0.15, -30, 60, 34);
     }
@@ -96,10 +93,10 @@ Item {
         const cy = area.y + area.height / 2;
         if (on) {
             root.curl(x, cy, 36);
-            root.leaf(x, cy - 6, rnd(40, 110), -rnd(90, 150));
+            root.leaf(x, cy - 6, bits.rnd(40, 110), -bits.rnd(90, 150));
         } else {
             for (let i = 0; i < 3; i++)
-                root.speck(x + rnd(-6, 6), cy - rnd(0, 8));
+                root.speck(x + bits.rnd(-6, 6), cy - bits.rnd(0, 8));
         }
     }
 
@@ -137,7 +134,7 @@ Item {
         property real knob: 10
         property real lead: 0
         property real seed: 0
-        property color cWind: root.theme ? root.theme.text : "#f4ead8"
+        property color cWind: root.theme.text
         fragmentShader: Qt.resolvedUrl("qsb/Interactions.gust.qsb")
     }
 
@@ -175,10 +172,10 @@ Item {
                 property real seed: 0
                 property real kind: 0
                 property real size: width
-                property color cWind: root.theme ? root.theme.text : "#f4ead8"
-                property color cLeaf: root.theme ? root.theme.accent : "#f39a3a"
-                property color cLeafBack: root.theme ? root.theme.peach : "#f0a03c"
-                property color cOutline: root.theme ? root.theme.crust : "#130f0b"
+                property color cWind: root.theme.text
+                property color cLeaf: root.theme.accent
+                property color cLeafBack: root.theme.peach
+                property color cOutline: root.theme.crust
                 fragmentShader: Qt.resolvedUrl("qsb/Interactions.qsb")
             }
         }

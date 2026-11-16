@@ -12,6 +12,10 @@ Singleton {
     id: root
 
     readonly property bool available: FeatureSupport.hasCommand("tailscale")
+    // Whether tailscaled answered the last look. While it doesn't, as when it is off,
+    // nothing watches it; a look when the network panel opens or the network changes
+    // finds it again.
+    property bool daemonUp: true
 
     // tailscaled's BackendState: NeedsLogin, NeedsMachineAuth, Stopped, Starting,
     // or Running; "" while tailscaled can't be reached.
@@ -39,8 +43,8 @@ Singleton {
     }
 
     function refresh() {
-        if (root.available && !statusProc.running)
-            statusProc.running = true;
+        if (root.available)
+            statusProc.request();
     }
 
     function parseStatus(text) {
@@ -50,6 +54,7 @@ Singleton {
         } catch (error) {
             status = null;
         }
+        root.daemonUp = status !== null;
         root.backendState = (status && status.BackendState) || "";
     }
 
@@ -106,7 +111,7 @@ Singleton {
         root.refresh();
     }
 
-    Process {
+    QueuedProcess {
         id: statusProc
         command: ["tailscale", "status", "--json", "--peers=false"]
         stdout: StdioCollector {
@@ -127,26 +132,28 @@ Singleton {
         onExited: exitCode => root.finishSwitch(exitCode)
     }
 
-    // tailscaled's notifications: any of them can change the status.
-    Process {
-        id: watchProc
-        running: root.available
+    // tailscaled's notifications: any of them can change the status. It exits when
+    // tailscaled goes away, and the look then tells whether to start it again.
+    Watcher {
+        watching: root.available && root.daemonUp
         command: ["tailscale", "debug", "watch-ipn"]
         stdout: SplitParser {
             onRead: refreshDebounce.restart()
         }
-        onRunningChanged: {
-            root.refresh();
-            if (!watchProc.running && root.available)
-                rewatch.restart();
-        }
+        onRunningChanged: root.refresh()
     }
 
-    // Restarts the watch when tailscaled goes away.
-    Timer {
-        id: rewatch
-        interval: 5000
-        onTriggered: watchProc.running = root.available
+    Connections {
+        target: NetworkService
+
+        function onConnectedWifiChanged() {
+            if (!root.daemonUp)
+                root.refresh();
+        }
+        function onWiredDeviceChanged() {
+            if (!root.daemonUp)
+                root.refresh();
+        }
     }
 
     Timer {

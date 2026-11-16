@@ -36,17 +36,21 @@ Card {
             color: Theme.subtext
         }
 
-        // The charge as a battery: a frame, the level, and the terminal.
+        // The charge as a battery: a frame, the level, and the terminal, the level as far
+        // inside the frame as the terminal stands out of it.
         Item {
             id: gauge
+
+            readonly property int inset: Theme.spacingMicro + Theme.borderWidth
+
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            width: 64
-            height: 22
+            width: gauge.height * 3
+            height: Theme.controlHeightSmall - Theme.spacingMicro
 
             Rectangle {
                 id: frame
-                width: parent.width - 4
+                width: parent.width - gauge.inset - Theme.borderWidth
                 height: parent.height
                 radius: Theme.borderRadius
                 color: Theme.controlFill
@@ -54,10 +58,10 @@ Card {
                 border.color: Theme.overlay
 
                 Rectangle {
-                    x: 3
-                    y: 3
-                    width: (frame.width - 6) * Math.max(0, Math.min(1, BatteryService.percent / 100))
-                    height: frame.height - 6
+                    x: gauge.inset
+                    y: gauge.inset
+                    width: (frame.width - gauge.inset * 2) * Math.max(0, Math.min(1, BatteryService.percent / 100))
+                    height: frame.height - gauge.inset * 2
                     radius: Theme.borderRadius
                     color: root.tone
 
@@ -69,11 +73,11 @@ Card {
 
             Rectangle {
                 anchors.left: frame.right
-                anchors.leftMargin: 1
+                anchors.leftMargin: Theme.borderWidth
                 anchors.verticalCenter: parent.verticalCenter
-                width: 3
-                height: 8
-                radius: 1
+                width: gauge.inset
+                height: Theme.spacingSmall
+                radius: Theme.borderWidth
                 color: Theme.overlay
             }
         }
@@ -124,17 +128,6 @@ Card {
     }
 
     PowerModeRow {}
-
-    SettingRow {
-        label: "Saver on battery"
-        info: "Switches to Saver when unplugged, and back to the mode picked while plugged in."
-
-        ToggleSwitch {
-            checked: PowerService.saverOnBattery
-            tooltipText: "Saver on battery"
-            onToggled: on => PowerService.setSaverOnBattery(on)
-        }
-    }
 
     DeviceSection {
         visible: BatteryService.peripherals.length > 0

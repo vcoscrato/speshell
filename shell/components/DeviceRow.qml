@@ -2,11 +2,14 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.services
+import "Keyboard.js" as Keyboard
 
 // A device or network: an icon disc, a title over a detail line, and its actions at the
-// right edge, flush with the panel's header. `current` lights the disc for the active
-// connection; `busy` spins it while it changes. What the row holds (a password prompt, an
-// error) lines up under its title.
+// right edge, flush with the panel's header. `current` marks the device in use or the
+// active connection, lighting the disc and checking the row; `busy` spins the disc while
+// it changes. Rows are as tall with a detail line as without. What the row holds (a
+// password prompt, an error) lines up under its title. Space or Enter picks it from the
+// keyboard.
 Item {
     id: root
 
@@ -20,17 +23,32 @@ Item {
     property var actions: [] // [{ text, kind, enabled, actionId }]
 
     default property alias expandedContent: expandedColumn.data
+    // Under the pointer, its actions too, for actions shown only on hover.
+    readonly property alias hovered: rowHover.hovered
 
     signal primaryTriggered()
     signal actionTriggered(string actionId)
 
-    width: parent ? parent.width : 300
+    width: parent?.width ?? 0
     implicitHeight: contentColumn.implicitHeight + Theme.spacingTiny * 2
+    activeFocusOnTab: root.primaryEnabled
 
     Accessible.role: Accessible.Button
     Accessible.name: root.title
     Accessible.description: root.subtitle
     Accessible.onPressAction: if (root.primaryEnabled) root.primaryTriggered()
+    Keys.onPressed: event => {
+        if (Keyboard.presses(event)) {
+            event.accepted = true;
+            if (!root.current)
+                EffectsService.picked(iconDisc, null);
+            root.primaryTriggered();
+        }
+    }
+
+    HoverHandler {
+        id: rowHover
+    }
 
     MouseArea {
         id: rowMouse
@@ -53,9 +71,10 @@ Item {
         anchors.topMargin: Theme.spacingTiny
         spacing: Theme.spacingSmall
 
+        // As tall as a title over a detail line, whether or not there is one.
         Item {
             width: parent.width
-            height: Math.max(iconDisc.height, textColumn.implicitHeight)
+            height: Math.max(iconDisc.height, titleLabel.implicitHeight + textColumn.spacing + subtitleLabel.implicitHeight)
 
             IconDisc {
                 id: iconDisc
@@ -76,6 +95,7 @@ Item {
                 spacing: Theme.spacingMicro
 
                 Label {
+                    id: titleLabel
                     role: "title"
                     width: parent.width
                     text: root.title
@@ -84,6 +104,7 @@ Item {
                 }
 
                 Label {
+                    id: subtitleLabel
                     role: "caption"
                     width: parent.width
                     text: root.subtitle
@@ -98,6 +119,14 @@ Item {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: Theme.spacingTiny
+
+                AppIcon {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: root.current && !root.busy
+                    name: "check"
+                    size: Theme.iconSizeSmall
+                    iconColor: Theme.accent
+                }
 
                 Repeater {
                     model: root.actions
@@ -122,4 +151,6 @@ Item {
             spacing: Theme.spacingSmall
         }
     }
+
+    FocusRing {}
 }

@@ -3,6 +3,7 @@ import QtQuick
 import Quickshell
 import qs.services
 import qs.components
+import "../components/Keyboard.js" as Keyboard
 
 // The bar's screen's Hyprland workspaces: those with windows and the active one. A
 // click shows one; hovering names its last focused window.
@@ -41,10 +42,17 @@ Row {
                 : (workspace.pointerInside ? Theme.cardHover : "transparent")
             border.width: workspace.info.active ? Theme.borderWidth : 0
             border.color: Theme.selectedBorder
+            activeFocusOnTab: true
 
             Accessible.role: Accessible.Button
             Accessible.name: "Workspace " + workspace.info.name
             Accessible.onPressAction: WorkspaceService.focus(workspace.modelData)
+            Keys.onPressed: event => {
+                if (Keyboard.presses(event)) {
+                    event.accepted = true;
+                    WorkspaceService.focus(workspace.modelData);
+                }
+            }
 
             Label {
                 id: nameText
@@ -82,6 +90,8 @@ Row {
                     WorkspaceService.focus(workspace.modelData);
                 }
             }
+
+            FocusRing {}
         }
     }
 }

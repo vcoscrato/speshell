@@ -9,7 +9,6 @@
 // from there.
 #include "../common/common.glsl"
 
-const float TAU = 6.2831853;
 // Shards around the impact, and how much longer they run along a ray than across it.
 const float N = 30.0;
 const float KU = 0.72;

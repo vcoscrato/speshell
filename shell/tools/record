@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 # Usage: record [region|screen]
 # Records an area the user drags out (region, the default) or the focused
-# monitor (screen), with audio, to Videos/Recordings. While a recording runs,
+# monitor (screen), with audio, to Videos/Recordings. While its recording runs,
 # any call stops it.
 set -euo pipefail
 # shellcheck source=lib.sh
 source "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")/lib.sh"
 
+# The recording this tool runs, by its wf-recorder's pid; another app's is left alone.
+pid_file="$runtime_dir/record.pid"
+pid="$(cat -- "$pid_file" 2>/dev/null || true)"
 # SIGINT lets wf-recorder finish the file.
-if pkill -SIGINT -x wf-recorder 2>/dev/null; then
+if [[ "$pid" =~ ^[0-9]+$ && "$(ps -o comm= -p "$pid" 2>/dev/null)" == wf-recorder ]] && kill -INT "$pid" 2>/dev/null; then
   refresh_activity
   exit 0
 fi
@@ -32,7 +35,11 @@ file="$(timestamped_file VIDEOS Recordings Recording).mp4"
 log="$runtime_dir/record.log"
 refresh_activity
 status=0
-wf-recorder "${target[@]}" --audio -f "$file" >"$log" 2>&1 </dev/null || status=$?
+(
+  printf '%s\n' "$BASHPID" >"$pid_file"
+  exec wf-recorder "${target[@]}" --audio -f "$file"
+) >"$log" 2>&1 </dev/null || status=$?
+rm -f -- "$pid_file"
 refresh_activity
 
 if [[ ! -s "$file" ]]; then

@@ -11,7 +11,7 @@ import "Shell.js" as Shell
 Singleton {
     id: root
 
-    // Each display as monitor() reads it from hyprctl: { name, description, disabled,
+    // Each display as monitor() reads it from hyprctl: { name, description, model, disabled,
     // focused, width and height in pixels, scale, x and y in logical pixels, mirrorOf
     // (the name of the display it mirrors, or ""), mode (its mode's key, or "preferred"),
     // and modes (the keys of the ones it has, largest first) }.
@@ -95,6 +95,7 @@ Singleton {
         return {
             name: String(raw.name || ""),
             description: String(raw.description || ""),
+            model: String(raw.model || ""),
             disabled: !!raw.disabled,
             focused: !!raw.focused,
             width: Number(raw.width) || 1,
@@ -264,30 +265,27 @@ Singleton {
     }
 
     // ── Applying ───────────────────────────────────────────
-    // The hyprctl arguments that set `monitor` up: an `eval` of Lua under a Lua config,
-    // else a `keyword monitor` rule.
+    // The hyprctl arguments that set `monitor` up: an hl.monitor() under a Lua config,
+    // else a monitor rule.
     function commandFor(monitor) {
         const mirrored = monitor.mirrorOf !== "";
         const position = mirrored ? "0x0" : Math.round(monitor.x) + "x" + Math.round(monitor.y);
-        if (!HyprlandService.usingLua) {
-            const rule = monitor.disabled
-                ? [monitor.name, "disable"]
-                : [monitor.name, monitor.mode, position, monitor.scale].concat(mirrored ? ["mirror", monitor.mirrorOf] : []);
-            return ["keyword", "monitor", rule.join(",")];
-        }
         const quote = HyprlandService.luaQuote;
         if (monitor.disabled)
-            return ["eval", "hl.monitor({ output = " + quote(monitor.name) + ", disabled = true })"];
-        return ["eval", "hl.monitor({ output = " + quote(monitor.name)
-            + ", mode = " + quote(monitor.mode)
-            + ", position = " + quote(position)
-            + ", scale = " + monitor.scale
-            // Always sent: Hyprland merges the rule into the last one, so a mirror left
-            // out stays mirrored, and a display disabled before (as the lid does) stays
-            // disabled.
-            + ", mirror = " + quote(monitor.mirrorOf)
-            + ", disabled = false"
-            + " })"];
+            return HyprlandService.configArgs("hl.monitor({ output = " + quote(monitor.name) + ", disabled = true })",
+                "monitor", monitor.name + ",disable");
+        return HyprlandService.configArgs("hl.monitor({ output = " + quote(monitor.name)
+                + ", mode = " + quote(monitor.mode)
+                + ", position = " + quote(position)
+                + ", scale = " + monitor.scale
+                // Always sent: Hyprland merges the rule into the last one, so a mirror left
+                // out stays mirrored, and a display disabled before (as the lid does) stays
+                // disabled.
+                + ", mirror = " + quote(monitor.mirrorOf)
+                + ", disabled = false"
+                + " })",
+            "monitor", [monitor.name, monitor.mode, position, monitor.scale]
+                .concat(mirrored ? ["mirror", monitor.mirrorOf] : []).join(","));
     }
 
     // Sets `monitors` up, in `phase` until done. Stops at the first display Hyprland
@@ -409,8 +407,8 @@ Singleton {
 
     // ── Reading ────────────────────────────────────────────
     function refresh() {
-        if (HyprlandService.running && !monitorsProc.running)
-            monitorsProc.running = true;
+        if (HyprlandService.running)
+            monitorsProc.request();
     }
 
     function queueRefresh() {
@@ -478,7 +476,8 @@ Singleton {
         }
     }
 
-    Process {
+    // A refresh during a read reads again after it.
+    QueuedProcess {
         id: monitorsProc
         command: ["hyprctl", "monitors", "all", "-j"]
         stdout: StdioCollector { id: monitorsOutput }

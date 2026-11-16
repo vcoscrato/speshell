@@ -9,28 +9,15 @@ import "Bolt.js" as Bolt
 // around it. While open, speed dashes trail off behind it, electricity crackles
 // along its border, and now and then a bolt strikes it.
 // Closing, it squats, stretches, and tears away to the right on two trails of fire.
-Item {
+LauncherStage {
     id: root
-
-    // ── Speshell effects API v1 ────────────────────────────────
-    property Item panel: null
-    property rect panelRect
-    property bool active: false
-    // The active palette, as Theme.qml names it.
-    property var theme: null
-    signal closingFinished()
 
     // ── Choreography (seconds) ──────────────────────────────
     readonly property real arriveTime: 0.5     // racing in to the stop
     readonly property real settleTime: 0.3     // rocking back on its springs
-    readonly property real exitTime: 0.42
-    readonly property real tailTime: 0.18      // the fire burning out
-
-    // enter: 0..1 over the arrival and the settle; leave: 0..1 exit progress.
-    property real enter: 0
-    property real leave: 0
-    property real tailStart: 0
-    property bool exitDone: false
+    enterTime: arriveTime + settleTime
+    exitTime: 0.42
+    tailTime: 0.18      // the fire burning out
 
     // The drive, sampled each tick.
     property real driveX: -root.farLeft
@@ -46,11 +33,13 @@ Item {
     property real sparkOwed: 0
     property bool primed: false
     property real nextStrike: 1.2              // s until lightning strikes the open panel
+    // Whether it had stopped, and was leaving, as of the last step.
+    property bool wasStopped: false
+    property bool wasLeaving: false
 
     readonly property real arriveEnd: arriveTime / (arriveTime + settleTime)
     readonly property real farLeft: panelRect.x + panelRect.width + 140
     readonly property real farRight: width - panelRect.x + 140
-    readonly property bool capturing: enter < 1 || leave > 0
     readonly property real floorY: panelRect.y + panelRect.height
     // The rear tires, about a fifth of the way along the panel.
     readonly property real rear: panelRect.x + driveX + panelRect.width * 0.2
@@ -68,75 +57,54 @@ Item {
         return 16 * Math.sin(Math.PI * Math.min(1, s * 1.15)) * (1 - s);
     }
 
-    onActiveChanged: exitDone = false
-
-    EffectClock {
-        id: clock
-        onAdvanced: dt => {
-            const wasStopped = root.enter >= root.arriveEnd * 0.94;
-            const wasLeaving = root.leave > 0;
-            if (root.active) {
-                // Reopened mid-exit: it backs into place first.
-                if (root.leave > 0)
-                    root.leave = Math.max(0, root.leave - dt / root.exitTime);
-                else
-                    root.enter = Math.min(1, root.enter + dt / (root.arriveTime + root.settleTime));
-            } else if (root.leave < 1) {
-                root.leave = Math.min(1, root.leave + dt / root.exitTime);
-                root.tailStart = clock.clock;
-            } else if (!root.exitDone && clock.clock - root.tailStart >= root.tailTime) {
-                root.exitDone = true;
-                // Speshell may destroy this item inside the signal, so nothing may follow it.
-                root.closingFinished();
-                return;
-            }
-
-            const x = root.position();
-            if (!root.primed) {
-                root.primed = true;
-                root.driveX = x;
-            }
-            const v = (x - root.driveX) / dt;
-            const accel = (v - root.speed) / dt;
+    onAdvanced: dt => {
+        const x = root.position();
+        if (!root.primed) {
+            root.primed = true;
             root.driveX = x;
-            root.speed = v;
-            // Leans into braking and back from acceleration, settling by the end.
-            const want = Math.max(-14, Math.min(14, -accel * 0.0009)) * (1 - root.span(root.enter, 0.85, 1) * (root.leave > 0 ? 0 : 1));
-            root.lean += (want - root.lean) * Math.min(1, dt * 18);
-            if (root.enter >= 1 && root.leave === 0)
-                root.lean = 0;
-            const stretchTo = Math.min(0.2, Math.abs(v) / 9000);
-            root.stretchVel += (380 * (stretchTo - root.stretch) - 13 * root.stretchVel) * dt;
-            root.stretch = Math.max(-0.2, Math.min(0.25, root.stretch + root.stretchVel * dt));
-            root.travel += dt * (650 + Math.abs(v) * 0.5);
-
-            if (root.skidAge >= 0)
-                root.skidAge += dt;
-            if (root.fireAge >= 0)
-                root.fireAge += dt;
-            // Sparks off the rear while braking hard.
-            if (root.leave === 0 && root.enter < root.arriveEnd && x > -320) {
-                root.sparkOwed += Math.abs(v) * dt;
-                while (root.sparkOwed > 26) {
-                    root.sparkOwed -= 26;
-                    bits.emit(bits.spark, { x: root.rear, y: root.floorY + bits.rnd(4, 14), vx: bits.rnd(-260, -60),
-                                            vy: bits.rnd(-200, -40), gravity: 700, life: bits.rnd(0.3, 0.5),
-                                            size: Math.round(bits.rnd(16, 24)), orient: true });
-                }
-            }
-            // Now and then while open, lightning strikes it.
-            if (root.active && root.enter >= 1 && root.leave === 0) {
-                root.nextStrike -= dt;
-                if (root.nextStrike <= 0) {
-                    root.nextStrike = bits.rnd(0.9, 2.2);
-                    root.strikeBorder(0);
-                }
-            }
-            if (!wasStopped && root.enter >= root.arriveEnd * 0.94 && root.leave === 0)
-                root.stopped();
-            if (!wasLeaving && root.leave > 0 && !root.active)
-                root.launched();
         }
+        const v = (x - root.driveX) / dt;
+        const accel = (v - root.speed) / dt;
+        root.driveX = x;
+        root.speed = v;
+        // Leans into braking and back from acceleration, settling by the end.
+        const want = Math.max(-14, Math.min(14, -accel * 0.0009)) * (1 - root.span(root.enter, 0.85, 1) * (root.leave > 0 ? 0 : 1));
+        root.lean += (want - root.lean) * Math.min(1, dt * 18);
+        if (root.enter >= 1 && root.leave === 0)
+            root.lean = 0;
+        const stretchTo = Math.min(0.2, Math.abs(v) / 9000);
+        root.stretchVel += (380 * (stretchTo - root.stretch) - 13 * root.stretchVel) * dt;
+        root.stretch = Math.max(-0.2, Math.min(0.25, root.stretch + root.stretchVel * dt));
+        root.travel += dt * (650 + Math.abs(v) * 0.5);
+
+        if (root.skidAge >= 0)
+            root.skidAge += dt;
+        if (root.fireAge >= 0)
+            root.fireAge += dt;
+        // Sparks off the rear while braking hard.
+        if (root.leave === 0 && root.enter < root.arriveEnd && x > -320) {
+            root.sparkOwed += Math.abs(v) * dt;
+            while (root.sparkOwed > 26) {
+                root.sparkOwed -= 26;
+                bits.emit(bits.spark, { x: root.rear, y: root.floorY + bits.rnd(4, 14), vx: bits.rnd(-260, -60),
+                                        vy: bits.rnd(-200, -40), gravity: 700, life: bits.rnd(0.3, 0.5),
+                                        size: Math.round(bits.rnd(16, 24)), orient: true });
+            }
+        }
+        // Now and then while open, lightning strikes it.
+        if (root.active && root.enter >= 1 && root.leave === 0) {
+            root.nextStrike -= dt;
+            if (root.nextStrike <= 0) {
+                root.nextStrike = bits.rnd(0.9, 2.2);
+                root.strikeBorder(0);
+            }
+        }
+        if (!root.wasStopped && root.enter >= root.arriveEnd * 0.94 && root.leave === 0)
+            root.stopped();
+        if (!root.wasLeaving && root.leave > 0 && !root.active)
+            root.launched();
+        root.wasStopped = root.enter >= root.arriveEnd * 0.94;
+        root.wasLeaving = root.leave > 0;
     }
 
     // Skidded to its mark: smoke from the tires, sparks off the front, and lightning.
@@ -201,13 +169,22 @@ Item {
     }
 
     // ── Around the panel: speed lines, crackle, skid marks, and fire ──
+    // Over the whole screen while it races; once it stands, only round the panel and
+    // the dashes trailing behind it, which fade out within 700 px.
     ShaderEffect {
-        anchors.fill: parent
+        readonly property bool standing: root.leave === 0 && calm >= 1
+        readonly property real fromX: Math.max(0, root.panelRect.x - 700)
+        x: standing ? fromX : 0
+        y: standing ? root.panelRect.y - 30 : 0
+        width: standing ? root.panelRect.x + root.panelRect.width + 30 - fromX : root.width
+        height: standing ? root.panelRect.height + 60 : root.height
         visible: lines > 0 || skid > 0 || fire > 0
+        property point offset: Qt.point(x, y)
         property size resolution: Qt.size(width, height)
-        property real time: clock.simTime
+        property real screenWidth: root.width
+        property real time: root.clock.simTime
         property rect rect: Qt.rect(root.panelRect.x + root.driveX, root.panelRect.y, root.panelRect.width, root.panelRect.height)
-        property real radius: 12
+        property real radius: root.panelRadius
         property real lines: root.span(root.enter, 0, 0.12) * (1 - root.span(root.leave, 0.5, 1))
         // Once it stands, the dashes draw back behind it.
         property real calm: root.leave > 0 ? 1 - root.span(root.leave, 0, 0.3) : root.span(root.enter, root.arriveEnd, 1)
@@ -220,7 +197,7 @@ Item {
         property real fire: root.fireAge < 0 ? 0 : Math.max(0, Math.min(1, 1 - (root.fireAge - 0.18) / 0.42))
         property point fireSpan: Qt.point(root.panelRect.x + root.panelRect.width * 0.2, root.rear)
         property real trackY: root.floorY
-        property color cLine: root.theme ? root.theme.text : "#f6eee8"
+        property color cLine: root.theme.text
         property color cCore: Bolt.core(root.theme)
         property color cGlow: Bolt.glow(root.theme)
         property color cEdge: Bolt.edge(root.theme)
@@ -239,20 +216,13 @@ Item {
     }
 
     // ── The panel, racing; otherwise the real panel shows ──
-    ShaderEffectSource {
-        id: panelTex
-        sourceItem: root.panel
-        hideSource: root.capturing
-        live: root.capturing
-    }
-
     ShaderEffect {
         visible: root.capturing && root.panel !== null
         x: 0
         y: root.panelRect.y - 24 - root.panelRect.height * 0.25
         width: root.width
         height: root.panelRect.height * 1.25 + 48
-        property var source: panelTex
+        property var source: root.panelTexture
         property point origin: Qt.point(x, y)
         property size resolution: Qt.size(width, height)
         property rect rect: root.panelRect

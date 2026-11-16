@@ -19,10 +19,7 @@ BarButton {
     text: root.active >= 0 && root.active < root.layouts.length ? root.layouts[root.active].code : ""
     fontWeight: Font.DemiBold
     onClicked: menu.open()
-    onWheeled: delta => {
-        if (delta)
-            HyprlandService.switchKeyboardLayout((root.active + (delta > 0 ? -1 : 1) + root.layouts.length) % root.layouts.length);
-    }
+    onScrolled: direction => HyprlandService.switchKeyboardLayout((root.active - direction + root.layouts.length) % root.layouts.length)
 
     PopupMenu {
         id: menu

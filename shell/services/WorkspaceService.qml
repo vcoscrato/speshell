@@ -23,7 +23,6 @@ Singleton {
     // them alone.
     property string lastRead: ""
     property string lastWindowsRead: ""
-    property bool refreshQueued: false
 
     // Events after which the workspaces may have changed. Window titles change too
     // often to follow; the bar and the launcher refresh when they are about to show.
@@ -36,13 +35,8 @@ Singleton {
     ]
 
     function refresh() {
-        if (!root.available)
-            return;
-        if (stateProc.running) {
-            root.refreshQueued = true;
-            return;
-        }
-        stateProc.running = true;
+        if (root.available)
+            stateProc.request();
     }
 
     function read(monitors, workspaces, clients) {
@@ -161,17 +155,12 @@ Singleton {
         onTriggered: root.refresh()
     }
 
-    Process {
+    // An event during a read reads again after it.
+    QueuedProcess {
         id: stateProc
         command: Shell.script("workspace.sh")
         stdout: StdioCollector {
             onStreamFinished: root.apply(text)
-        }
-        onExited: {
-            if (root.refreshQueued) {
-                root.refreshQueued = false;
-                refreshTimer.restart();
-            }
         }
     }
 

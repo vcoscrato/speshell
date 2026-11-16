@@ -22,11 +22,11 @@ lint:
     #!/bin/sh
     set -e
     shellcheck -x -P SCRIPTDIR shell/speshell shell/greeter/speshell-greeter shell/greeter/speshell-greeter-theme \
-        shell/tools/* shell/services/*.sh preview/*.sh
+        shell/greeter/sessions.sh packaging/speshell-greeter-theme.generator shell/tools/* shell/services/*.sh preview/*.sh
     ruff check --quiet --select E,F,W,B,UP,SIM --ignore E501 {{ python }}
     ruff format --quiet --check --line-length 120 {{ python }}
     # One JavaScript: let and const, and arrows for functions passed as values.
-    old=$(git ls-files --cached --others --exclude-standard '*.qml' '*.js' | xargs grep -nE '(^|[^[:alnum:]_.$])(var[[:space:]]+[[:alpha:]_$]|function[[:space:]]*\()' \
+    old=$(git ls-files --cached --others --exclude-standard '*.qml' '*.js' | xargs grep -snE '(^|[^[:alnum:]_.$])(var[[:space:]]+[[:alpha:]_$]|function[[:space:]]*\()' \
         | grep -vE 'property var|signal |\(var ' || true)
     [ -z "$old" ] || { printf 'Use let or const, and arrow functions:\n%s\n' "$old"; exit 1; }
     # Quickshell loads the shell through a module tree it generates, in which each
@@ -61,7 +61,7 @@ lint:
 format:
     ruff format --line-length 120 {{ python }}
 
-# Run the QML unit tests.
+# Run the QML unit tests and the Python ones for speshell-system.
 test:
     QT_QPA_PLATFORM=offscreen QML_XHR_ALLOW_FILE_READ=1 {{ qmltestrunner }} -input tests
     python3 -m unittest discover --quiet --start-directory tests --pattern 'test_*.py'
@@ -78,7 +78,7 @@ shaders:
         if [ ! -f "$out" ] || [ "$src" -nt "$out" ] || [ shell/effects/common/common.glsl -nt "$out" ] \
                 || [ -n "$(find "$(dirname "$src")" -maxdepth 1 -name "*.glsl" -newer "$out")" ]; then
             echo "qsb $src"
-            {{ qsb }} --glsl "100 es,120,150" --hlsl 50 --msl 12 -o "$out" "$src"
+            {{ qsb }} --glsl "100 es,120,150" -o "$out" "$src"
         fi
     done
 
@@ -96,7 +96,7 @@ paint theme="":
         painting=$(basename "$frag" .frag)
         out="${frag%.frag}.jpg"
         echo "paint $frag -> $out"
-        {{ qsb }} --glsl "100 es,120,150" --hlsl 50 --msl 12 -o "$PREVIEW_OUT/paintings/$painting.qsb" "$frag"
+        {{ qsb }} --glsl "100 es,120,150" -o "$PREVIEW_OUT/paintings/$painting.qsb" "$frag"
         SCENE="$PWD/preview/scenes/PaintingScene.qml" PAINTING="$PREVIEW_OUT/paintings/$painting.qsb" DURATION=0.05 OUT="$frames" \
             QT_FORCE_STDERR_LOGGING=1 timeout 60 quickshell --no-color -p preview/scenes/shell.qml 2>&1 \
             | grep -E "rror|WARN" | grep -v "window masks" >&2 || true
@@ -140,7 +140,7 @@ check: shaders
 bench *args: shaders
     preview/bench.sh {{ args }}
 
-# Render the real bar in a theme with each panel open (all, or those named, or `launcher`, `themes`, `wallpapers`, or `osd`) into ~/.cache/speshell-preview/shots/ (needs Wayland).
+# Render the real bar in a theme with each panel open (all, or those named, or `launcher`, `themes`, `wallpapers`, `osd`, or `toasts`) into ~/.cache/speshell-preview/shots/ (needs Wayland).
 shot theme="cosmos" *shots: shaders
     preview/shot.sh "{{ theme }}" {{ shots }}
 

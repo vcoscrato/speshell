@@ -1,6 +1,7 @@
 import QtQuick
 import "common"
 import "common/Colors.js" as Colors
+import "Cosmos.js" as Cosmos
 
 // Cosmos launcher transition: a star flares where the panel will be, and the panel
 // opens out of it behind a bright ring while planets spiral out to their orbits.
@@ -12,9 +13,10 @@ Item {
     // ── Speshell effects API v1 ────────────────────────────────
     property Item panel: null
     property rect panelRect
+    property real panelRadius: 16
     property bool active: false
     // The active palette, as Theme.qml names it.
-    property var theme: null
+    property var theme: Colors.fallback
     signal closingFinished()
 
     // ── Choreography (seconds) ──────────────────────────────
@@ -23,12 +25,11 @@ Item {
     readonly property real closeTime: 0.42
     readonly property real tailTime: 0.24      // the star fading after the panel is gone
 
-    // ── Palette, from the theme; Gruvbox until it arrives ─────────
-    // The star's white-hot core, brighter than any theme color.
-    readonly property color hot: root.theme ? Qt.lighter(Colors.mix(root.theme.text, root.theme.yellow, 0.15), 1.2) : "#fbf1c7"
-    readonly property color warm: root.theme ? root.theme.accent : "#fe8019"
-    readonly property color gold: root.theme ? root.theme.yellow : "#fabd2f"
-    readonly property color violet: root.theme ? root.theme.pink : "#d3869b"
+    // ── Palette, from the theme ─────────────────────────────
+    readonly property color hot: Cosmos.hot(root.theme)
+    readonly property color warm: root.theme.accent
+    readonly property color gold: root.theme.yellow
+    readonly property color violet: root.theme.pink
 
     // 0..1 entrance progress; the exit runs it backwards, so a reopen mid-exit
     // simply turns around.
@@ -125,7 +126,7 @@ Item {
         height: 2 * (root.cy - y)
         property rect rect: Qt.rect(x, y, width, height)
         property rect panel: root.panelRect
-        property real radius: 10
+        property real radius: root.panelRadius
         property point origin: root.origin
         property real circle: root.eased * root.revealMax
         property point center: Qt.point(root.cx, root.cy)
@@ -136,17 +137,17 @@ Item {
         property vector4d angles: Qt.vector4d(root.a0, root.a1, root.a2, root.a3)
         property real angle4: root.a4
         property real moonAngle: root.moonAngle
-        property color c0: root.theme ? Colors.mix(root.theme.overlay, root.theme.text, 0.4) : "#a89984"
+        property color c0: Colors.mix(root.theme.overlay, root.theme.text, 0.4)
         property color c1: root.gold
-        property color c2: root.theme ? root.theme.blue : "#83a598"
-        property color c3: root.theme ? root.theme.error : "#fb4934"
+        property color c2: root.theme.blue
+        property color c3: root.theme.error
         property color c4: root.warm
         property color cRing: Colors.alpha(Colors.mix(root.gold, root.hot, 0.5), 0.85)
-        property color cMoon: root.theme ? root.theme.text : "#ebdbb2"
-        property color cShade: root.theme ? root.theme.mantle : "#1d2021"
-        property color cOrbit: root.theme ? Colors.alpha(root.theme.text, 0.34) : Qt.rgba(0.92, 0.86, 0.70, 0.34)
+        property color cMoon: root.theme.text
+        property color cShade: root.theme.mantle
+        property color cOrbit: Colors.alpha(root.theme.text, 0.34)
         property color cGlow: Colors.alpha(root.warm, 0.3)
-        property color cGlint: root.theme ? root.theme.text : "#ebdbb2"
+        property color cGlint: root.theme.text
         fragmentShader: Qt.resolvedUrl("qsb/LauncherTransition.qsb")
     }
 
@@ -169,7 +170,7 @@ Item {
         property var source: panelTex
         property rect rect: Qt.rect(x, y, width, height)
         property rect panel: root.panelRect
-        property real radius: root.theme && root.theme.surfaceRadius !== undefined ? root.theme.surfaceRadius : 16
+        property real radius: root.panelRadius
         property point origin: root.origin
         property real circle: root.eased * root.revealMax
         property real outside: 0

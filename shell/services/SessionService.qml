@@ -72,6 +72,7 @@ Singleton {
     }
 
     Process {
+        id: lidProc
         running: root.laptop
         command: root.logindCall("/org/freedesktop/login1", "org.freedesktop.DBus.Properties.Get",
             ["org.freedesktop.login1.Manager", "LidClosed"])
@@ -89,12 +90,15 @@ Singleton {
         }
     }
 
-    Process {
-        running: true
+    // Without it Speshell misses the lid, sleep, and lock, so it starts again when it
+    // stops; the lid may have moved meanwhile.
+    Watcher {
+        watching: true
         command: ["gdbus", "monitor", "--system", "--dest", "org.freedesktop.login1"]
         stdout: SplitParser {
             onRead: line => root.readEvent(line)
         }
+        onStarted: if (root.laptop) lidProc.running = true
     }
 
     // Held while awake; logind waits for its release, up to InhibitDelayMaxSec (5 s).

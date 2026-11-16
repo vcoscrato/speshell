@@ -1,22 +1,21 @@
 .pragma library
 .import "common/Colors.js" as Colors
 
-// Water's colors, from a theme's blues (`theme` as Theme.qml names it); the Water
-// palette's own before a theme arrives.
+// Water's colors, from a theme's blues (`theme` as Theme.qml names it).
 
 function deep(theme) {
-    return theme ? Colors.mix(theme.accent, theme.bg, 0.45) : "#1d5f8c";
+    return Colors.mix(theme.accent, theme.bg, 0.45);
 }
 
 function mid(theme) {
-    return theme ? Colors.mix(theme.accent, theme.crust, 0.1) : "#2f8fc4";
+    return Colors.mix(theme.accent, theme.crust, 0.1);
 }
 
 function light(theme) {
-    return theme ? theme.sky : "#7cc9ea";
+    return theme.sky;
 }
 
 // Foam and spray, brighter than any theme color.
 function foam(theme) {
-    return theme ? Qt.lighter(Colors.mix(theme.text, theme.sky, 0.2), 1.15) : "#f2fbff";
+    return Qt.lighter(Colors.mix(theme.text, theme.sky, 0.2), 1.15);
 }

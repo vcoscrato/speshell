@@ -12,11 +12,11 @@ This is Speshell, pronounced *special*. My [Quickshell](https://quickshell.outfo
 ## Features
 
 - A bar on every screen: workspaces, the clock with the weather and your timers, the playing track, the tray, and a button for each panel
-- Clock panel: a clock face in the theme's style beside the month, and a button that opens Google Calendar in the browser
+- Clock panel: a clock face in the theme's style beside the month, and a button that opens your calendar in the browser (`[Clock] calendarUrl`)
 - Weather panel: the conditions now, the next hours, and the week
 - Panels for audio output and input, displays and brightness, network (Wi-Fi, and NetworkManager's VPN and WireGuard profiles), Bluetooth, battery, notifications with Do Not Disturb, media, power, Markdown notes, clipboard history, and tools
 - On a laptop: the battery's charge in the bar, low-battery warnings, dimming, locking, and sleeping on idle, hibernating, a lower brightness on battery, locking before the lid sleeps it, the laptop's display off while docked with the lid closed, and an OSD for brightness, the keyboard backlight, the microphone, the touchpad, and airplane mode (see [Laptops](#laptops))
-- Launcher: apps, open windows and apps hidden in the tray, a calculator, web searches and your own bangs
+- Launcher: apps, open windows and apps hidden in the tray, themes, a calculator, web searches and your own bangs
 - Theme gallery: every theme over its wallpaper, previewed full screen in its own colors with its clock face, then its wallpapers to pick from
 - System: the machine's packages, services, groups, and files declared in plain-text modules, applied and updated from the launcher or a terminal (see [System](#system))
 - Lock screen, login screen (greetd), and password prompts (polkit) in the theme: its wallpaper, its clock face, and its colors (see [Lock, login, and passwords](#lock-login-and-passwords))
@@ -30,7 +30,7 @@ Panels for missing hardware or tools hide themselves. Speshell runs on any Wayla
 
 Quickshell ≥ 0.3, PipeWire/WirePlumber, NetworkManager, BlueZ, libnotify, UPower, polkit, jq, sudo.
 
-Optional: Hyprland (workspaces, the Displays panel), `brightnessctl`, `openconnect` (OpenConnect VPN logins), `libsecret` (remembering VPN passwords in the keyring), `greetd` (the login screen), `paru` or `yay` (AUR packages in System), `pacman-contrib` (its count of updates), `power-profiles-daemon` (power profiles), `matugen` (app themes), `cliphist`, `wl-clipboard`, `xdg-utils`, and the tools' programs below.
+Optional: Hyprland (workspaces, the Displays panel), `brightnessctl`, `openconnect` (OpenConnect VPN logins), `libsecret` (remembering VPN passwords in the keyring), `greetd` (the login screen), `paru` or `yay` (AUR packages in `speshell system`), `power-profiles-daemon` (power profiles), `matugen` (app themes), `cliphist`, `wl-clipboard`, `xdg-utils`, and the tools' programs below.
 
 ## Install
 
@@ -48,11 +48,12 @@ cd speshell/packaging
 makepkg -si
 ```
 
-Start it with your session, and bind the launcher to a key. On Hyprland:
+Start it with your session, and bind the launcher to a key. The package's user unit, `speshell.service`, runs it under `graphical-session.target` and starts it again if it crashes, which matters because the lock, the password prompts, and notifications live in it. It needs the session's environment imported into systemd and `graphical-session.target` active, as a session target bound to it does; without them it fails to start, and Speshell starts on its own instead. On Hyprland:
 
 ```lua
 hl.on("hyprland.start", function()
-    hl.exec_cmd("speshell --no-duplicate --daemonize")
+    hl.exec_cmd("dbus-update-activation-environment --systemd --all && systemctl --user start hyprland-session.target; "
+        .. "systemctl --user start speshell.service || speshell --no-duplicate --daemonize")
 end)
 
 hl.bind("SUPER + SPACE", hl.dsp.exec_cmd("speshell launcher toggle"))
@@ -86,11 +87,12 @@ The weather, on with `[Weather] enabled`, comes from [Open-Meteo](https://open-m
 | `!yt query` | A bang from `[Launcher.Bangs]` |
 | `? query` | Search with `[Launcher] searchUrl` |
 | `!theme`, or "themes" | Open the theme gallery |
+| a theme's name, as "fire" | Open the theme gallery at that theme |
 | `!wallpaper`, or "wallpapers" | Pick another wallpaper of the current theme |
 | `!mirror` | Mirror the displays, or extend them again |
 | `!apply`, `!update` | Apply your system modules, or update the system and then apply them, in a terminal |
 
-Unknown bangs go to the search engine, so its own bangs work too.
+Unknown bangs go to the search engine, so its own bangs work too. Up and Down move through the results, Page Up and Page Down a page at a time, and Home and End to the first and last; Tab completes a bang.
 
 A window result focuses it, switching workspace or showing the scratchpad it's on. An app closed to the tray, such as Steam or Discord, shows as hidden in the tray, and its result brings the window back. Clicking a notification does the same for the app that sent it, after its own action: a toast, or a row in the Notifications panel, where the arrow expands a long one.
 
@@ -133,7 +135,9 @@ hl.bind("SUPER + L", hl.dsp.exec_cmd("speshell lock"))
 hl.config({ misc = { allow_session_lock_restore = true } })
 ```
 
-The lock outlives a crash: Hyprland keeps the session locked, and a Speshell started again locks again at once, which `allow_session_lock_restore` lets it do. From a console (Ctrl+Alt+F3), `hyprctl --instance 0 dispatch 'hl.dsp.exec_cmd("speshell")'` starts it.
+The lock outlives a crash: Hyprland keeps the session locked, and a Speshell started again, as `speshell.service` does, is locked from its first frame, which `allow_session_lock_restore` lets it do. Without the unit, from a console (Ctrl+Alt+F3), `hyprctl --instance 0 dispatch 'hl.dsp.exec_cmd("speshell")'` starts it. Speshell doesn't reload when its files change, as an upgrade changes them: Relaunch, in the Power panel's header, starts it again.
+
+A PAM step after the password, such as a one-time code or a new password once the old one expires, asks in the same field, with PAM's own question.
 
 **Password prompts**: Speshell is the session's polkit agent, so `pkexec` and apps asking for an administrator's password ask over the focused screen. Don't also start another agent, such as `polkit-kde-agent` or `hyprpolkitagent`.
 
@@ -145,7 +149,7 @@ command = "speshell-greeter"
 user = "greeter"
 ```
 
-Then `systemctl enable greetd` in place of your display manager, and `systemctl enable --now speshell-greeter-theme@$USER.path`, which copies your theme's colors and wallpaper to `/var/lib/speshell/theme` whenever it changes (the login screen can't read your home). The keyboard follows `localectl set-x11-keymap`; `/etc/speshell/greeter.lua`, if present, adds Hyprland settings for the login screen, such as monitors. To unlock KDE Wallet or GNOME Keyring at login, add their PAM lines to `/etc/pam.d/greetd`; KDE Wallet also needs `/usr/lib/pam_kwallet_init` run at the start of the Hyprland session, before anything asks for a secret. If the monitor stays black for a moment after login, the console between the two Hyprlands runs another mode: set it to Hyprland's with the kernel's `video=` parameter, such as `video=1920x1080@300`.
+Then `systemctl enable greetd` in place of your display manager, and `systemctl enable --now speshell-greeter-theme@$USER.path`, which copies your theme's colors and wallpaper to `/var/lib/speshell/theme` whenever it changes (the login screen can't read your home, wherever it is). The keyboard follows `localectl set-x11-keymap`; `/etc/speshell/greeter.lua`, if present, adds Hyprland settings for the login screen, such as monitors. To unlock KDE Wallet or GNOME Keyring at login, add their PAM lines to `/etc/pam.d/greetd`; KDE Wallet also needs `/usr/lib/pam_kwallet_init` run at the start of the Hyprland session, before anything asks for a secret. If the monitor stays black for a moment after login, the console between the two Hyprlands runs another mode: set it to Hyprland's with the kernel's `video=` parameter, such as `video=1920x1080@300`.
 
 ## System
 
@@ -240,6 +244,7 @@ The file is rewritten only when the palette changes, so restarting Speshell leav
 
 ```bash
 speshell launcher [open|close|toggle]
+speshell help
 speshell lock
 speshell panel list | open NAME | toggle NAME | close
 speshell theme list | get | set ID | shuffle [ID] | rescan | open | close | toggle

@@ -6,10 +6,21 @@ set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")" && pwd)"
 readonly app_dir="${SPESHELL_QML_DIR:-$script_dir}"
 readonly config_file="${XDG_CONFIG_HOME:-$HOME/.config}/speshell/config.ini"
+# The user unit that runs the packaged shell under the session and restarts it if it
+# crashes, when the session starts it.
+readonly unit=speshell.service
+readonly unit_dir=/usr/share/speshell
 
 if [[ ! -r "$app_dir/shell.qml" ]]; then
   printf 'speshell: shell.qml not found in %s\n' "$app_dir" >&2
   exit 1
+fi
+
+# The instance on this display, or from a console, the one on any.
+if [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
+  display_args=()
+else
+  display_args=(--any-display)
 fi
 
 # Prints the call's output. A frozen instance still accepts IPC connections but never
@@ -17,7 +28,7 @@ fi
 # without the target, as before its config loads, says so and exits 0; that is 3 here.
 ipc_try() {
   local output
-  output="$(timeout 3 /usr/bin/quickshell ipc --any-display -p "$app_dir" call -- "$@" 2>/dev/null)" || return
+  output="$(timeout 3 /usr/bin/quickshell ipc "${display_args[@]}" -p "$app_dir" call -- "$@" 2>/dev/null)" || return
   if [[ "$output" == "Target not found." ]]; then
     return 3
   fi
@@ -34,17 +45,41 @@ config_invalid() {
   printf 'speshell: config.ini is invalid, so Speshell is stopped until it is fixed: %s\n' "$config_file" >&2
 }
 
+# Whether the unit runs this shell: it is the packaged one, and the unit is running,
+# starting, or failed rather than never started.
+runs_as_unit() {
+  [[ "$app_dir" == "$unit_dir" ]] || return 1
+  local state
+  state="$(systemctl --user show -P ActiveState "$unit" 2>/dev/null)" || return 1
+  [[ -n "$state" && "$state" != inactive ]]
+}
+
+# Stops this display's instances, which stopped answering: a moment for each to exit,
+# then SIGKILL.
 stop_frozen_instances() {
   local pid
   for pid in $(/usr/bin/quickshell list -j -p "$app_dir" 2>/dev/null | sed -n 's/^ *"pid": \([0-9]*\).*/\1/p'); do
     printf 'speshell: instance %s stopped responding; restarting it\n' "$pid" >&2
     kill -TERM "$pid" 2>/dev/null || continue
-    for _ in $(seq 1 20); do
+    for _ in $(seq 1 40); do
       kill -0 "$pid" 2>/dev/null || continue 2
       sleep 0.05
     done
     kill -KILL "$pid" 2>/dev/null || true
   done
+}
+
+# Starts Speshell, or starts it over when it froze: through the unit when that runs it,
+# which stops a frozen one itself, else as a daemon of its own.
+start_instance() {
+  if runs_as_unit; then
+    systemctl --user reset-failed "$unit" 2>/dev/null || true
+    systemctl --user restart "$unit"
+    return
+  fi
+  [[ "${1:-}" != frozen ]] || stop_frozen_instances
+  # It saves its own log; its output would end up in the reply.
+  /usr/bin/quickshell -p "$app_dir" --no-duplicate --daemonize >/dev/null 2>&1
 }
 
 ipc_call() {
@@ -54,13 +89,27 @@ ipc_call() {
     return 0
   fi
   if (( status == 124 )); then
-    stop_frozen_instances
+    # A busy instance may answer a moment later: ask it something harmless once more
+    # before starting it over, rather than send the call twice.
+    if ipc_try config status >/dev/null; then
+      printf 'speshell: Speshell took too long to answer %s\n' "${1:-unknown}" >&2
+      return 1
+    fi
+    # From a console there is no telling which display's instance froze, nor a display
+    # to start one on.
+    if [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
+      printf 'speshell: Speshell stopped responding\n' >&2
+      return 1
+    fi
+    start_instance frozen
   elif config_invalid; then
     return 1
+  elif [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
+    printf 'speshell: Speshell is not running, and there is no display to start it on\n' >&2
+    return 1
+  else
+    start_instance
   fi
-
-  # It saves its own log; its output would end up in the reply.
-  /usr/bin/quickshell -p "$app_dir" --no-duplicate --daemonize >/dev/null 2>&1
 
   for _ in $(seq 1 30); do
     if ipc_try "$@"; then
@@ -74,6 +123,7 @@ ipc_call() {
 }
 
 readonly usage_text='usage: speshell [QUICKSHELL OPTIONS]
+       speshell help
        speshell launcher [open | close | toggle]
        speshell lock
        speshell panel [list | open NAME | toggle NAME | close]
@@ -108,6 +158,7 @@ call() {
 
 # Anything but a command runs the shell itself.
 case "${1:-}" in
+  help|-h|--help) printf '%s\n' "$usage_text"; exit 0 ;;
   launcher|lock|panel|timer|activity|tool|brightness|awake|touchpad|airplane|nightlight|theme|wallpaper|system) ;;
   *) exec /usr/bin/quickshell -p "$app_dir" "$@" ;;
 esac

@@ -77,6 +77,7 @@ const files = ({
     "record-stop": "tabler/player-stop",
     "power": "tabler/power",
     "refresh": "tabler/refresh",
+    "relaunch": "tabler/rotate-clockwise-2",
     "restart": "tabler/reload",
     "search": "tabler/search",
     "shuffle": "tabler/arrows-shuffle",

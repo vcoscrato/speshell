@@ -1,11 +1,13 @@
 import QtQuick
 import qs.services
+import "Keyboard.js" as Keyboard
 
 // A tile that runs something, in a tone: an icon disc, a title over a detail line, and
 // an optional secondary button. Hovered it tints in its tone, and `active` (running, or
 // armed to confirm) fills it; `busy` spins its icon and takes no clicks. While active,
 // `countdownMs` drains a line along its foot. `stacked` sets the disc over the title, in
-// a narrow tile, without the detail line.
+// a narrow tile, without the detail line. `flat` leaves it unfilled at rest, as a row in a
+// list.
 Rectangle {
     id: root
 
@@ -19,6 +21,7 @@ Rectangle {
     property string secondaryIcon: ""
     property string secondaryText: ""
     property bool stacked: false
+    property bool flat: false
 
     readonly property color toneColor: Theme.toneColor(root.tone)
     readonly property bool hot: root.active || (mouse.containsMouse && root.enabled && !root.busy)
@@ -32,8 +35,10 @@ Rectangle {
     radius: Theme.borderRadius
     clip: true
     opacity: root.enabled ? 1 : Theme.disabledOpacity
+    activeFocusOnTab: true
     color: root.active ? Theme.alpha(root.toneColor, Theme.tintStrong)
         : root.hot ? Theme.alpha(root.toneColor, Theme.tintSubtle)
+        : root.flat ? "transparent"
         : Theme.controlFill
     border.width: Theme.borderWidth
     border.color: root.active ? Theme.alpha(root.toneColor, Theme.tintOutlineStrong)
@@ -48,6 +53,15 @@ Rectangle {
     Accessible.name: root.label
     Accessible.description: root.detail
     Accessible.onPressAction: if (root.enabled && !root.busy) root.activated()
+    Keys.onPressed: event => {
+        if (Keyboard.presses(event)) {
+            event.accepted = true;
+            if (!root.busy) {
+                EffectsService.picked(root, null);
+                root.activated();
+            }
+        }
+    }
 
     MouseArea {
         id: mouse
@@ -122,7 +136,7 @@ Rectangle {
 
     ProgressBar {
         anchors.bottom: parent.bottom
-        height: 2
+        height: Theme.outlineWidth
         color: "transparent"
         fillColor: root.toneColor
         visible: root.active && root.countdownMs > 0
@@ -134,4 +148,6 @@ Rectangle {
             duration: root.countdownMs
         }
     }
+
+    FocusRing {}
 }

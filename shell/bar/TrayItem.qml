@@ -1,9 +1,11 @@
 import QtQuick
 import qs.components
 import qs.services
+import "../components/Keyboard.js" as Keyboard
 
 // One app's system tray icon: left click activates it, or opens its menu when it
 // only has one; right click opens the menu below the icon, or above it on a bottom bar.
+// From the keyboard, Space or Enter is the left click and the Menu key the right.
 Item {
     id: root
 
@@ -37,6 +39,7 @@ Item {
 
     width: Theme.controlHeight
     height: Theme.controlHeight
+    activeFocusOnTab: true
 
     Connections {
         target: root.Window ? root.Window.window : null
@@ -50,6 +53,15 @@ Item {
     Accessible.role: Accessible.Button
     Accessible.name: root.labelText
     Accessible.onPressAction: root.activate()
+    Keys.onPressed: event => {
+        if (Keyboard.presses(event)) {
+            event.accepted = true;
+            root.activate();
+        } else if (event.key === Qt.Key_Menu && root.modelData.hasMenu) {
+            event.accepted = true;
+            menu.open();
+        }
+    }
 
     Rectangle {
         anchors.fill: parent
@@ -78,7 +90,7 @@ Item {
 
     Tooltip {
         visible: root.containingWindowVisible
-            && root.pointerInside
+            && (root.pointerInside || root.activeFocus)
             && !root.menuOpen
             && root.labelText !== ""
         text: root.labelText
@@ -108,4 +120,6 @@ Item {
                 menu.open();
         }
     }
+
+    FocusRing {}
 }

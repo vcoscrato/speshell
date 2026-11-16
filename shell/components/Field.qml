@@ -6,6 +6,7 @@ import qs.services
 // `clearable` field, then lets an empty one's Escape through; other fields it cancels.
 // With `autoFocus`, it takes the keyboard as it shows; it forgets what was typed when
 // hidden. `compact` fits a row of tabs, and `large` leads a window, as the launcher's.
+// `heading` is text to edit in place, as a title: large and bold, with no box.
 // keyPressed() sees each key first, and takes it by accepting it.
 Item {
     id: root
@@ -23,7 +24,8 @@ Item {
     property bool autoFocus: false
     property bool compact: false
     property bool large: false
-    readonly property int padding: root.large ? Theme.spacingMedium : Theme.spacingSmall
+    property bool heading: false
+    readonly property int padding: root.heading ? 0 : root.large ? Theme.spacingMedium : Theme.spacingSmall
 
     signal accepted()
     signal cancelled()
@@ -35,8 +37,9 @@ Item {
         input.forceActiveFocus();
     }
 
-    width: parent ? parent.width : 300
+    width: parent?.width ?? 0
     height: root.large ? Math.max(48, Math.ceil(Theme.fontSizeLarge * 1.35) + Theme.spacingMedium * 2)
+        : root.heading ? Math.max(Theme.controlHeight, Math.ceil(Theme.fontSizeLarge * 1.5))
         : root.compact ? Theme.controlHeightSmall
         : Theme.controlHeight
 
@@ -54,8 +57,8 @@ Item {
         anchors.rightMargin: confirmButton.visible ? Theme.spacingSmall : 0
         height: parent.height
         radius: Theme.borderRadius
-        color: Theme.controlFill
-        border.width: Theme.borderWidth
+        color: root.heading ? "transparent" : Theme.controlFill
+        border.width: root.heading ? 0 : Theme.borderWidth
         border.color: input.activeFocus ? Theme.accent : Theme.controlBorder
 
         AppIcon {
@@ -81,7 +84,8 @@ Item {
             color: Theme.text
             selectionColor: Theme.accent
             selectedTextColor: Theme.onAccent
-            font.pixelSize: root.large ? Theme.fontSizeLarge : Theme.fontSizeSmall
+            font.pixelSize: root.large || root.heading ? Theme.fontSizeLarge : Theme.fontSizeSmall
+            font.weight: root.heading ? Font.DemiBold : Font.Normal
             font.family: Theme.fontFamily
             clip: true
             Accessible.name: root.placeholder
@@ -115,8 +119,15 @@ Item {
                 text: root.placeholder
                 color: Theme.overlay
                 font.pixelSize: root.large ? Theme.fontSizeNormal : input.font.pixelSize
+                font.weight: input.font.weight
                 elide: Text.ElideRight
                 visible: input.text === "" && !input.preeditText
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.NoButton
+                cursorShape: Qt.IBeamCursor
             }
         }
 

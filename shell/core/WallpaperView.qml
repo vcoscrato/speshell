@@ -28,46 +28,56 @@ Item {
     default property alias fallback: fallbackLayer.data
     // The new image is still loading.
     readonly property bool loading: root.shown.status === Image.Loading
-    // Something is changing on screen: a capture, a load, or a transition.
-    readonly property bool busy: root.outgoing !== null || root.capturing
+    // "idle"; "loading" the new image under the old, to carry the old away once it
+    // shows, or "placing" it, to show it at once; "running" the transition; or
+    // "capturing" the frame on screen while one runs, which takes a frame or two.
+    property string phase: "idle"
+    // Something is changing on screen.
+    readonly property bool busy: root.phase !== "idle"
 
     property Image shown: imageA
-    // The old image, fallbackLayer, or a frozen frame.
+    // What is going away while not idle: the old image, fallbackLayer, or a frozen frame.
     property Item outgoing: null
-    property bool transitionRunning: false
+    // The transition running, from when it starts until it finishes.
     property Component runningTransition: null
-    // The next change shows its image at once.
-    property bool placing: false
-    // Freezing the frame on screen, which takes a frame or two.
-    property bool capturing: false
+    // The frozen frame being captured.
     property ShaderEffectSource freezing: null
     property int framesToCapture: 0
 
     // Shows `path` without a transition, keeping what is on screen until it loads.
     function place() {
-        root.placing = true;
-        root.change();
+        root.change(true);
     }
 
-    function change() {
+    // Shows `path`, carrying what is on screen away, or `atOnce`.
+    function change(atOnce) {
         const url = ThemeProvider.fileUrl(root.path);
-        if (root.capturing)
-            return;
+        if (root.phase === "capturing") {
+            if (!atOnce)
+                return;
+            // Shown at once, the new image needs no frozen frame to cover it.
+            captureTimer.stop();
+            root.freezing.visible = false;
+            root.freezing = null;
+            root.phase = "running";
+        }
         // Placing cuts a transition short, leaving its new image.
-        if (root.placing && root.transitionRunning)
+        if (atOnce && root.phase === "running")
             root.finishTransition();
         if (String(root.shown.source) === url) {
-            // Shown, or loading to show; placing ends once nothing is left to replace.
-            if (root.outgoing === null)
-                root.placing = false;
+            // Shown, or loading to show.
+            if (atOnce && root.phase === "loading")
+                root.phase = "placing";
             return;
         }
-        if (root.transitionRunning) {
+        if (root.phase === "running") {
             root.capture();
             return;
         }
-        if (root.outgoing !== null) {
+        if (root.phase !== "idle") {
             // Still loading the last one: load this one in its place.
+            if (atOnce)
+                root.phase = "placing";
             root.shown.source = url;
             root.startWhenLoaded();
             return;
@@ -80,12 +90,14 @@ Item {
             if (url !== "")
                 root.outgoing = fallbackLayer;
         }
-        root.swapIn(next, url);
+        root.swapIn(next, url, atOnce);
     }
 
-    function swapIn(next, url) {
-        if (root.outgoing !== null)
+    function swapIn(next, url, atOnce) {
+        if (root.outgoing !== null) {
             root.outgoing.z = 1;
+            root.phase = atOnce ? "placing" : "loading";
+        }
         next.z = 0;
         root.shown = next;
         next.source = url;
@@ -99,31 +111,29 @@ Item {
         root.freezing.visible = true;
         root.freezing.scheduleUpdate();
         root.framesToCapture = 2;
-        root.capturing = true;
+        root.phase = "capturing";
         captureTimer.restart();
     }
 
     function finishCapture() {
-        if (!root.capturing)
+        if (root.phase !== "capturing")
             return;
         captureTimer.stop();
-        root.capturing = false;
         const frozen = root.freezing;
         root.freezing = null;
+        root.phase = "running";
         root.finishTransition();
         // The frame covers the image under it, which the next one replaces.
         root.outgoing = frozen;
         const next = root.shown === imageA ? imageB : imageA;
         root.shown.source = "";
-        root.swapIn(next, ThemeProvider.fileUrl(root.path));
+        root.swapIn(next, ThemeProvider.fileUrl(root.path), false);
     }
 
     function startWhenLoaded() {
-        if (root.outgoing === null || root.transitionRunning || root.capturing
-                || root.shown.status === Image.Loading)
+        if ((root.phase !== "loading" && root.phase !== "placing") || root.shown.status === Image.Loading)
             return;
-        if (root.placing || root.timeScale <= 0) {
-            root.placing = false;
+        if (root.phase === "placing" || root.timeScale <= 0) {
             root.finishTransition();
             return;
         }
@@ -132,17 +142,21 @@ Item {
             root.finishTransition();
             return;
         }
-        root.transitionRunning = true;
+        root.phase = "running";
         safetyTimer.restart();
     }
 
+    // Ends the change: the transition, and what it carried away. A capture in flight
+    // carries on, taking the frame on screen.
     function finishTransition() {
         safetyTimer.stop();
         // Detached first: clearing the source reports a status change, which
         // re-enters startWhenLoaded().
         const old = root.outgoing;
         root.outgoing = null;
-        root.transitionRunning = false;
+        root.runningTransition = null;
+        if (root.phase !== "capturing")
+            root.phase = "idle";
         if (old === freezeA || old === freezeB)
             old.visible = false;
         else if (old === fallbackLayer)
@@ -160,8 +174,8 @@ Item {
     }
 
     // Deferred so a wallpaper change sees its new effects' transition.
-    onPathChanged: Qt.callLater(root.change)
-    Component.onCompleted: root.change()
+    onPathChanged: Qt.callLater(root.change, false)
+    Component.onCompleted: root.change(false)
 
     // Everything a frame shows, but the frozen frames themselves.
     Item {
@@ -205,7 +219,7 @@ Item {
             property int frameRate: root.frameRate
             z: 2
             anchors.fill: parent
-            active: root.transitionRunning && root.runningTransition !== null
+            active: root.runningTransition !== null
             sourceComponent: root.runningTransition
         }
     }
@@ -260,7 +274,7 @@ Item {
     // The frozen frame shows once the window has drawn it, two frames on to be sure.
     Connections {
         target: root.Window.window
-        enabled: root.capturing
+        enabled: root.phase === "capturing"
 
         function onFrameSwapped() {
             root.framesToCapture--;

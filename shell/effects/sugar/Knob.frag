@@ -35,7 +35,6 @@ layout(std140, binding = 0) uniform buf {
 #include "../common/common.glsl"
 #include "Bag.glsl"
 
-const float PI = 3.1415927;
 
 // Frosting shaded as a round thing lit from the upper left: `v` runs -1 (lit) to 1
 // across it.

@@ -34,9 +34,10 @@ PanelWindow {
     readonly property var shownLevel: root.levels[root.level] ?? null
 
     function present() {
+        // Called back while fading out: comes back from as far as it got.
         if (exitAnimation.running) {
             exitAnimation.stop();
-            osdCard.opacity = 1;
+            comeBack.restart();
         }
         if (root.shown)
             return;
@@ -46,6 +47,7 @@ PanelWindow {
     }
 
     function dismiss() {
+        comeBack.stop();
         if (root.shown)
             exitAnimation.restart();
     }
@@ -71,7 +73,7 @@ PanelWindow {
     // Quickshell's type info hides the fields of PanelWindow.margins.
     // qmllint disable missing-property
     margins {
-        bottom: 64
+        bottom: Theme.osdMargin
     }
     // qmllint enable missing-property
 
@@ -93,7 +95,7 @@ PanelWindow {
 
     Timer {
         id: hideTimer
-        interval: 1200
+        interval: Theme.osdTimeout
         repeat: false
         onTriggered: if (!hover.hovered) root.dismiss()
     }
@@ -190,12 +192,21 @@ PanelWindow {
         target: osdCard
         property: "opacity"
         to: 0
-        duration: Theme.motion ? 140 : 0
-        easing.type: Easing.InCubic
+        duration: Theme.animDurationExit
+        easing.type: Theme.animEasingExit
         // Also stopped, short of the end, when present() takes the card back.
         onStopped: {
             if (osdCard.opacity <= 0)
                 root.shown = false;
         }
+    }
+
+    NumberAnimation {
+        id: comeBack
+        target: osdCard
+        property: "opacity"
+        to: 1
+        duration: Theme.animDurationFast
+        easing.type: Theme.animEasing
     }
 }

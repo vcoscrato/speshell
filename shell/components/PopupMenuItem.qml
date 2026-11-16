@@ -16,8 +16,6 @@ T.MenuItem {
     horizontalPadding: Theme.spacingSmall
     verticalPadding: Theme.spacingMicro
     spacing: Theme.spacingSmall
-    font.family: Theme.fontFamily
-    font.pixelSize: Theme.fontSizeSmall
     icon.width: Theme.iconSizeSmall
     icon.height: Theme.iconSizeSmall
     opacity: root.enabled ? 1.0 : Theme.disabledOpacity
@@ -45,11 +43,9 @@ T.MenuItem {
                 fillMode: Image.PreserveAspectFit
             }
 
-            Text {
+            Label {
                 anchors.verticalCenter: parent.verticalCenter
                 text: root.text
-                textFormat: Text.PlainText
-                font: root.font
                 color: root.selected ? Theme.accent : Theme.text
             }
         }

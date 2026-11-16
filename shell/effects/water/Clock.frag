@@ -14,7 +14,7 @@ layout(std140, binding = 0) uniform buf {
     float hourTurn;     // each hand's turns from twelve, clockwise
     float minuteTurn;
     float secondTurn;
-    float seconds;      // 1 shows the drops and their rings
+    float ticking;      // 1 shows the drops and their rings
     float sinceTick;    // s since the second hand ticked
     float time;         // s, for the caustics and the whirlpool
     vec4 cDeep;
@@ -26,21 +26,6 @@ layout(std140, binding = 0) uniform buf {
     vec4 cTeal;
 } u;
 #include "../common/common.glsl"
-
-const float TAU = 6.2831853;
-
-vec2 at(float turn, float r) {
-    float a = turn * TAU;
-    return vec2(sin(a), -cos(a)) * r;
-}
-
-float turnOf(vec2 p) {
-    return fract(atan(p.x, -p.y) / TAU + 1.0);
-}
-
-vec2 handFrame(vec2 p, float turn) {
-    return rot(p, -turn * TAU) * vec2(1.0, -1.0);
-}
 
 // A drop pointing out along y: round at its base, drawn to a point. Negative inside.
 float drop(vec2 q, float r) {
@@ -125,7 +110,7 @@ void main() {
 
     // ── The second's drop and the rings it leaves ──
     float rS = R * 0.71;
-    if (u.seconds > 0.5) {
+    if (u.ticking > 0.5) {
         // A ring of faint marks the drops land on.
         float dot60 = length(p - at(floor(turn * 60.0 + 0.5) / 60.0, rS));
         o = over(o, u.cLight.rgb, 0.3 * cover(1.0 - dot60));

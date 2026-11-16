@@ -13,8 +13,9 @@ SequentialAnimation {
             root.restart();
     }
 
-    NumberAnimation { target: root.offset; property: "x"; to: -12; duration: 50 }
-    NumberAnimation { target: root.offset; property: "x"; to: 10; duration: 80 }
-    NumberAnimation { target: root.offset; property: "x"; to: -6; duration: 70 }
-    NumberAnimation { target: root.offset; property: "x"; to: 0; duration: 60 }
+    // Each swing shorter than the last.
+    NumberAnimation { target: root.offset; property: "x"; to: -Theme.shakeDistance; duration: Theme.shakeDuration * 0.2 }
+    NumberAnimation { target: root.offset; property: "x"; to: Theme.shakeDistance * 0.8; duration: Theme.shakeDuration * 0.3 }
+    NumberAnimation { target: root.offset; property: "x"; to: -Theme.shakeDistance * 0.5; duration: Theme.shakeDuration * 0.27 }
+    NumberAnimation { target: root.offset; property: "x"; to: 0; duration: Theme.shakeDuration * 0.23 }
 }

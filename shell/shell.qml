@@ -9,6 +9,11 @@ import qs.core
 ShellRoot {
     id: root
 
+    // No reload when a file changes, as a package upgrade writes them all: a reload
+    // would start every service over, the lock among them. Relaunch, in the Power
+    // panel's header, starts Speshell again.
+    settings.watchFiles: false
+
     // Services that act on their own, created first rather than when the bar first
     // reads them: idling, the battery's warnings, the backlight, the lid, the radios and
     // touchpad that keys switch, and the night light. They run with the defaults while

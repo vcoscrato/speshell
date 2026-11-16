@@ -9,14 +9,12 @@ import qs.services
 Card {
     id: root
     panel: "bluetooth"
-    property bool presented: false
 
     readonly property var adapter: BluetoothService.adapter
     readonly property bool btOn: BluetoothService.enabled
     readonly property bool scanning: BluetoothService.scanning
 
     // Scanning waits for the refresh button; closing the panel stops it.
-    onPresentedChanged: if (!root.presented && root.scanning) BluetoothService.stopDiscovery()
     Component.onDestruction: if (BluetoothService.scanning) BluetoothService.stopDiscovery()
 
     function devicesWhere(test) {
@@ -57,24 +55,23 @@ Card {
         return [{ text: "Connect", enabled: !busy, actionId: "connect" }];
     }
 
-    headerActions: Row {
-        spacing: Theme.spacingSmall
-
+    headerActions: [
         HeaderButton {
             iconName: "refresh"
             visible: root.btOn
-            busy: root.presented && root.scanning
+            busy: root.scanning
             tooltipText: root.scanning ? "Stop Bluetooth scan" : "Scan for Bluetooth devices"
             onClicked: BluetoothService.toggleDiscovery()
-        }
+        },
 
-        ToggleSwitch {
-            enabled: root.adapter !== null
+        HeaderButton {
+            visible: root.adapter !== null
+            iconName: root.btOn ? "bluetooth" : "bluetooth-off"
             checked: root.btOn
             tooltipText: root.btOn ? "Turn Bluetooth off" : "Turn Bluetooth on"
-            onToggled: state => BluetoothService.setEnabled(state)
+            onClicked: BluetoothService.setEnabled(!root.btOn)
         }
-    }
+    ]
 
     component DeviceList: Column {
         id: list
@@ -140,30 +137,22 @@ Card {
         }
     ]
 
-    Column {
+    DeviceList {
+        title: "Paired"
+        devices: root.knownDevices
+    }
+
+    DeviceList {
+        title: "Nearby"
+        devices: root.discoveredDevices
+    }
+
+    Label {
+        visible: root.btOn && (root.deviceCount === 0 || (root.scanning && root.discoveredDevices.length === 0))
         width: parent.width
-        spacing: Theme.spacingMedium
-
-        DeviceList {
-            title: "Paired"
-            devices: root.knownDevices
-        }
-
-        DeviceList {
-            title: "Nearby"
-            devices: root.discoveredDevices
-        }
-
-        EmptyState {
-            visible: root.btOn && (root.deviceCount === 0 || (root.scanning && root.discoveredDevices.length === 0))
-            iconName: "bluetooth"
-            busy: root.scanning
-            title: root.scanning ? "Looking for devices…" : "No devices yet"
-            detail: root.scanning ? "Put the device in pairing mode to find it."
-                : "Put a device in pairing mode, then scan for it."
-            actionLabel: root.scanning ? "" : "Scan"
-            actionIconName: "refresh"
-            onActivated: BluetoothService.startDiscovery()
-        }
+        text: root.scanning ? "Looking for devices. Put the device in pairing mode to find it."
+            : "Put a device in pairing mode, then scan from the header."
+        color: Theme.subtext
+        wrapMode: Text.WordWrap
     }
 }

@@ -2,7 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.components
 import qs.services
-import "../services/TimerProvider.js" as TimerProvider
+import "../services/Duration.js" as Duration
 import "../components/Format.js" as Format
 
 // A timer, opened from its chip in the bar. New, it takes a name and starts from a
@@ -17,7 +17,7 @@ Card {
     property var held: null
     readonly property bool isSet: root.timer !== null && root.timer.isSet
     readonly property bool paused: root.isSet && root.timer.paused
-    readonly property var typed: TimerProvider.parseTimer(lengthField.text)
+    readonly property var typed: Duration.parseTimer(lengthField.text)
 
     // Set, stopped, or gone; the dropdown closes.
     signal done()
@@ -78,13 +78,13 @@ Card {
         spacing: Theme.spacingTiny
 
         Repeater {
-            model: TimerProvider.presets
+            model: Duration.presets
 
             delegate: ActionButton {
                 required property int modelData
 
-                width: (parent.width - Theme.spacingTiny * (TimerProvider.presets.length - 1)) / TimerProvider.presets.length
-                text: modelData + " min"
+                width: (parent.width - Theme.spacingTiny * (Duration.presets.length - 1)) / Duration.presets.length
+                text: Format.duration(modelData * 60)
                 onClicked: root.begin(modelData * 60, "")
             }
         }
@@ -114,33 +114,15 @@ Card {
     }
 
     // ── Running: its name, the time left and when it ends, and how much has gone ──
-    TextInput {
+    // Enter keeps the name; Escape closes, as anywhere in the panel.
+    Field {
         id: nameInput
         visible: root.isSet
-        width: parent.width
-        color: Theme.text
-        selectionColor: Theme.accent
-        selectedTextColor: Theme.onAccent
-        font.pixelSize: Theme.fontSizeLarge
-        font.family: Theme.fontFamily
-        font.weight: Font.DemiBold
-        clip: true
-        Accessible.name: "Timer name"
-        onTextEdited: TimerService.rename(root.timer, nameInput.text)
-        onAccepted: nameInput.focus = false
-
-        Text {
-            visible: nameInput.text === "" && !nameInput.activeFocus
-            text: "Add a name"
-            color: Theme.overlay
-            font: nameInput.font
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            acceptedButtons: Qt.NoButton
-            cursorShape: Qt.IBeamCursor
-        }
+        heading: true
+        placeholder: "Add a name"
+        onEdited: TimerService.rename(root.timer, nameInput.text)
+        onAccepted: root.forceActiveFocus()
+        onCancelled: root.done()
     }
 
     Item {
@@ -166,13 +148,8 @@ Card {
         }
 
         // Scrolling changes it by a minute.
-        MouseArea {
-            anchors.fill: parent
-            acceptedButtons: Qt.NoButton
-            onWheel: wheel => {
-                if (wheel.angleDelta.y)
-                    TimerService.add(root.timer, wheel.angleDelta.y > 0 ? 60 : -60);
-            }
+        WheelSteps {
+            onStepped: direction => TimerService.add(root.timer, direction * 60)
         }
     }
 
@@ -195,7 +172,7 @@ Card {
                 required property int modelData
 
                 width: (parent.width - Theme.spacingTiny * 2) / 3
-                text: "+" + modelData + " min"
+                text: "+" + Format.duration(modelData * 60)
                 onClicked: TimerService.add(root.timer, modelData * 60)
             }
         }

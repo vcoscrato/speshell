@@ -1,5 +1,8 @@
 // Shared helpers for element shaders. Coordinates are screen pixels unless noted.
 
+const float PI = 3.1415927;
+const float TAU = 6.2831853;
+
 float hash(vec2 p) {
     p = fract(p * vec2(123.34, 456.21));
     p += dot(p, p + 45.32);
@@ -224,4 +227,22 @@ vec2 rrPoint(float s, vec2 h, float r) {
     s -= 2.0 * b;
     float f = s / r;
     return vec2(-a, -b) + r * vec2(-cos(f), -sin(f));
+}
+
+// ── Clock faces: angles as turns clockwise from twelve, with y down ──
+
+// The point at radius r, `turn` turns from twelve.
+vec2 at(float turn, float r) {
+    float a = turn * TAU;
+    return vec2(sin(a), -cos(a)) * r;
+}
+
+// Turns from twelve to p.
+float turnOf(vec2 p) {
+    return fract(atan(p.x, -p.y) / TAU + 1.0);
+}
+
+// p in a hand's frame: x across it, y out along it from the center.
+vec2 handFrame(vec2 p, float turn) {
+    return rot(p, -turn * TAU) * vec2(1.0, -1.0);
 }

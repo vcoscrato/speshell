@@ -8,41 +8,42 @@ import qs.services
 Card {
     id: root
     panel: "network"
-    property bool presented: false
     readonly property bool wifiReady: NetworkService.wifiOn && NetworkService.wifiDevice !== null
     readonly property bool connecting: NetworkService.connectingNetwork !== null && NetworkService.connectedWifi === null
 
     // Opening reads what NetworkManager already knows; only the refresh button scans.
-    onPresentedChanged: if (root.presented) NetworkService.refreshList()
+    // It also looks for tailscaled, which may have started since.
+    Component.onCompleted: {
+        NetworkService.refreshList();
+        TailscaleService.refresh();
+    }
 
-    headerActions: Row {
-        spacing: Theme.spacingSmall
-
-        // Lit while every radio is off.
-        HeaderButton {
-            id: airplaneButton
-            visible: RadioService.available
-            iconName: "airplane"
-            iconColor: RadioService.airplaneMode ? Theme.accent : airplaneButton.containsMouse ? Theme.text : Theme.subtext
-            tooltipText: RadioService.airplaneMode ? "Turn airplane mode off" : "Turn airplane mode on"
-            onClicked: RadioService.setAirplaneMode(!RadioService.airplaneMode)
-        }
-
+    headerActions: [
         HeaderButton {
             iconName: "refresh"
             visible: root.wifiReady
-            busy: root.presented && NetworkService.isScanning
+            busy: NetworkService.isScanning
             tooltipText: NetworkService.isScanning ? "Scanning for Wi-Fi networks…" : "Scan for Wi-Fi networks"
             onClicked: NetworkService.scan()
-        }
+        },
 
-        ToggleSwitch {
+        // On while every radio is off.
+        HeaderButton {
+            visible: RadioService.available
+            iconName: "airplane"
+            checked: RadioService.airplaneMode
+            tooltipText: RadioService.airplaneMode ? "Turn airplane mode off" : "Turn airplane mode on"
+            onClicked: RadioService.setAirplaneMode(!RadioService.airplaneMode)
+        },
+
+        HeaderButton {
             visible: NetworkService.wifiDevice !== null
+            iconName: NetworkService.wifiOn ? "wifi" : "wifi-off"
             checked: NetworkService.wifiOn
             tooltipText: NetworkService.wifiOn ? "Turn Wi-Fi off" : "Turn Wi-Fi on"
-            onToggled: state => NetworkService.setWifiEnabled(state)
+            onClicked: NetworkService.setWifiEnabled(!NetworkService.wifiOn)
         }
-    }
+    ]
 
     pinnedContent: [
         Notice {
@@ -97,11 +98,14 @@ Card {
                 current: vpnRow.connected
                 busy: VpnService.busy(vpnRow.modelData)
                 primaryEnabled: !vpnRow.connected && !vpnRow.busy
+                // Connect shows while hovered, as the row's click does it too.
                 actions: {
                     if (vpnRow.connected && !vpnRow.busy)
                         return [{ text: "Disconnect", actionId: "disconnect" }];
                     if (vpnRow.failed && VpnService.errorCanRetry)
                         return [{ text: "Enter password", actionId: "retry" }];
+                    if (vpnRow.hovered && !vpnRow.busy && !vpnRow.prompt)
+                        return [{ text: "Connect", actionId: "connect" }];
                     return [];
                 }
                 onPrimaryTriggered: {
@@ -111,8 +115,8 @@ Card {
                         VpnService.connect(vpnRow.modelData.uuid, false);
                 }
                 onActionTriggered: actionId => {
-                    if (actionId === "retry")
-                        VpnService.connect(vpnRow.modelData.uuid, true);
+                    if (actionId === "retry" || actionId === "connect")
+                        VpnService.connect(vpnRow.modelData.uuid, actionId === "retry");
                     else
                         VpnService.disconnect(vpnRow.modelData.uuid);
                 }
@@ -289,10 +293,7 @@ Card {
                         ? [{ text: "Forget", kind: "danger", actionId: "forget" }]
                         : []
                     onPrimaryTriggered: NetworkService.activate(networkRow.modelData)
-                    onActionTriggered: {
-                        if (networkRow.modelData.network)
-                            networkRow.modelData.network.forget();
-                    }
+                    onActionTriggered: NetworkService.forget(networkRow.modelData)
 
                     Field {
                         visible: networkRow.prompting
@@ -300,9 +301,9 @@ Card {
                         masked: true
                         confirmText: "Connect"
                         autoFocus: true
-                        text: NetworkService.passwordText
-                        onTextChanged: NetworkService.passwordText = text
-                        onAccepted: NetworkService.connectWithPassword(networkRow.modelData, NetworkService.passwordText)
+                        // The draft goes with the prompt.
+                        onVisibleChanged: if (!visible) text = ""
+                        onAccepted: NetworkService.connectWithPassword(networkRow.modelData, text)
                         onCancelled: NetworkService.cancelPasswordPrompt()
                     }
 
@@ -317,17 +318,14 @@ Card {
                 }
             }
 
-            EmptyState {
-                visible: NetworkService.displayedNetworks.length === 0
-                iconName: "wifi"
-                busy: NetworkService.isScanning
-                title: NetworkService.isScanning ? "Looking for networks…"
-                    : (NetworkService.scannedAtMs > 0 ? "No other networks found" : "No scan yet")
-                detail: NetworkService.isScanning ? ""
-                    : (NetworkService.scannedAtMs > 0 ? "Nothing else is in range right now." : "Scan to see the Wi-Fi networks around you.")
-                actionLabel: NetworkService.isScanning ? "" : (NetworkService.scannedAtMs > 0 ? "Scan again" : "Scan")
-                actionIconName: "refresh"
-                onActivated: NetworkService.scan()
+            // The heading says while it scans.
+            Label {
+                visible: NetworkService.displayedNetworks.length === 0 && !NetworkService.isScanning
+                width: parent.width
+                text: NetworkService.scannedAtMs > 0 ? "Nothing else is in range."
+                    : "Scan from the header to see the networks around you."
+                color: Theme.subtext
+                wrapMode: Text.WordWrap
             }
         }
     ]

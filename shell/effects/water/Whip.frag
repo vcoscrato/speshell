@@ -27,8 +27,6 @@ layout(std140, binding = 0) uniform buf {
 } u;
 #include "../common/common.glsl"
 
-const float TAU = 6.2831853;
-
 // Arc length (px) along the spine from spiral parameter v up to the head.
 float arcTo(float v) {
     return sqrt(1.0 + u.k * u.k) * u.r0 / u.k * (exp(-u.k * v) - exp(-u.k * u.head));

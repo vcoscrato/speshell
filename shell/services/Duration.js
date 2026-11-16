@@ -1,6 +1,6 @@
 .pragma library
 
-// Timer lengths and names as typed.
+// Timer lengths and names as typed, for the timer panel and `speshell timer`.
 
 const presets = [5, 10, 25, 45];
 const longest = 24 * 3600;

@@ -5,6 +5,11 @@ function localPath(url) {
     return decodeURIComponent(String(url).replace(/^file:\/\//, ""));
 }
 
+// Where Speshell is: the folder of shell.qml.
+function appDir() {
+    return localPath(Qt.resolvedUrl("..")).replace(/\/$/, "");
+}
+
 // The command that runs the script `name` beside this file (one of the services'
 // *.sh) with `args`.
 function script(name, args) {

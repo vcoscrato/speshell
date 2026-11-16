@@ -7,4 +7,9 @@ state=/var/lib/speshell/greeter
 export XDG_CACHE_HOME="$state/cache" XDG_STATE_HOME="$state/state" \
     XDG_DATA_HOME="$state/data" XDG_CONFIG_HOME="$state/config"
 export SPESHELL_QML_DIR="${SPESHELL_QML_DIR:-$(dirname -- "$(dirname -- "$(readlink -f -- "$0")")")}"
+# The login screen needs no desktop portal, and Hyprland's crashes as this Hyprland
+# exits at login: keep the account's user manager from starting either, until the
+# greeter's runtime directory goes.
+systemctl --user --runtime --quiet mask xdg-desktop-portal.service xdg-desktop-portal-hyprland.service \
+    >/dev/null 2>&1 || true
 exec start-hyprland -- --config "$SPESHELL_QML_DIR/greeter/hyprland.lua"

@@ -126,6 +126,7 @@ Item {
             }
 
             Spoke {
+                id: hourHand
                 angle: (face.hours % 12 + face.minutes / 60) * 30
                 from: face.radius * 0.5
                 to: 0
@@ -150,13 +151,14 @@ Item {
                 color: Theme.accent
             }
 
+            // The hub, a little wider than the hour hand.
             Rectangle {
                 anchors.centerIn: parent
-                width: 10
-                height: 10
-                radius: 5
+                width: hourHand.thickness + Theme.spacingTiny
+                height: width
+                radius: width / 2
                 color: face.running ? Theme.accent : Theme.text
-                border.width: 2
+                border.width: Theme.outlineWidth
                 border.color: Theme.mantle
             }
         }

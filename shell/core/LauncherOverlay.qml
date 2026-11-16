@@ -11,11 +11,10 @@ import qs.services
 // leaving with the theme's launcher transition.
 ModalWindow {
     id: root
-    property bool opened: false
-    // Mapped on screen; outlives `opened` while an effects transition plays the exit.
-    property bool presenting: false
+    // "" unmapped; "open"; "closing" while an effects transition plays the exit.
+    property string phase: ""
+    readonly property bool presenting: root.phase !== ""
     property int selectedIndex: 0
-    readonly property bool mapped: root.visible && root.backingWindowVisible
     // Latched per presentation so an effects change, e.g. from a theme picked while it
     // closes, lets the old effects finish their exit.
     property Component transition: null
@@ -26,22 +25,25 @@ ModalWindow {
     readonly property bool mixedKinds: root.results.some(result => (result.badge || "") !== (root.results[0].badge || ""))
     readonly property int configuredWidth: ConfigService.settings.launcher.width
     readonly property int configuredVisibleRows: ConfigService.settings.launcher.visibleRows
-    readonly property int paletteWidth: Math.min(root.configuredWidth, Math.max(320, root.width - Theme.spacingXL * 2))
-    readonly property int resultRowHeight: Math.max(56,
-        Math.ceil((Theme.fontSizeNormal + Theme.fontSizeSmall) * 1.25)
-            + Theme.spacingMedium * 2)
+    readonly property int paletteWidth: Math.min(root.configuredWidth, Math.max(Theme.panelWidth, root.width - Theme.spacingXL * 2))
+    // App icons draw a touch larger than the symbolic ones beside them.
+    readonly property int resultIconSize: Theme.iconSizeLarge + Theme.spacingTiny
+    readonly property int resultRowHeight: Math.max(root.resultIconSize,
+        Math.ceil((Theme.fontSizeNormal + Theme.fontSizeSmall) * 1.25) + Theme.spacingMicro)
+        + Theme.spacingMedium * 2
 
     readonly property int resultSpacing: Theme.spacingTiny
     readonly property int resultViewportHeight: root.configuredVisibleRows * root.resultRowHeight
         + Math.max(0, root.configuredVisibleRows - 1) * root.resultSpacing
+    // Rows a page key moves by.
+    readonly property int pageRows: Math.max(1, root.configuredVisibleRows - 1)
 
+    opened: root.phase === "open"
+    focusTarget: searchBox
     visible: root.presenting && root.targetScreen !== null
     updatesEnabled: root.visible
 
     WlrLayershell.namespace: "speshell-launcher"
-    takesKeyboard: root.visible && root.opened
-    // Click-through while the exit transition plays.
-    mask: root.opened ? null : passThrough
 
     function clampSelected() {
         root.selectedIndex = root.resultCount <= 0
@@ -49,10 +51,17 @@ ModalWindow {
             : Math.max(0, Math.min(root.selectedIndex, root.resultCount - 1));
     }
 
+    // Arrows wrap around; pages and Home/End stop at the ends.
     function moveSelection(delta) {
         if (root.resultCount <= 0)
             return;
-        root.selectedIndex = (root.selectedIndex + delta + root.resultCount) % root.resultCount;
+        root.select((root.selectedIndex + delta + root.resultCount) % root.resultCount);
+    }
+
+    function select(index) {
+        if (root.resultCount <= 0)
+            return;
+        root.selectedIndex = Math.max(0, Math.min(index, root.resultCount - 1));
         resultsList.positionViewAtIndex(root.selectedIndex, ListView.Contain);
     }
 
@@ -67,14 +76,12 @@ ModalWindow {
         closeSafetyTimer.stop();
         if (!root.presenting)
             root.transition = EffectsService.launcherTransition;
-        root.opened = true;
-        root.presenting = true;
         resultsList.contentY = 0;
+        root.phase = "open";
     }
 
     function closeLauncher() {
-        root.opened = false;
-        root.focusGrabActive = false;
+        root.phase = "closing";
         if (root.transitionReady)
             closeSafetyTimer.restart();
         else
@@ -86,7 +93,7 @@ ModalWindow {
         if (root.opened)
             return;
         closeSafetyTimer.stop();
-        root.presenting = false;
+        root.phase = "";
         LauncherService.setQuery("");
         root.selectedIndex = 0;
     }
@@ -105,16 +112,6 @@ ModalWindow {
     }
 
     onResultCountChanged: root.clampSelected()
-    onVisibleChanged: {
-        if (root.visible) {
-            resultsList.contentY = 0;
-            focusTimer.restart();
-        } else {
-            focusTimer.stop();
-            root.focusGrabActive = false;
-        }
-    }
-    onBackingWindowVisibleChanged: if (root.mapped) focusTimer.restart()
 
     Connections {
         target: LauncherService
@@ -127,26 +124,11 @@ ModalWindow {
         }
     }
 
-    Region { id: passThrough }
-
     // An effects transition must emit closingFinished(); this bounds a broken one.
     Timer {
         id: closeSafetyTimer
         interval: Math.round(2500 / Math.max(0.25, transitionLoader.timeScale))
         onTriggered: root.finishPresentation()
-    }
-
-    Timer {
-        id: focusTimer
-        interval: 60
-        repeat: false
-        onTriggered: {
-            if (!root.mapped || !root.opened)
-                return;
-            searchBox.focusInput();
-            searchBox.cursorPosition = searchBox.text.length;
-            root.focusGrabActive = true;
-        }
     }
 
     Rectangle {
@@ -205,7 +187,7 @@ ModalWindow {
                 id: searchBox
                 large: true
                 iconName: "search"
-                placeholder: "Search apps, calculate, ! for commands, ? for the web"
+                placeholder: "Search apps and themes, calculate, ! for commands, ? for the web"
 
                 onTextChanged: {
                     LauncherService.setQuery(text);
@@ -220,6 +202,14 @@ ModalWindow {
                         root.moveSelection(1);
                     } else if (event.key === Qt.Key_Up) {
                         root.moveSelection(-1);
+                    } else if (event.key === Qt.Key_PageDown) {
+                        root.select(root.selectedIndex + root.pageRows);
+                    } else if (event.key === Qt.Key_PageUp) {
+                        root.select(root.selectedIndex - root.pageRows);
+                    } else if (event.key === Qt.Key_Home) {
+                        root.select(0);
+                    } else if (event.key === Qt.Key_End) {
+                        root.select(root.resultCount - 1);
                     } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                         root.activateSelected();
                     } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
@@ -281,13 +271,11 @@ ModalWindow {
                         anchors.left: parent.left
                         anchors.leftMargin: Theme.spacingMedium
                         anchors.verticalCenter: parent.verticalCenter
-                        width: 30
-                        height: 30
+                        width: root.resultIconSize
+                        height: root.resultIconSize
 
                         IconImage {
-                            anchors.centerIn: parent
-                            width: 27
-                            height: 27
+                            anchors.fill: parent
                             source: resultRow.nativeIconPath
                             asynchronous: true
                             visible: resultRow.nativeIconPath !== ""
@@ -310,13 +298,12 @@ ModalWindow {
                         anchors.right: resultKind.left
                         anchors.rightMargin: Theme.spacingMedium
                         anchors.verticalCenter: parent.verticalCenter
-                        spacing: 2
+                        spacing: Theme.spacingMicro
 
                         Label {
                             width: parent.width
+                            role: "title"
                             text: resultRow.modelData.title || ""
-                            color: Theme.text
-                            font.pixelSize: Theme.fontSizeNormal
                             font.bold: resultRow.modelData.kind === "calculator"
                             elide: Text.ElideRight
                         }
@@ -337,11 +324,12 @@ ModalWindow {
                         anchors.right: parent.right
                         anchors.rightMargin: Theme.spacingMedium
                         anchors.verticalCenter: parent.verticalCenter
+                        role: "section"
                         text: root.mixedKinds ? resultRow.modelData.badge || "" : ""
                         color: resultRow.index === root.selectedIndex ? Theme.accent : Theme.overlay
+                        // A badge, a size under a section's heading.
                         font.pixelSize: Theme.fontSizeMicro
                         font.weight: Font.Bold
-                        font.letterSpacing: 0.8
                     }
 
                     MouseArea {
@@ -361,9 +349,7 @@ ModalWindow {
 
             Item {
                 width: parent.width
-                height: Math.max(54,
-                    Math.ceil(Theme.fontSizeNormal * 1.35)
-                        + Theme.spacingLarge * 2)
+                height: root.resultRowHeight
                 visible: root.resultCount === 0
 
                 Row {
@@ -378,9 +364,9 @@ ModalWindow {
                     }
 
                     Label {
+                        role: "title"
                         text: LauncherService.emptyMessage()
                         color: Theme.subtext
-                        font.pixelSize: Theme.fontSizeNormal
                         anchors.verticalCenter: parent.verticalCenter
                     }
                 }
@@ -420,6 +406,13 @@ ModalWindow {
         target: transitionLoader.item
         property: "panelRect"
         value: Qt.rect(launcherPanel.x, launcherPanel.y, launcherPanel.width, launcherPanel.height)
+    }
+
+    Binding {
+        target: transitionLoader.item
+        property: "panelRadius"
+        value: Theme.surfaceRadius
+        when: transitionLoader.item !== null && "panelRadius" in transitionLoader.item
     }
 
     Binding {

@@ -1,5 +1,6 @@
 import QtQuick
 import qs.services
+import "Keyboard.js" as Keyboard
 
 // One tab of a row of them: an icon, a label, or both, filled in the accent while it's
 // the current one. A tab without its label names itself in a tooltip.
@@ -28,6 +29,7 @@ Rectangle {
     radius: Theme.borderRadius
     opacity: root.enabled ? 1 : Theme.disabledOpacity
     scale: root.pressed ? Theme.pressScale : 1
+    activeFocusOnTab: true
     color: root.current ? Theme.alpha(Theme.accent, Theme.tintStrong)
         : root.hovered ? Theme.cardHover
         : Theme.controlFill
@@ -43,6 +45,14 @@ Rectangle {
     Accessible.name: root.text
     Accessible.selected: root.current
     Accessible.onPressAction: if (root.enabled) root.clicked()
+    Keys.onPressed: event => {
+        if (Keyboard.presses(event)) {
+            event.accepted = true;
+            if (!root.current)
+                EffectsService.picked(root, null);
+            root.clicked();
+        }
+    }
 
     Row {
         id: content
@@ -84,7 +94,9 @@ Rectangle {
     }
 
     Tooltip {
-        visible: !root.labelShown && root.text !== "" && mouse.containsMouse
+        visible: !root.labelShown && root.text !== "" && (mouse.containsMouse || root.activeFocus)
         text: root.text
     }
+
+    FocusRing {}
 }

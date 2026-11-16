@@ -8,36 +8,20 @@ import "../components/Format.js" as Format
 Card {
     id: root
     panel: "media"
-    property bool presented: false
 
     readonly property var player: MediaService.player
     readonly property bool hasPlayer: MediaService.hasPlayer
 
-    onPresentedChanged: MediaService.setViewPresented(root.presented)
-    Component.onCompleted: MediaService.setViewPresented(root.presented)
+    Component.onCompleted: MediaService.setViewPresented(true)
     Component.onDestruction: MediaService.setViewPresented(false)
 
-    // ── No player fallback — compact one-liner ──
-    Row {
-        width: parent.width
-        spacing: Theme.spacingSmall
+    EmptyState {
         visible: !root.hasPlayer
-
-        AppIcon {
-            name: "media"
-            size: Theme.iconSizeMedium
-            iconColor: Theme.overlay
-            opacity: Theme.disabledOpacity
-            anchors.verticalCenter: parent.verticalCenter
-        }
-        Label {
-            text: "No media playing"
-            color: Theme.overlay
-            anchors.verticalCenter: parent.verticalCenter
-        }
+        iconName: "media"
+        title: "Nothing playing"
+        detail: "Music and videos you play show up here."
     }
 
-    // ── Player content ───────────────────────
     Column {
         width: parent.width
         spacing: Theme.spacingSmall
@@ -47,9 +31,9 @@ Card {
             width: parent.width
             spacing: Theme.spacingMedium
 
-            // ── Album art ────────────────────────
-            // Square covers fill an 80 px square; wide art such as video thumbnails
-            // keeps its shape (up to 16:9) instead of being cropped.
+            // Square covers are as tall as the track's details; wide art such as video
+            // thumbnails keeps its shape (up to 16:9), half as wide again, instead of
+            // being cropped.
             Rectangle {
                 id: artBox
                 readonly property real aspect: artImage.status === Image.Ready && artImage.implicitHeight > 0
@@ -57,8 +41,8 @@ Card {
                     : 1
                 readonly property bool wide: aspect > 1.2
 
-                width: wide ? 128 : 80
-                height: wide ? Math.round(128 / Math.min(aspect, 16 / 9)) : 80
+                width: wide ? Math.round(info.height * 1.5) : info.height
+                height: wide ? Math.round(width / Math.min(aspect, 16 / 9)) : info.height
                 anchors.verticalCenter: parent.verticalCenter
                 radius: Theme.borderRadius
                 color: Theme.surface2
@@ -73,19 +57,18 @@ Card {
                     visible: source !== ""
                 }
 
-                // Fallback icon
                 AppIcon {
                     anchors.centerIn: parent
                     name: "media"
-                    size: 32
+                    size: Theme.iconSizeLarge
                     iconColor: Theme.overlay
                     visible: artImage.status !== Image.Ready
                 }
             }
 
-            // ── Track info + controls ────────────
-            // Fixed height (two title lines), so Home doesn't shift between tracks.
+            // As tall as two title lines, so the panel keeps its height between tracks.
             Item {
+                id: info
                 width: parent.width - artBox.width - Theme.spacingMedium
                 height: titleMetrics.lineSpacing * 2 + artistText.height + Theme.spacingTiny + controlsRow.height
 
@@ -122,7 +105,6 @@ Card {
                     }
                 }
 
-                // ── Playback controls ────────────
                 Row {
                     id: controlsRow
                     anchors.bottom: parent.bottom
@@ -133,35 +115,32 @@ Card {
                         anchors.verticalCenter: parent.verticalCenter
                         iconName: "media-previous"
                         tooltipText: "Previous track"
-                        onClicked: { if (root.player) root.player.previous() }
+                        onClicked: MediaService.previous()
                     }
 
                     IconButton {
                         anchors.verticalCenter: parent.verticalCenter
                         iconName: MediaService.playing ? "media-pause" : "media-play"
                         iconSize: Theme.iconSizeLarge
-                        size: 40
+                        size: Theme.controlHeight + Theme.spacingSmall
                         iconColor: Theme.accent
                         iconXOffset: MediaService.playing ? 0 : 2
                         tooltipText: MediaService.playing
                             ? "Pause"
                             : "Play"
-                        onClicked: {
-                            if (root.player) root.player.togglePlaying()
-                        }
+                        onClicked: MediaService.togglePlaying()
                     }
 
                     IconButton {
                         anchors.verticalCenter: parent.verticalCenter
                         iconName: "media-next"
                         tooltipText: "Next track"
-                        onClicked: { if (root.player) root.player.next() }
+                        onClicked: MediaService.next()
                     }
                 }
             }
         }
 
-        // ── Progress bar ─────────────────────────
         Column {
             width: parent.width
             spacing: Theme.spacingMicro
@@ -176,7 +155,7 @@ Card {
                 live: false
                 Accessible.name: "Track position"
                 onPressedChanged: if (!pressed) MediaService.seek(valueAt(position))
-                onWheelAdjusted: nextValue => MediaService.seek(nextValue)
+                onStepped: nextValue => MediaService.seek(nextValue)
             }
 
             Row {

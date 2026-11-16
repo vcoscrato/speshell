@@ -9,16 +9,8 @@ import "Sugar.js" as Sugar
 // now and then catching the light. Closing, it is
 // eaten: bites chomp in from its edges, showing the sponge inside and throwing
 // crumbs, until a last big bite takes the rest.
-Item {
+LauncherStage {
     id: root
-
-    // ── Speshell effects API v1 ────────────────────────────────
-    property Item panel: null
-    property rect panelRect
-    property bool active: false
-    // The active palette, as Theme.qml names it.
-    property var theme: null
-    signal closingFinished()
 
     // ── Choreography (seconds) ──────────────────────────────
     readonly property real pipeStart: 0.15
@@ -26,14 +18,11 @@ Item {
     readonly property real liftTime: 0.5
     readonly property real cherryGap: 0.45       // between one cherry and the next
     readonly property real cherryDrop: 0.55      // one cherry's way down onto the border
-    readonly property real exitTime: 0.48
-    readonly property real tailTime: 0.25       // at least, and until the last crumbs fall
+    exitTime: 0.48
+    tailTime: 0.25       // at least, and until the last crumbs fall
 
     // open: seconds open, which paces the decorating; leave: 0..1 over the bites.
     property real open: 0
-    property real leave: 0
-    property real tailStart: 0
-    property bool exitDone: false
     // Bites already taken, so each throws its crumbs once.
     property int bitten: 0
     // Where the bites land: (x, y) on the panel, relative to its top-left, as a
@@ -45,8 +34,8 @@ Item {
     readonly property real pipe: span(open, pipeStart, pipeEnd)
     readonly property real cherryStart: pipeEnd + 0.35
     readonly property bool cherriesSet: open >= cherryStart + (cherrySpots.length - 1) * cherryGap + cherryDrop
-    readonly property real radius: root.theme && root.theme.surfaceRadius !== undefined ? root.theme.surfaceRadius : 16
-    readonly property bool capturing: leave > 0
+    capturing: leave > 0
+    lingering: bits.live > 0
     readonly property real margin: 140
     // When each bite starts, as leave; the last is the big one.
     readonly property var biteAt: [0.0, 0.18, 0.36, 0.6]
@@ -55,7 +44,7 @@ Item {
     // border's shells (px, from the panel's center), z the angle facing out there.
     readonly property var cherrySpots: {
         const r = root.panelRect, w = r.width / 2, h = r.height / 2;
-        const rad = Math.min(root.radius, w, h), a = w - rad, b = h - rad, d = Math.SQRT1_2, off = 6;
+        const rad = Math.min(root.panelRadius, w, h), a = w - rad, b = h - rad, d = Math.SQRT1_2, off = 6;
         const spots = [];
         function at(x, y, nx, ny) { spots.push(Qt.vector3d(x + nx * off, y + ny * off, Math.atan2(ny, nx))); }
         const wide = r.width > 360, tall = r.height > 360;
@@ -116,44 +105,29 @@ Item {
         return Qt.vector4d(r.x + b.x * r.width, r.y + b.y * r.height, size * snap, i * 1.7 + 0.3);
     }
 
-    onActiveChanged: exitDone = false
+    // Where the bites land is planned as it closes.
+    onActiveChanged: {
+        if (!root.active && root.leave === 0)
+            root.planBites();
+    }
 
-    EffectClock {
-        id: clock
-        onAdvanced: dt => {
-            if (root.active) {
-                // Reopened mid-exit: it grows back.
-                if (root.leave > 0)
-                    root.leave = Math.max(0, root.leave - dt / root.exitTime);
-                else
-                    root.open += dt;
-            } else if (root.leave < 1) {
-                if (root.leave === 0)
-                    root.planBites();
-                root.leave = Math.min(1, root.leave + dt / root.exitTime);
-                root.tailStart = clock.clock;
-            } else if (!root.exitDone && clock.clock - root.tailStart >= root.tailTime && bits.live === 0) {
-                root.exitDone = true;
-                // Speshell may destroy this item inside the signal, so nothing may follow it.
-                root.closingFinished();
-                return;
+    onAdvanced: dt => {
+        if (root.active && root.leave === 0)
+            root.open += dt;
+        if (!root.active && root.leave > 0) {
+            while (root.bitten < root.biteAt.length && root.leave >= root.biteAt[root.bitten]) {
+                root.crumbs(root.bitten);
+                root.bitten++;
             }
-
-            if (!root.active && root.leave > 0) {
-                while (root.bitten < root.biteAt.length && root.leave >= root.biteAt[root.bitten]) {
-                    root.crumbs(root.bitten);
-                    root.bitten++;
-                }
-            } else {
-                root.bitten = 0;
-            }
-            // Once the cherries are set, now and then one catches the light.
-            if (root.active && root.leave === 0 && root.cherriesSet) {
-                root.nextGlint -= dt;
-                if (root.nextGlint <= 0) {
-                    root.nextGlint = bits.rnd(2.2, 4.5);
-                    root.glint();
-                }
+        } else {
+            root.bitten = 0;
+        }
+        // Once the cherries are set, now and then one catches the light.
+        if (root.active && root.leave === 0 && root.cherriesSet) {
+            root.nextGlint -= dt;
+            if (root.nextGlint <= 0) {
+                root.nextGlint = bits.rnd(2.2, 4.5);
+                root.glint();
             }
         }
     }
@@ -185,24 +159,17 @@ Item {
             bits.emit(bits.puff, { x: b.x, y: b.y, vy: -20, drag: 2, life: 0.45, size: 44, delay: 0.04 });
     }
 
-    ShaderEffectSource {
-        id: panelTex
-        sourceItem: root.panel
-        hideSource: root.capturing
-        live: root.capturing
-    }
-
     ShaderEffect {
         x: root.panelRect.x - root.margin
         y: root.panelRect.y - root.margin
         width: root.panelRect.width + 2 * root.margin
         height: root.panelRect.height + 2 * root.margin
         visible: root.panel !== null && (root.leave < 1 || root.active)
-        property var source: panelTex
+        property var source: root.panelTexture
         property point origin: Qt.point(x, y)
         property size resolution: Qt.size(width, height)
         property rect rect: root.panelRect
-        property real radius: root.radius
+        property real radius: root.panelRadius
         property real capture: root.capturing ? 1 : 0
         property real pipe: root.pipe
         // The bag coming in, and lifting away when done.

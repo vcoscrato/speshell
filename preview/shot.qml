@@ -9,7 +9,7 @@ import qs.services
 // open (`bar`) and once with each panel in SHOTS open, the launcher (`launcher`), the
 // theme gallery at its themes (`themes`) or the theme's wallpapers (`wallpapers`), or the
 // OSD (`osd`) at the level SHOT_OSD names (`output`, `input`, `brightness`, `keyboard`)
-// or, for anything else, at a state.
+// or, for anything else, at a state, or three toasts (`toasts`).
 // shot.sh copies this file to the root of a copy of the tree, so `qs.*` and the shipped
 // themes resolve. For each shot it saves OUT/<name>.png and logs the area to keep as
 // "crop <name> x y w h".
@@ -29,6 +29,9 @@ ShellRoot {
     property var launcher: null
     property var gallery: null
     property var osd: null
+    property var toasts: null
+    // The toasts' list, moved into the scene.
+    property Item toastList: null
     // The OSD's card, moved into the scene.
     property Item osdCard: null
     property int waits: 0
@@ -53,10 +56,11 @@ ShellRoot {
 
     function start() {
         TimerService.start(25 * 60, "Tea");
-        ActivityService.publish("shot", {
+        // Published, so the tools' look at the processes leaves it.
+        ActivityService.published = [ActivityService.entry({
             id: "screen-recording", state: "active", label: "Recording", iconName: "screen-recording",
             tone: "error", startedAt: Date.now() - 78000, actions: [{ id: "stop", label: "Stop and save" }]
-        });
+        })];
         if (Quickshell.env("SHOT_SAMPLES") === "1")
             shell.fillSamples();
         shell.bar = shell.create("bar/Bar.qml", { modelData: Quickshell.screens[0] });
@@ -96,7 +100,9 @@ ShellRoot {
         const name = shell.shots[shell.index];
         shell.bar.closeDropdown();
         if (name === "launcher") {
-            shell.launcher = shell.create("core/LauncherOverlay.qml", { opened: true, presenting: true });
+            // Shown first, as the launcher's keybinding does, so the service searches.
+            LauncherService.shown = true;
+            shell.launcher = shell.create("core/LauncherOverlay.qml", { phase: "open" });
             LauncherService.setQuery(Quickshell.env("SHOT_QUERY") || "");
         } else if (name === "themes" || name === "wallpapers") {
             shell.gallery = shell.create("core/ThemeGallery.qml", {});
@@ -104,6 +110,8 @@ ShellRoot {
             typing.restart();
         } else if (name === "osd") {
             shell.showOsd();
+        } else if (name === "toasts") {
+            shell.showToasts();
         } else if (name !== "bar") {
             const button = shell.bar.buttonFor(name);
             // The weather's button shows once the forecast arrives.
@@ -140,7 +148,24 @@ ShellRoot {
         card.width = Qt.binding(() => body.implicitWidth + Theme.panelPadding * 2);
         card.height = Qt.binding(() => body.implicitHeight + Theme.panelPadding * 2);
         card.x = Qt.binding(() => (scene.width - card.width) / 2);
-        card.y = Qt.binding(() => scene.height - 64 - card.height);
+        card.y = Qt.binding(() => scene.height - Theme.osdMargin - card.height);
+    }
+
+    // The toasts where they show on a screen with the bar at the top: in the bottom right
+    // corner, the oldest nearest it.
+    function showToasts() {
+        const before = scene.children.length;
+        shell.toasts = shell.create("core/NotificationToastWindow.qml", {});
+        const list = scene.children.slice(before).find(item => "verticalLayoutDirection" in item);
+        list.anchors.fill = undefined;
+        list.width = Theme.toastWidth;
+        list.height = scene.height / 2;
+        list.x = scene.width - list.width - Theme.spacingXL;
+        list.y = scene.height - list.height - Theme.spacingXL;
+        shell.toastList = list;
+        NotificationService.addInternalNotification("shot-saved", "Screenshot saved", "Copied to the clipboard and saved in Pictures.", true);
+        NotificationService.addInternalNotification("shot-timer", "Tea is ready", "The 4 minute timer finished.", true);
+        NotificationService.addInternalNotification("shot-battery", "Battery low", "15% left. Plug in soon.", true, 2);
     }
 
     function save(name) {
@@ -150,6 +175,11 @@ ShellRoot {
         if (name === "launcher") {
             const width = shell.launcher.paletteWidth + Theme.spacingXL * 2;
             area = Qt.rect((scene.width - width) / 2, 0, width, scene.height * 0.8);
+        } else if (name === "toasts") {
+            const list = shell.toastList;
+            const margin = Theme.spacingLarge;
+            area = Qt.rect(list.x - margin, list.y + list.height - list.contentHeight - margin,
+                list.width + margin * 2, list.contentHeight + margin * 2);
         } else if (name === "osd") {
             const card = shell.osdCard;
             const margin = Theme.spacingLarge;
@@ -164,8 +194,15 @@ ShellRoot {
             console.log("crop", name, Math.max(0, Math.round(area.x)), Math.round(area.y),
                 Math.round(Math.min(area.width, scene.width - area.x)), Math.round(Math.min(area.height, scene.height)));
             if (shell.launcher) {
+                LauncherService.shown = false;
                 shell.launcher.destroy();
                 shell.launcher = null;
+            }
+            if (shell.toasts) {
+                NotificationService.activePopups = [];
+                shell.toasts.destroy();
+                shell.toasts = null;
+                shell.toastList = null;
             }
             if (shell.osd) {
                 shell.osd.destroy();

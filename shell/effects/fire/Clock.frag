@@ -14,7 +14,7 @@ layout(std140, binding = 0) uniform buf {
     float hourTurn;     // each hand's turns from twelve, clockwise
     float minuteTurn;
     float secondTurn;
-    float seconds;      // 1 shows the running ember
+    float ticking;      // 1 shows the running ember
     float time;         // s, for the flames
     vec4 cCoal;
     vec4 cAsh;
@@ -27,22 +27,6 @@ layout(std140, binding = 0) uniform buf {
     vec4 cEdge;
 } u;
 #include "../common/common.glsl"
-
-const float TAU = 6.2831853;
-
-vec2 at(float turn, float r) {
-    float a = turn * TAU;
-    return vec2(sin(a), -cos(a)) * r;
-}
-
-float turnOf(vec2 p) {
-    return fract(atan(p.x, -p.y) / TAU + 1.0);
-}
-
-// p in a hand's frame: x across it, y out along it from the center.
-vec2 handFrame(vec2 p, float turn) {
-    return rot(p, -turn * TAU) * vec2(1.0, -1.0);
-}
 
 // A blade from the center out to `len`, `w` wide at its base, a short tang behind the
 // center, tapering to a point. Negative inside.
@@ -115,7 +99,7 @@ void main() {
 
     // ── The running ember and its sparks ──
     float rS = R * 0.68;
-    if (u.seconds > 0.5) {
+    if (u.ticking > 0.5) {
         o = over(o, u.cEdge.rgb, 0.35 * cover(0.8 - abs(r - rS)));
         float behind = fract(u.secondTurn - turn + 1.0);
         float trail = 1.0 - behind / 0.06;

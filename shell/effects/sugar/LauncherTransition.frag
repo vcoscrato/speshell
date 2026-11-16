@@ -50,7 +50,6 @@ layout(binding = 1) uniform sampler2D source;
 #include "../common/common.glsl"
 #include "Bag.glsl"
 
-const float PI = 3.1415927;
 const float OFF = 4.0;          // px the border's middle sits outside the panel
 const float SHELL = 6.5;        // px, a shell's half width at its head
 const float CHERRY = 8.5;       // px, a cherry's radius

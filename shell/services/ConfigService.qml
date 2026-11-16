@@ -24,8 +24,9 @@ Singleton {
     property string configPath: ""
     property string configDir: ""
     property string dataDir: ""
-    property string operationMessage: ""
-    property bool operationFailed: false
+    // What the last open, copy, or save of config.ini says, as { text, tone }: tone
+    // "neutral" with no text, "success", or "error".
+    property var feedback: ({ text: "", tone: "neutral" })
     // config.ini's text as last read or written.
     property string sourceText: ""
     // The text the panels' changes make, which `config` already reflects; it is
@@ -42,25 +43,20 @@ Singleton {
     onConfigChanged: if (root.config) root.settings = root.config
 
     function load() {
-        if (loader.running) {
-            loader.queued = true;
-            return;
-        }
-        root.status = "loading";
-        root.config = null;
-        root.errors = [];
-        root.clearMessage();
-        loader.running = true;
+        loader.request();
     }
 
-    function clearMessage() {
-        root.operationMessage = "";
-        root.operationFailed = false;
+    function setFeedback(text, tone) {
+        root.feedback = { text: text, tone: tone };
+    }
+
+    function clearFeedback() {
+        if (root.feedback.text !== "")
+            root.setFeedback("", "neutral");
     }
 
     function fail(message) {
-        root.operationFailed = true;
-        root.operationMessage = message;
+        root.setFeedback(message, "error");
     }
 
     function failLoad(message) {
@@ -121,7 +117,7 @@ Singleton {
             return true;
         root.wantedText = text;
         root.config = parsed.config;
-        root.clearMessage();
+        root.clearFeedback();
         if (!root.writing)
             root.write();
         return true;
@@ -177,7 +173,7 @@ Singleton {
         root.sourceText = text;
         root.wantedText = text;
         root.config = parsed.config;
-        root.clearMessage();
+        root.clearFeedback();
         console.info("[Speshell] Applied config.ini changes.");
     }
 
@@ -198,7 +194,7 @@ Singleton {
             return "";
         return [
             "Speshell configuration error",
-            "Version: " + SystemState.appVersion,
+            "Version: " + PowerService.appVersion,
             "File: " + (root.configPath || "~/.config/speshell/config.ini"),
             ""
         ].concat(root.errors.map((error, i) => (i + 1) + ". " + root.diagnosticText(error))).join("\n");
@@ -208,7 +204,7 @@ Singleton {
         if (openConfigProc.running)
             return;
         const configHome = Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config");
-        root.clearMessage();
+        root.clearFeedback();
         openConfigProc.command = Shell.editFileCommand(root.configPath !== "" ? root.configPath : configHome + "/speshell/config.ini");
         openConfigProc.running = true;
     }
@@ -216,26 +212,25 @@ Singleton {
     function copyErrorReport() {
         if (copyReportProc.running || root.errorReport === "")
             return;
-        root.clearMessage();
+        root.clearFeedback();
         copyReportProc.command = ["wl-copy", "--", root.errorReport];
         copyReportProc.running = true;
     }
 
-    Process {
+    // A load asked for during one runs again after it, which may have read the file
+    // before the change.
+    QueuedProcess {
         id: loader
-
-        property bool queued: false
-
         command: Shell.script("config.sh", [Shell.localPath(Qt.resolvedUrl("../config.example.ini"))])
         stdout: StdioCollector { id: loaderOutput }
         stderr: StdioCollector { id: loaderErrors }
-        onExited: exitCode => {
-            root.finishLoad(loaderOutput.text, exitCode, loaderErrors.text);
-            if (loader.queued) {
-                loader.queued = false;
-                Qt.callLater(root.load);
-            }
+        onStarted: {
+            root.status = "loading";
+            root.config = null;
+            root.errors = [];
+            root.clearFeedback();
         }
+        onExited: exitCode => root.finishLoad(loaderOutput.text, exitCode, loaderErrors.text)
     }
 
     FileView {
@@ -260,11 +255,8 @@ Singleton {
 
     Process {
         id: copyReportProc
-        onExited: exitCode => {
-            root.operationFailed = exitCode !== 0;
-            root.operationMessage = exitCode === 0
-                ? "Error report copied."
-                : "Could not copy the report; select the text manually.";
-        }
+        onExited: exitCode => root.setFeedback(exitCode === 0
+            ? "Error report copied." : "Could not copy the report; select the text manually.",
+            exitCode === 0 ? "success" : "error")
     }
 }

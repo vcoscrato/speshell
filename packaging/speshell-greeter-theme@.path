@@ -1,8 +1,10 @@
+# Watches %i's theme.json in their home, which speshell-greeter-theme's generator adds
+# as PathChanged= once this is enabled.
 [Unit]
 Description=Show %i's Speshell theme on the login screen
 
 [Path]
-PathChanged=/home/%i/.local/share/speshell/theme.json
+Unit=speshell-greeter-theme@%i.service
 
 [Install]
 WantedBy=multi-user.target

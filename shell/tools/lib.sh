@@ -3,8 +3,14 @@
 # settings in SPESHELL_* variables (see services/ToolsService.qml). Run by hand,
 # they fall back to plain defaults.
 
-runtime_dir="${XDG_RUNTIME_DIR:-/tmp}/speshell"
-mkdir -p "$runtime_dir"
+# Their recordings and logs stay in the user's own runtime directory, never in a
+# shared one such as /tmp.
+if [[ -z "${XDG_RUNTIME_DIR:-}" ]]; then
+  printf '%s: XDG_RUNTIME_DIR is not set\n' "${0##*/}" >&2
+  exit 1
+fi
+runtime_dir="$XDG_RUNTIME_DIR/speshell"
+mkdir -m 0700 "$runtime_dir" 2>/dev/null || [[ -d "$runtime_dir" ]]
 
 # Prints the area the user drags out, as "X,Y WxH", or nothing when they cancel.
 select_region() {

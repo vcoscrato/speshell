@@ -15,7 +15,7 @@ Item {
 
     signal activated()
 
-    width: parent ? parent.width : 300
+    width: parent?.width ?? 0
     implicitHeight: column.implicitHeight + Theme.spacingXL * 2
     height: implicitHeight
 

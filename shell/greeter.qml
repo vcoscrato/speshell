@@ -15,6 +15,9 @@ import "services/Shell.js" as Shell
 ShellRoot {
     id: root
 
+    // No reload when a file changes, as a package upgrade writes them all.
+    settings.watchFiles: false
+
     readonly property string stateDir: "/var/lib/speshell"
     // { name, label } for each person's account.
     property var users: []
@@ -27,10 +30,16 @@ ShellRoot {
     // The user's theme: { theme, colors, wallpaper }.
     property var theme: null
     property string draft: ""
+    // Where greetd's conversation is, as LockService's: "idle", waiting for the password;
+    // "checking", at work; "prompt", PAM asked something more and waits for what's typed.
+    property string phase: "idle"
+    property string prompt: ""
+    property bool promptVisible: false
+    // The password typed before the session started, for PAM's first question.
+    property string answer: ""
     property string message: ""
     property bool messageIsError: false
     property int failures: 0
-    readonly property bool busy: Greetd.state !== GreetdState.Inactive
 
     readonly property var current: root.sessions.find(entry => entry.id === root.session) || null
 
@@ -42,21 +51,37 @@ ShellRoot {
                 || root.sessions.find(entry => entry.id === "hyprland") || root.sessions[0]).id;
     }
 
+    // Sends what's typed: the password, which starts a session, or the answer PAM waits for.
     function submit() {
-        if (root.busy || root.user === "" || !root.current)
+        if (root.phase === "checking" || root.draft === "" || root.user === "" || !root.current)
             return;
         root.message = "";
         root.messageIsError = false;
-        Greetd.createSession(root.user);
+        if (root.phase === "prompt") {
+            Greetd.respond(root.draft);
+        } else {
+            root.answer = root.draft;
+            Greetd.createSession(root.user);
+        }
+        root.draft = "";
+        root.phase = "checking";
+    }
+
+    // Drops the conversation, as when another account is picked.
+    function reset() {
+        if (Greetd.state !== GreetdState.Inactive)
+            Greetd.cancelSession();
+        root.phase = "idle";
+        root.answer = "";
+        root.draft = "";
+        root.message = "";
     }
 
     function fail(text) {
-        root.draft = "";
+        root.reset();
         root.failures++;
         root.message = text;
         root.messageIsError = true;
-        if (root.busy)
-            Greetd.cancelSession();
     }
 
     // People's accounts: a regular uid and a shell to log in with.
@@ -66,6 +91,37 @@ ShellRoot {
             return fields.length >= 7 && uid >= 1000 && uid < 60000 && !/(nologin|false)$/.test(fields[6]);
         }).map(fields => ({ name: fields[0], label: fields[4].split(",")[0].trim() || fields[0] }));
         root.pickDefaults();
+    }
+
+    // A desktop entry's Exec as arguments, by the spec's quoting: spaces split words,
+    // double quotes keep one together, a backslash in them takes the next character as
+    // it is, and field codes, as %f, go.
+    function execArguments(value) {
+        const text = String(value).replace(/\\([snrt\\])/g, (match, c) =>
+            ({ s: " ", n: "\n", r: "\r", t: "\t", "\\": "\\" })[c]);
+        const words = [];
+        // The word being read, or null between words.
+        let word = null;
+        let quoted = false;
+        for (let i = 0; i < text.length; i++) {
+            const c = text[i];
+            if (!quoted && (c === " " || c === "\t")) {
+                if (word !== null)
+                    words.push(word);
+                word = null;
+            } else if (c === "\"") {
+                quoted = !quoted;
+                word = word || "";
+            } else if (quoted && c === "\\" && i + 1 < text.length) {
+                i++;
+                word += text[i];
+            } else {
+                word = (word || "") + c;
+            }
+        }
+        if (word !== null)
+            words.push(word);
+        return words.filter(entry => !/^%[A-Za-z]$/.test(entry)).map(entry => entry.replace(/%%/g, "%"));
     }
 
     // `file\tpath` lines, each followed by its entry's keys.
@@ -85,7 +141,7 @@ ShellRoot {
             if (pair[1] === "Name")
                 entry.name = pair[2];
             else if (pair[1] === "Exec")
-                entry.command = pair[2].split(/\s+/).filter(word => word !== "" && !/^%[A-Za-z]$/.test(word));
+                entry.command = root.execArguments(pair[2]);
             else if (pair[1] === "DesktopNames")
                 entry.desktop = pair[2].replace(/;$/, "").replace(/;/g, ":");
             else if ((pair[1] === "NoDisplay" || pair[1] === "Hidden") && pair[2] === "true")
@@ -101,7 +157,7 @@ ShellRoot {
         Greetd.launch(entry.command, [
             "XDG_SESSION_TYPE=wayland",
             "XDG_SESSION_DESKTOP=" + entry.id,
-            "XDG_CURRENT_DESKTOP=" + (entry.desktop || entry.name)
+            "XDG_CURRENT_DESKTOP=" + (entry.desktop || entry.id)
         ], true);
     }
 
@@ -122,13 +178,22 @@ ShellRoot {
         target: Greetd
 
         function onAuthMessage(message, error, responseRequired, echoResponse) {
-            if (responseRequired) {
-                Greetd.respond(root.draft);
-                root.draft = "";
-            } else if (message !== "") {
-                root.message = message;
-                root.messageIsError = error;
+            if (!responseRequired) {
+                if (message !== "") {
+                    root.message = message;
+                    root.messageIsError = error;
+                }
+                return;
             }
+            // The password answers the first question; any other waits for the user.
+            if (root.answer !== "") {
+                Greetd.respond(root.answer);
+                root.answer = "";
+                return;
+            }
+            root.prompt = message.replace(/:\s*$/, "");
+            root.promptVisible = echoResponse;
+            root.phase = "prompt";
         }
 
         function onAuthFailure(message) {
@@ -223,8 +288,7 @@ ShellRoot {
                         currentValue: root.user
                         onValueSelected: value => {
                             root.user = value;
-                            root.draft = "";
-                            root.message = "";
+                            root.reset();
                         }
                     }
 
@@ -242,7 +306,10 @@ ShellRoot {
                 GatePassword {
                     visible: window.primary
                     draft: root.draft
-                    placeholder: root.busy ? "Logging in…" : "Password"
+                    phase: root.phase
+                    prompt: root.prompt
+                    promptVisible: root.promptVisible
+                    checkingText: "Logging in…"
                     message: root.message
                     messageIsError: root.messageIsError
                     onDraftEdited: text => root.draft = text

@@ -1,5 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import QtQml.Models
 import Quickshell
 import Quickshell.Services.SystemTray
 import Quickshell.Wayland
@@ -36,7 +37,7 @@ PanelWindow {
     // As much space beside the end buttons as above and below them.
     readonly property int edgePadding: Math.max(Theme.spacingTiny, (root.settings.height - root.itemSize) / 2)
     // The panel buttons, left to right, in groups: tools, status, and Speshell itself.
-    // "awake" is no panel but Keep awake's switch, shown on battery, where idling runs.
+    // "awake" is no panel but Keep awake's switch.
     readonly property var panelGroups: [
         ["tools", "clipboard", "notes"],
         ["audio", "microphone", "display", "network", "bluetooth", "awake", "battery", "notifications"],
@@ -47,8 +48,15 @@ PanelWindow {
     readonly property string openPanel: dropdown.panel
     readonly property Item dropdownButton: dropdown.button
     readonly property bool dropdownOpen: root.openPanel !== ""
-    property int openMenus: 0
-    readonly property bool overlayOpen: root.dropdownOpen || root.openMenus > 0
+    // A tray item's or the keyboard layouts' menu is open.
+    readonly property bool menuOpen: {
+        for (let i = 0; i < trayRepeater.count; i++) {
+            if ((trayRepeater.itemAt(i) as TrayItem)?.menuOpen)
+                return true;
+        }
+        return layoutButton.menuOpen;
+    }
+    readonly property bool overlayOpen: root.dropdownOpen || root.menuOpen
 
     // A thin line between groups of bar items.
     component Separator: Rectangle {
@@ -79,9 +87,6 @@ PanelWindow {
         value: IdleService.keepAwake
     }
 
-    onDropdownOpenChanged: PanelService.openDropdowns += root.dropdownOpen ? 1 : -1
-    Component.onDestruction: if (root.dropdownOpen) PanelService.openDropdowns -= 1
-
     // `pointer`: the MouseArea clicked, or null from the keyboard.
     function toggleDropdown(panel, button, pointer) {
         if (dropdown.panel === panel && dropdown.button === button) {
@@ -89,13 +94,11 @@ PanelWindow {
             return;
         }
         EffectsService.picked(button, pointer || null);
-        dropdown.button = button;
-        dropdown.panel = panel;
+        dropdown.show(panel, button);
     }
 
     function closeDropdown() {
-        dropdown.panel = "";
-        dropdown.button = null;
+        dropdown.show("", null);
     }
 
     // The button that opens `panel`, or null.
@@ -117,6 +120,7 @@ PanelWindow {
         return null;
     }
 
+    // Scrolling over a panel's button: a step of its level, 1 up or -1 down.
     function step(panel, direction) {
         if (panel === "audio")
             AudioService.output.stepVolume(direction);
@@ -164,7 +168,9 @@ PanelWindow {
                 root.toggleDropdown(panel, button, null);
         }
 
-        function onDismissRequested() {
+        function onDismissRequested(closed) {
+            if (root.dropdownOpen)
+                closed.any = true;
             root.closeDropdown();
         }
     }
@@ -195,13 +201,14 @@ PanelWindow {
             readonly property real requiredWidth: root.edgePadding * 2 + leftRow.width + rightRow.width
                 + strip.gap * 2 + strip.beforeClock + clockButton.width + strip.afterClock
             // What going compact saves, so the bar knows its full width while compact.
-            readonly property real compactSavings: clockMetrics.advanceWidth(Format.shortDate(clock.date) + "   ")
-                + (weatherButton.visible && WeatherService.ready
-                    ? chipMetrics.advanceWidth(WeatherService.temperatureText(WeatherService.current.temperature)) + Theme.spacingSmall
-                    : 0)
-                + TimerService.timers.reduce((sum, timer) => sum + (timer.isSet && timer.name !== ""
-                    ? chipMetrics.advanceWidth(timer.name + "  ") : 0), 0)
-                + ActivityService.activities.reduce((sum, activity) => sum + chipMetrics.advanceWidth(activity.label + "  "), 0)
+            readonly property real compactSavings: {
+                let sum = clockButton.compactSavings + weatherButton.compactSavings;
+                for (const chips of [timerChips, activityChips]) {
+                    for (let i = 0; i < chips.count; i++)
+                        sum += (chips.itemAt(i) as BarButton)?.compactSavings ?? 0;
+                }
+                return sum;
+            }
             // Set, not bound: going compact changes the width it is judged by.
             property bool compact: false
 
@@ -211,19 +218,6 @@ PanelWindow {
 
             onRequiredWidthChanged: strip.updateCompact()
             onCompactSavingsChanged: strip.updateCompact()
-
-            FontMetrics {
-                id: clockMetrics
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeNormal
-                font.weight: Font.DemiBold
-            }
-
-            FontMetrics {
-                id: chipMetrics
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeSmall
-            }
 
             x: Math.round((root.width - width) / 2)
             y: root.atTop ? root.settings.margin : root.height - root.settings.margin - root.settings.height
@@ -297,7 +291,6 @@ PanelWindow {
             BarButton {
                 id: clockButton
 
-
                 size: root.itemSize
                 labelAbove: !root.atTop
                 x: Math.max(strip.middleStart + strip.beforeClock, Math.min(strip.middleEnd - strip.afterClock - width,
@@ -306,7 +299,9 @@ PanelWindow {
                 open: root.dropdownButton === clockButton
                 horizontalPadding: Theme.spacingLarge
                 label: strip.compact ? Format.date(clock.date) : ""
-                text: (strip.compact ? "" : Format.shortDate(clock.date) + "   ") + Format.time(clock.date)
+                compact: strip.compact
+                detail: Format.shortDate(clock.date) + "   "
+                text: Format.time(clock.date)
                 fontSize: Theme.fontSizeNormal
                 fontWeight: Font.DemiBold
                 onClicked: pointer => root.toggleDropdown("clock", clockButton, pointer)
@@ -340,7 +335,8 @@ PanelWindow {
                     open: root.dropdownButton === weatherButton
                     label: PanelService.status("weather")
                     iconName: PanelService.icon("weather")
-                    text: WeatherService.ready && !strip.compact ? WeatherService.temperatureText(WeatherService.current.temperature) : ""
+                    compact: strip.compact
+                    detail: WeatherService.ready ? WeatherService.temperatureText(WeatherService.current.temperature) : ""
                     tabularDigits: true
                     onClicked: pointer => root.toggleDropdown("weather", weatherButton, pointer)
                 }
@@ -420,18 +416,15 @@ PanelWindow {
                                 width: root.itemSize - Theme.spacingTiny
                                 height: root.itemSize - Theme.spacingTiny
                                 above: !root.atTop
-                                onMenuOpenChanged: root.openMenus = Math.max(0, root.openMenus + (menuOpen ? 1 : -1))
-                                Component.onDestruction: if (menuOpen) root.openMenus = Math.max(0, root.openMenus - 1)
                             }
                         }
                     }
                 }
 
                 KeyboardLayoutButton {
+                    id: layoutButton
                     size: root.itemSize
                     labelAbove: !root.atTop
-                    onMenuOpenChanged: root.openMenus = Math.max(0, root.openMenus + (menuOpen ? 1 : -1))
-                    Component.onDestruction: if (menuOpen) root.openMenus = Math.max(0, root.openMenus - 1)
                 }
 
                 Repeater {
@@ -465,50 +458,51 @@ PanelWindow {
                             id: groupButtons
                             model: group.modelData
 
-                            delegate: BarButton {
-                                id: button
+                            delegate: DelegateChooser {
+                                role: "modelData"
 
-                                required property string modelData
-                                readonly property bool awake: button.modelData === "awake"
+                                DelegateChoice {
+                                    roleValue: "awake"
 
-                                size: root.itemSize
-                                labelAbove: !root.atTop
-                                panel: button.awake ? "" : button.modelData
-                                visible: button.awake ? !BatteryService.pluggedIn : PanelService.isSupported(button.modelData)
-                                open: !button.awake && root.dropdownButton === button
-                                label: button.awake ? (IdleService.keepAwake ? "Keep awake: on" : "Keep awake: off")
-                                    : PanelService.status(button.modelData)
-                                iconName: button.awake ? "awake" : PanelService.icon(button.modelData)
-                                text: PanelService.text(button.modelData)
-                                tabularDigits: true
-                                iconColor: {
-                                    const tone = button.awake ? (IdleService.keepAwake ? "accent" : "")
-                                        : PanelService.tone(button.modelData);
-                                    if (tone !== "")
-                                        return Theme.toneColor(tone);
-                                    return button.open ? Theme.accent : (button.pointerInside ? Theme.text : Theme.subtextBright);
-                                }
-                                onClicked: pointer => {
-                                    if (!button.awake) {
-                                        root.toggleDropdown(button.modelData, button, pointer);
-                                        return;
+                                    AwakeButton {
+                                        size: root.itemSize
+                                        labelAbove: !root.atTop
                                     }
-                                    EffectsService.picked(button, pointer);
-                                    IdleService.setKeepAwake(!IdleService.keepAwake);
                                 }
-                                onWheeled: delta => root.step(button.modelData, delta)
-                                onRightClicked: root.cycleDevice(button.modelData)
 
-                                // Unread notifications.
-                                Rectangle {
-                                    visible: button.modelData === "notifications"
-                                        && NotificationService.notificationHistory.length > 0
-                                    x: parent.width - width - Theme.spacingTiny
-                                    y: Theme.spacingTiny
-                                    width: 6
-                                    height: 6
-                                    radius: 3
-                                    color: Theme.accent
+                                DelegateChoice {
+                                    BarButton {
+                                        id: button
+
+                                        required property string modelData
+
+                                        size: root.itemSize
+                                        labelAbove: !root.atTop
+                                        panel: button.modelData
+                                        visible: PanelService.isSupported(button.modelData)
+                                        open: root.dropdownButton === button
+                                        label: PanelService.status(button.modelData)
+                                        iconName: PanelService.icon(button.modelData)
+                                        tone: PanelService.tone(button.modelData)
+                                        text: PanelService.text(button.modelData)
+                                        tabularDigits: true
+                                        onClicked: pointer => root.toggleDropdown(button.modelData, button, pointer)
+                                        onScrolled: direction => root.step(button.modelData, direction)
+                                        onRightClicked: root.cycleDevice(button.modelData)
+
+                                        // Unread notifications.
+                                        Rectangle {
+                                            visible: button.modelData === "notifications"
+                                                && NotificationService.notificationHistory.length > 0
+                                            x: parent.width - width - Theme.spacingTiny
+                                            y: Theme.spacingTiny
+                                            // A dot between the spacing steps, small beside the icon.
+                                            width: Theme.spacingTiny + Theme.spacingMicro
+                                            height: width
+                                            radius: width / 2
+                                            color: Theme.accent
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -521,7 +515,6 @@ PanelWindow {
             id: dropdown
             barRect: Qt.rect(strip.x, strip.y, strip.width, strip.height)
             atTop: root.atTop
-            shown: root.visible
             onCloseRequested: root.closeDropdown()
         }
 
@@ -530,7 +523,6 @@ PanelWindow {
             z: 200
             anchors.fill: parent
             host: content
-            presented: root.visible
         }
     }
 }

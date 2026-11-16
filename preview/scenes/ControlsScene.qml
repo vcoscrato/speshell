@@ -5,27 +5,12 @@ import Quickshell
 // and let go twice, another stepped by the wheel, an audio device and a segment picked,
 // a switch turned on and off, and a square button picked. The effects' knob draws the
 // thumbs, and their interactions get the calls bar/InteractionsLayer.qml makes.
-Item {
+EffectScene {
     id: root
-    width: 1920
-    height: 1080
-    property real previewTime: 0
     // Effect speed, as Speshell passes [Appearance] controlEffectsSpeed to EffectClock.
     readonly property real timeScale: Number(Quickshell.env("SPEED") || 1)
 
-    property var effects: {
-        const component = Qt.createComponent("file://" + Quickshell.env("EFFECTS_DIR") + "/Effects.qml");
-        if (component.status !== Component.Ready) {
-            console.error(component.errorString());
-            return null;
-        }
-        return component.createObject(root);
-    }
     readonly property Component knobComponent: root.effects && ("knob" in root.effects) ? root.effects.knob : null
-
-    ThemePalette {
-        id: swatch
-    }
 
     // ── Script ───────────────────────────────────────────────
     function ease(a, b, t0, t1, t) {
@@ -158,7 +143,7 @@ Item {
 
         Rectangle {
             anchors.fill: parent
-            color: swatch.bg
+            color: root.swatch.bg
         }
 
         Loader {
@@ -167,7 +152,7 @@ Item {
             sourceComponent: root.effects && ("backdrop" in root.effects) ? root.effects.backdrop : null
         }
 
-        Binding { target: backdrop.item; property: "theme"; value: swatch }
+        Binding { target: backdrop.item; property: "theme"; value: root.swatch }
 
         Rectangle {
             id: buttonBox
@@ -176,9 +161,9 @@ Item {
             width: 38
             height: 38
             radius: 3
-            color: Qt.rgba(swatch.accent.r, swatch.accent.g, swatch.accent.b, root.previewTime >= 4.3 ? 0.12 : 0)
+            color: Qt.rgba(root.swatch.accent.r, root.swatch.accent.g, root.swatch.accent.b, root.previewTime >= 4.3 ? 0.12 : 0)
             border.width: 1
-            border.color: Qt.rgba(swatch.accent.r, swatch.accent.g, swatch.accent.b, root.previewTime >= 4.3 ? 0.45 : 0)
+            border.color: Qt.rgba(root.swatch.accent.r, root.swatch.accent.g, root.swatch.accent.b, root.previewTime >= 4.3 ? 0.45 : 0)
 
             Rectangle {
                 anchors.centerIn: parent
@@ -187,7 +172,7 @@ Item {
                 radius: 4
                 color: "transparent"
                 border.width: 2
-                border.color: root.previewTime >= 4.3 ? swatch.accent : swatch.subtext
+                border.color: root.previewTime >= 4.3 ? root.swatch.accent : root.swatch.subtext
             }
         }
 
@@ -195,13 +180,13 @@ Item {
             x: 80
             y: 22
             text: "Volume"
-            color: swatch.subtext
+            color: root.swatch.subtext
             font.pixelSize: 12
         }
 
         LabSlider {
             id: volumeSlider
-            theme: swatch
+            theme: root.swatch
             knobComponent: root.knobComponent
             space: fxLayer
             x: 80
@@ -226,14 +211,14 @@ Item {
                 height: 14
                 radius: 7
                 border.width: 2
-                border.color: swatch.accent
-                color: root.device === index ? swatch.accent : "transparent"
+                border.color: root.swatch.accent
+                color: root.device === index ? root.swatch.accent : "transparent"
 
                 Text {
                     x: 24
                     anchors.verticalCenter: parent.verticalCenter
                     text: parent.modelData
-                    color: swatch.text
+                    color: root.swatch.text
                     font.pixelSize: 12
                 }
             }
@@ -245,9 +230,9 @@ Item {
             width: 300
             height: 30
             radius: 5
-            color: Qt.rgba(swatch.overlay.r, swatch.overlay.g, swatch.overlay.b, 0.08)
+            color: Qt.rgba(root.swatch.overlay.r, root.swatch.overlay.g, root.swatch.overlay.b, 0.08)
             border.width: 1
-            border.color: Qt.rgba(swatch.overlay.r, swatch.overlay.g, swatch.overlay.b, 0.24)
+            border.color: Qt.rgba(root.swatch.overlay.r, root.swatch.overlay.g, root.swatch.overlay.b, 0.24)
 
             Repeater {
                 id: segments
@@ -261,14 +246,14 @@ Item {
                     width: 74
                     height: 26
                     radius: 3
-                    color: root.segment === index ? Qt.rgba(swatch.accent.r, swatch.accent.g, swatch.accent.b, 0.2) : "transparent"
+                    color: root.segment === index ? Qt.rgba(root.swatch.accent.r, root.swatch.accent.g, root.swatch.accent.b, 0.2) : "transparent"
                     border.width: root.segment === index ? 1 : 0
-                    border.color: swatch.accent
+                    border.color: root.swatch.accent
 
                     Text {
                         anchors.centerIn: parent
                         text: parent.modelData
-                        color: root.segment === parent.index ? swatch.text : swatch.subtext
+                        color: root.segment === parent.index ? root.swatch.text : root.swatch.subtext
                         font.pixelSize: 11
                         font.bold: true
                     }
@@ -283,7 +268,7 @@ Item {
             width: 36
             height: 20
             radius: 10
-            color: root.switchOn ? swatch.accent : Qt.rgba(swatch.surface2.r, swatch.surface2.g, swatch.surface2.b, 0.4)
+            color: root.switchOn ? root.swatch.accent : Qt.rgba(root.swatch.surface2.r, root.swatch.surface2.g, root.swatch.surface2.b, 0.4)
 
             Rectangle {
                 id: thumb
@@ -293,7 +278,7 @@ Item {
                 width: 14
                 height: 14
                 radius: 7
-                color: thumbLoader.status === Loader.Ready ? "transparent" : root.switchOn ? swatch.bg : swatch.subtext
+                color: thumbLoader.status === Loader.Ready ? "transparent" : root.switchOn ? root.swatch.bg : root.swatch.subtext
 
                 Loader {
                     id: thumbLoader
@@ -303,7 +288,7 @@ Item {
                         item.switchArea = Qt.binding(() => Qt.rect(-thumb.x, -thumb.y, toggle.width, toggle.height))
                 }
 
-                Binding { target: thumbLoader.item; property: "theme"; value: swatch }
+                Binding { target: thumbLoader.item; property: "theme"; value: root.swatch }
                 Binding { target: thumbLoader.item; property: "checked"; value: root.switchOn }
                 Binding { target: thumbLoader.item; property: "travel"; value: thumb.x }
                 Binding { target: thumbLoader.item; property: "hovered"; value: root.switchHovered }
@@ -315,13 +300,13 @@ Item {
             x: 80
             y: 262
             text: "Brightness"
-            color: swatch.subtext
+            color: root.swatch.subtext
             font.pixelSize: 12
         }
 
         LabSlider {
             id: brightnessSlider
-            theme: swatch
+            theme: root.swatch
             knobComponent: root.knobComponent
             space: fxLayer
             x: 80
@@ -330,7 +315,7 @@ Item {
             value: root.brightness
             hovered: root.previewTime > 1.7 && root.previewTime < 2.3
             pointerX: 230
-            fill: swatch.yellow
+            fill: root.swatch.yellow
         }
 
         // The effects' interactions, over the panel and taking no input.
@@ -340,7 +325,7 @@ Item {
             sourceComponent: root.effects && ("interactions" in root.effects) ? root.effects.interactions : null
         }
 
-        Binding { target: fxLayer.item; property: "theme"; value: swatch }
+        Binding { target: fxLayer.item; property: "theme"; value: root.swatch }
     }
 
     Component.onCompleted: {

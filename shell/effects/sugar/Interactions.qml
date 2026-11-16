@@ -1,4 +1,5 @@
 import QtQuick
+import "common/Colors.js" as Colors
 
 // Sugar's effects on Speshell's controls, kept small and light, since the knob's bag
 // and spatula do the work on a slider. A glint now and then on frosting freshly piped,
@@ -8,7 +9,7 @@ Item {
     id: root
 
     // ── Speshell effects API v1: interactions ───────────────
-    property var theme: null
+    property var theme: Colors.fallback
 
     // Travel piped since the last glint, px.
     property real piped: 0

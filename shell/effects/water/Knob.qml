@@ -1,4 +1,5 @@
 import QtQuick
+import "common/Colors.js" as Colors
 import "common"
 
 // Water's knob for Speshell's sliders and switches: a drop that stretches along
@@ -7,7 +8,7 @@ Item {
     id: root
 
     // ── Speshell effects API v1: knob ───────────────────────
-    property var theme: null
+    property var theme: Colors.fallback
     property bool pressed: false
     property bool hovered: false
     property bool checked: true
@@ -39,10 +40,10 @@ Item {
         property real glow: root.glow
         property real dim: root.checked ? 0 : 1
         property real time: swell.item ? swell.item.clock : 0
-        property color cWater: root.theme ? root.theme.accent : "#4a97d8"
-        property color cLight: root.theme ? root.theme.sky : "#7fd3f0"
-        property color cFoam: root.theme ? root.theme.text : "#e3eef4"
-        property color cDeep: root.theme ? root.theme.crust : "#081016"
+        property color cWater: root.theme.accent
+        property color cLight: root.theme.sky
+        property color cFoam: root.theme.text
+        property color cDeep: root.theme.crust
         fragmentShader: Qt.resolvedUrl("qsb/Knob.qsb")
     }
 }

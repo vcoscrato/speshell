@@ -3,12 +3,18 @@ import qs.components
 import qs.services
 
 // The gate's password field and the message under it. The field follows `draft`, which
-// every screen's gate shares, and reports typing with draftEdited().
+// every screen's gate shares, and reports typing with draftEdited(). It follows the
+// authentication's `phase` as LockService and the greeter keep it: "idle" asks for the
+// password, "checking" says `checkingText`, and "prompt" asks the question the system
+// asked next (`prompt`, as a one-time code), shown as typed when `promptVisible`.
 Column {
     id: root
 
     property string draft: ""
-    property string placeholder: "Password"
+    property string phase: "idle"
+    property string prompt: ""
+    property bool promptVisible: false
+    property string checkingText: "Checking…"
     property string message: ""
     property bool messageIsError: false
 
@@ -25,10 +31,12 @@ Column {
 
     Field {
         id: password
-        masked: true
+        masked: root.phase !== "prompt" || !root.promptVisible
         autoFocus: true
         iconName: "lock"
-        placeholder: root.placeholder
+        placeholder: root.phase === "checking" ? root.checkingText
+            : root.phase === "prompt" ? root.prompt || "Answer"
+            : "Password"
         onEdited: root.draftEdited(password.text)
         onAccepted: root.accepted()
         onCancelled: root.draftEdited("")

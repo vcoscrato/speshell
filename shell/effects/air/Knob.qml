@@ -1,4 +1,5 @@
 import QtQuick
+import "common/Colors.js" as Colors
 import "common"
 
 // Air's knob for Speshell's sliders and switches: a ball of wind whose spiral arms
@@ -7,7 +8,7 @@ Item {
     id: root
 
     // ── Speshell effects API v1: knob ───────────────────────
-    property var theme: null
+    property var theme: Colors.fallback
     property bool pressed: false
     property bool hovered: false
     property bool checked: true
@@ -36,10 +37,10 @@ Item {
         property real glow: root.glow
         property real dim: root.checked ? 0 : 1
         property real time: breeze.item ? breeze.item.clock : 0
-        property color cBody: root.theme ? root.theme.bg : "#211b14"
-        property color cWind: root.theme ? root.theme.text : "#f4ead8"
-        property color cAccent: root.theme ? root.theme.accent : "#f39a3a"
-        property color cOutline: root.theme ? root.theme.crust : "#130f0b"
+        property color cBody: root.theme.bg
+        property color cWind: root.theme.text
+        property color cAccent: root.theme.accent
+        property color cOutline: root.theme.crust
         fragmentShader: Qt.resolvedUrl("qsb/Knob.qsb")
     }
 }

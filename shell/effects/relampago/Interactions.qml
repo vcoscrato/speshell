@@ -1,4 +1,5 @@
 import QtQuick
+import "common/Colors.js" as Colors
 
 // Relâmpago's effects on Speshell's controls, drawn like cartoons. A knob dragged
 // along a slider throws fat sparks off behind it with zigzag arcs crackling into it;
@@ -8,7 +9,7 @@ Item {
     id: root
 
     // ── Speshell effects API v1: interactions ───────────────
-    property var theme: null
+    property var theme: Colors.fallback
 
     // Travel not yet paid out in sparks and arcs, px.
     property real sparkOwed: 0

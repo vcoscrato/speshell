@@ -1,4 +1,5 @@
 import QtQuick
+import "common/Colors.js" as Colors
 import "Flame.js" as Flame
 import "common"
 
@@ -8,7 +9,7 @@ Item {
     id: root
 
     // ── Speshell effects API v1: knob ───────────────────────
-    property var theme: null
+    property var theme: Colors.fallback
     property bool pressed: false
     property bool hovered: false
     property bool checked: true
@@ -46,8 +47,8 @@ Item {
         property color cMid: Flame.mid(root.theme)
         property color cOuter: Flame.outer(root.theme)
         property color cEdge: Flame.edge(root.theme)
-        property color cCoal: root.theme ? root.theme.crust : "#11080a"
-        property color cAsh: root.theme ? root.theme.subtext : "#b99a89"
+        property color cCoal: root.theme.crust
+        property color cAsh: root.theme.subtext
         fragmentShader: Qt.resolvedUrl("qsb/Knob.qsb")
     }
 }

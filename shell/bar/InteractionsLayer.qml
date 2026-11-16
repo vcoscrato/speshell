@@ -8,7 +8,6 @@ Item {
     id: root
 
     required property Item host
-    property bool presented: false
 
     // Untyped, so the effects' functions can be called on it.
     readonly property var interactions: effectsLoader.item
@@ -43,7 +42,7 @@ Item {
 
         anchors.fill: parent
         enabled: false
-        active: root.presented && EffectsService.interactions !== null
+        active: EffectsService.interactions !== null
         sourceComponent: EffectsService.interactions
     }
 

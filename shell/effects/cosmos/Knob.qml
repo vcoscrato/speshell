@@ -7,7 +7,7 @@ Item {
     id: root
 
     // ── Speshell effects API v1: knob ───────────────────────
-    property var theme: null
+    property var theme: Colors.fallback
     property bool pressed: false
     property bool hovered: false
     property bool checked: true
@@ -27,13 +27,13 @@ Item {
         property real turn: root.travel / Math.max(1, root.size / 2)
         property real glow: root.glow
         property real dim: root.checked ? 0 : 1
-        property color cBody: root.theme ? root.theme.accent : "#fe8019"
+        property color cBody: root.theme.accent
         // Taken toward the darkest, so the bands show whatever the accent: in Cosmos the
         // accent and peach are the same orange.
-        property color cBand: Colors.mix(root.theme ? root.theme.peach : "#fe8019", cShade, 0.3)
-        property color cLight: root.theme ? root.theme.text : "#ebdbb2"
-        property color cShade: root.theme ? root.theme.crust : "#1b1b1b"
-        property color cRing: root.theme ? root.theme.subtextBright : "#d5c4a1"
+        property color cBand: Colors.mix(root.theme.peach, cShade, 0.3)
+        property color cLight: root.theme.text
+        property color cShade: root.theme.crust
+        property color cRing: root.theme.subtextBright
         fragmentShader: Qt.resolvedUrl("qsb/Knob.qsb")
     }
 }

@@ -45,6 +45,6 @@ Singleton {
     // A running hyprsunset takes a new temperature over Hyprland's socket.
     onTemperatureChanged: {
         if (sunset.running)
-            Quickshell.execDetached(["hyprctl", "hyprsunset", "temperature", String(root.temperature)]);
+            HyprlandService.hyprctl(["hyprsunset", "temperature", String(root.temperature)]);
     }
 }

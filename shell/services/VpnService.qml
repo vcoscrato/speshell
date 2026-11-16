@@ -76,8 +76,7 @@ Singleton {
     }
 
     function refresh() {
-        if (!listProc.running)
-            listProc.running = true;
+        listProc.request();
     }
 
     // nmcli -t escapes ':' and '\' in values; NAME is last, so the first three
@@ -396,7 +395,7 @@ Singleton {
         storeProc.running = true;
     }
 
-    Process {
+    QueuedProcess {
         id: listProc
         command: ["nmcli", "-t", "-f", "UUID,TYPE,STATE,NAME", "connection", "show"]
         stdout: StdioCollector {
@@ -404,13 +403,15 @@ Singleton {
         }
     }
 
-    // Any NetworkManager change can add, remove, or switch a profile.
-    Process {
-        running: true
+    // Any NetworkManager change can add, remove, or switch a profile. It starts again
+    // when it stops, and the list is read again then.
+    Watcher {
+        watching: true
         command: ["nmcli", "monitor"]
         stdout: SplitParser {
             onRead: refreshDebounce.restart()
         }
+        onStarted: root.refresh()
     }
 
     Timer {
@@ -462,16 +463,8 @@ Singleton {
         }
     }
 
-    Process {
+    QueuedProcess {
         id: storeProc
-        property string input: ""
-        stdinEnabled: true
-        onStarted: {
-            storeProc.write(storeProc.input);
-            storeProc.input = "";
-            storeProc.stdinEnabled = false;
-        }
-        onExited: storeProc.stdinEnabled = true
     }
 
     Process {
@@ -487,6 +480,4 @@ Singleton {
             root.refresh();
         }
     }
-
-    Component.onCompleted: root.refresh()
 }

@@ -1,4 +1,5 @@
 import QtQuick
+import "common/Colors.js" as Colors
 import "Flame.js" as Flame
 import "common"
 
@@ -15,9 +16,10 @@ Item {
     // ── Speshell effects API v1 ────────────────────────────────
     property Item panel: null
     property rect panelRect
+    property real panelRadius: 16
     property bool active: false
     // The active palette, as Theme.qml names it.
-    property var theme: null
+    property var theme: Colors.fallback
     signal closingFinished()
 
     // ── Choreography (seconds) ──────────────────────────────
@@ -109,10 +111,6 @@ Item {
         }
     }
 
-    function rnd(a, b) {
-        return a + Math.random() * (b - a);
-    }
-
     // While it simmers: embers thrown up off the crown, and now and then a curl of smoke.
     function simmerBits(dt) {
         if (root.simmering <= 0)
@@ -123,19 +121,19 @@ Item {
             root.embersOwed -= 1;
             // Some small and quick, a few larger and lazier, swaying as they rise.
             const big = Math.random() < 0.25;
-            bits.spawn({ x: r.x + r.width * rnd(0.04, 0.96), y: r.y - rnd(6, 18), vx: rnd(-18, 18),
-                         vy: -rnd(30, big ? 60 : 110), gravity: -rnd(10, 50), drag: 0.6,
-                         life: rnd(big ? 1.6 : 0.9, big ? 2.4 : 1.6), size: Math.round(big ? rnd(15, 19) : rnd(10, 13)),
-                         props: { kind: 4, seed: Math.random(), z: 1 } });
+            bits.emit(4, { x: r.x + r.width * bits.rnd(0.04, 0.96), y: r.y - bits.rnd(6, 18), vx: bits.rnd(-18, 18),
+                           vy: -bits.rnd(30, big ? 60 : 110), gravity: -bits.rnd(10, 50), drag: 0.6,
+                           life: bits.rnd(big ? 1.6 : 0.9, big ? 2.4 : 1.6), size: Math.round(big ? bits.rnd(15, 19) : bits.rnd(10, 13)),
+                           props: { z: 1 } });
         }
         root.nextSmoke -= dt;
         if (root.nextSmoke <= 0) {
-            root.nextSmoke = rnd(2.5, 5);
-            const x = r.x + r.width * rnd(0.15, 0.85), drift = rnd(-14, 14);
+            root.nextSmoke = bits.rnd(2.5, 5);
+            const x = r.x + r.width * bits.rnd(0.15, 0.85), drift = bits.rnd(-14, 14);
             for (let i = 0; i < 3; i++)
-                bits.spawn({ x: x + drift * i * 0.4, y: r.y - 20 - i * 6, vx: drift + rnd(-6, 6), vy: -rnd(24, 36),
-                             drag: 0.4, life: rnd(1.4, 1.9), delay: i * 0.22, size: Math.round(30 + 10 * i),
-                             props: { kind: 2, seed: Math.random(), z: 0 } });
+                bits.emit(2, { x: x + drift * i * 0.4, y: r.y - 20 - i * 6, vx: drift + bits.rnd(-6, 6), vy: -bits.rnd(24, 36),
+                               drag: 0.4, life: bits.rnd(1.4, 1.9), delay: i * 0.22, size: Math.round(30 + 10 * i),
+                               props: { z: 0 } });
         }
     }
 
@@ -156,15 +154,21 @@ Item {
         fragmentShader: Qt.resolvedUrl("qsb/LauncherTransition.glow.qsb")
     }
 
+    // Over the panel's columns and the air to either side its flames drift into: the
+    // fuel lies along the panel's border. On the simulation's 4 px grid, so it runs as
+    // one over the whole screen would.
     Flames {
         theme: root.theme
-        anchors.fill: parent
+        x: Math.floor((root.panelRect.x - 200) / 4) * 4
+        width: Math.ceil((root.panelRect.x + root.panelRect.width + 200) / 4) * 4 - x
+        height: parent.height
         readonly property bool exiting: root.burn > 0 && !root.refill
         readonly property real kindled: exiting ? 0 : root.sweep
         time: clock.simTime
         emit: root.active ? root.simmer * Math.max(0, Math.min(1, (kindled - 0.5) / 0.5)) : 0
         frontFuel: (root.sweep > 0 && root.sweep < 1) || (exiting && root.burn < 1) ? 1 : 0
         panelRect: root.panelRect
+        radius: root.panelRadius
         origin: exiting ? root.burnOrigin : root.revealOrigin
         burnR: exiting ? root.burnR : root.revealR
         core: root.core
@@ -186,8 +190,8 @@ Item {
                 property color cMid: Flame.mid(root.theme)
                 property color cOuter: Flame.outer(root.theme)
                 property color cEdge: Flame.edge(root.theme)
-                property color cSmoke: root.theme ? root.theme.overlay : "#8a5048"
-                property color cGlint: root.theme ? root.theme.text : "#f3e3d3"
+                property color cSmoke: root.theme.overlay
+                property color cGlint: root.theme.text
                 fragmentShader: Qt.resolvedUrl("qsb/Interactions.qsb")
             }
         }

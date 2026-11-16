@@ -21,6 +21,13 @@ Scope {
         return polkitAgent.flow;
     }
 
+    function reset() {
+        root.failures = 0;
+        password.text = "";
+    }
+
+    onFlowChanged: root.reset()
+
     PolkitAgent {
         id: agent
 
@@ -43,15 +50,12 @@ Scope {
         targetScreen: root.targetScreen
         visible: agent.isActive && root.flow !== null && root.targetScreen !== null
         color: Theme.alpha(Theme.crust, 0.6)
-        focusGrabActive: window.visible
+        focusTarget: password
 
         WlrLayershell.namespace: "speshell-auth"
 
-        onVisibleChanged: {
-            root.failures = 0;
-            if (window.visible)
-                password.focusInput();
-        }
+        // Each prompt starts clean: no failures, and no password left from one cancelled.
+        onVisibleChanged: root.reset()
 
         Dialog {
             width: Theme.panelWidth + Theme.spacingXL * 2

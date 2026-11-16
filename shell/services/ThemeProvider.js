@@ -26,9 +26,11 @@ function baseName(path) {
     return String(path).substring(String(path).lastIndexOf("/") + 1);
 }
 
+// A file's name as a title: "cloud-sea.jpg" is "Cloud sea".
 function titleFor(path) {
     const name = baseName(path).replace(/\.[^.]+$/, "");
-    return name.replace(/[-_]+/g, " ").trim() || name;
+    const title = name.replace(/[-_]+/g, " ").trim() || name;
+    return title.charAt(0).toUpperCase() + title.substring(1);
 }
 
 // The path relative to the themes directory holding it, "theme/file", or "" for
@@ -124,10 +126,16 @@ function luminance(hex) {
     return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
 }
 
-// Of `light` and `dark`, the one that reads better on `fill`.
-function readableOn(fill, light, dark) {
-    const l = luminance(fill);
-    return (luminance(light) + 0.05) / (l + 0.05) >= (l + 0.05) / (luminance(dark) + 0.05) ? light : dark;
+// WCAG contrast ratio of two colors, 1 to 21.
+function contrast(first, second) {
+    const a = luminance(first);
+    const b = luminance(second);
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+// Of `first` and `second`, the one that reads better on `fill`; `first` on a tie.
+function readableOn(fill, first, second) {
+    return contrast(fill, first) >= contrast(fill, second) ? first : second;
 }
 
 // A full palette (every colorKeys entry) as matugen's JSON, which `matugen json`

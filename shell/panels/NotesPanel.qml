@@ -1,15 +1,15 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Templates as T
 import qs.components
 import qs.services
+import "Markdown.js" as Markdown
 
 // Markdown notes: tabs for each note, and the open one, shown rendered and edited in place.
 Card {
     id: root
     panel: "notes"
 
-    property bool presented: false
     property bool syncingFromService: false
     property bool previewMode: true
     property bool creatingNote: false
@@ -26,7 +26,6 @@ Card {
         : notesInput.implicitHeight) + editorPadding * 2
 
     readonly property bool canDeleteNote: NotesService.noteList.length > 1
-        && NotesService.pendingDeleteNote === ""
         && NotesService.managementEnabled
 
     headerActions: HeaderButton {
@@ -36,74 +35,9 @@ Card {
         onClicked: ClipboardService.copyText(notesInput.text)
     }
 
-    // Qt leaves almost no room between Markdown paragraphs. Put a short spacer
-    // paragraph between two plain ones; lists, quotes, headings, tables, and code
-    // keep their own structure.
-    function spaceParagraphs(src) {
-        const structural = /^\s*([-*+]\s|\d+[.)]\s|#|>|\||```|~~~)|^\s{4}/;
-        const lines = src.split("\n");
-        const out = [];
-        let inFence = false;
-        let previous = "";
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            if (/^\s*(```|~~~)/.test(line))
-                inFence = !inFence;
-            if (inFence || line.trim() !== "") {
-                out.push(line);
-                previous = line;
-                continue;
-            }
-            let next = i + 1;
-            while (next < lines.length && lines[next].trim() === "")
-                next++;
-            const between = previous.trim() !== "" && next < lines.length
-                && !structural.test(previous) && !structural.test(lines[next]);
-            out.push(between ? "\n<span style='font-size:4px'>&nbsp;</span>\n" : "");
-            i = next - 1;
-            previous = "";
-        }
-        return out.join("\n");
-    }
-
+    // Between paragraphs, a third of the text's height.
     function updateRenderedMarkdown() {
-        const src = notesInput.text;
-        if (!src || src.trim() === "") {
-            root.renderedMarkdown = "";
-            return;
-        }
-        let str = root.spaceParagraphs(String(src));
-
-        // Subscripts: $X_1$ or $X_{12}$
-        str = str.replace(/\$([a-zA-Z0-9]+)_\{?([a-zA-Z0-9+\-=]+)\}?\$/g, "$1<sub>$2</sub>");
-        // Superscripts: $X^2$ or $X^{12}$
-        str = str.replace(/\$([a-zA-Z0-9]+)\^\{?([a-zA-Z0-9+\-=]+)\}?\$/g, "$1<sup>$2</sup>");
-        // Simple standalone X_1 or X^2 outside formulas
-        str = str.replace(/\b([a-zA-Z])_([0-9a-zA-Z])\b/g, "$1<sub>$2</sub>");
-        str = str.replace(/\b([a-zA-Z])\^([0-9a-zA-Z])\b/g, "$1<sup>$2</sup>");
-
-        // TeX / Math symbols
-        str = str.replace(/\\alpha\b/g, "α")
-                 .replace(/\\beta\b/g, "β")
-                 .replace(/\\gamma\b/g, "γ")
-                 .replace(/\\delta\b/g, "δ")
-                 .replace(/\\pi\b/g, "π")
-                 .replace(/\\theta\b/g, "θ")
-                 .replace(/\\lambda\b/g, "λ")
-                 .replace(/\\sigma\b/g, "σ")
-                 .replace(/\\sum\b/g, "∑")
-                 .replace(/\\int\b/g, "∫")
-                 .replace(/\\infty\b/g, "∞")
-                 .replace(/\\approx\b/g, "≈")
-                 .replace(/\\neq\b/g, "≠")
-                 .replace(/\\le\b/g, "≤")
-                 .replace(/\\ge\b/g, "≥")
-                 .replace(/\\times\b/g, "×")
-                 .replace(/\\div\b/g, "÷")
-                 .replace(/\\pm\b/g, "±")
-                 .replace(/\\sqrt\{([^}]+)\}/g, "√($1)");
-
-        root.renderedMarkdown = str;
+        root.renderedMarkdown = Markdown.render(notesInput.text, Math.round(Theme.fontSizeSmall / 3));
     }
 
     function exitEditMode() {
@@ -149,25 +83,9 @@ Card {
             root.updateRenderedMarkdown();
     }
 
-    function restoreEditingFocus() {
-        if (!root.presented)
-            return;
-        if (root.creatingNote)
-            newNoteInput.focusInput();
-        else if (!root.previewMode)
-            notesInput.forceActiveFocus();
-    }
-
     onPreviewModeChanged: {
         if (root.previewMode)
             root.updateRenderedMarkdown();
-    }
-
-    onPresentedChanged: {
-        if (root.presented) {
-            NotesService.read();
-            Qt.callLater(root.restoreEditingFocus);
-        }
     }
 
     Component.onCompleted: {
@@ -191,7 +109,7 @@ Card {
     Connections {
         target: root.Window ? root.Window.window : null
         function onActiveFocusItemChanged() {
-            if (root.presented && !root.previewMode && root.Window && root.Window.window
+            if (!root.previewMode && root.Window && root.Window.window
                     && root.Window.window.activeFocusItem !== notesInput) {
                 root.exitEditMode();
             }
@@ -262,7 +180,7 @@ Card {
             Item {
                 id: newTabButton
                 height: Theme.controlHeightSmall
-                width: root.creatingNote ? 110 : Theme.controlHeightSmall
+                width: root.creatingNote ? Theme.fontSizeSmall * 10 : Theme.controlHeightSmall
                 enabled: NotesService.managementEnabled
                 opacity: newTabButton.enabled ? 1.0 : Theme.disabledOpacity
 
@@ -302,7 +220,7 @@ Card {
                     }
                     // Clicking away names it too.
                     onInputFocusedChanged: {
-                        if (!newNoteInput.inputFocused && root.creatingNote && root.presented
+                        if (!newNoteInput.inputFocused && root.creatingNote
                                 && root.Window && root.Window.window && root.Window.window.visible)
                             newNoteInput.create();
                     }
@@ -378,27 +296,23 @@ Card {
             interactive: needsVerticalScroll
             clip: true
 
-            ScrollBar.vertical: StyledScrollBar {
-                policy: notesFlickable.needsVerticalScroll ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
+            T.ScrollBar.vertical: StyledScrollBar {
+                policy: notesFlickable.needsVerticalScroll ? T.ScrollBar.AsNeeded : T.ScrollBar.AlwaysOff
             }
 
-            TextArea {
+            T.TextArea {
                 id: notesInput
                 focusPolicy: Qt.ClickFocus
                 visible: !root.previewMode
                 width: notesFlickable.contentWidth
                 height: notesFlickable.contentHeight
+                implicitWidth: contentWidth
+                implicitHeight: contentHeight
                 wrapMode: TextEdit.Wrap
-                background: null
-                topPadding: 0
-                bottomPadding: 0
-                leftPadding: 0
-                rightPadding: 0
-                placeholderText: "Keep notes, prompts, commands, or text you want nearby.\nEnter to finish · Shift+Enter for a new line"
+                padding: 0
                 color: Theme.text
                 selectionColor: Theme.accent
                 selectedTextColor: Theme.onAccent
-                placeholderTextColor: Theme.subtext
                 font.pixelSize: Theme.fontSizeSmall
                 font.family: Theme.fontFamily
                 enabled: NotesService.loaded && !NotesService.mutating
@@ -424,9 +338,16 @@ Card {
                     }
                 }
 
+                Label {
+                    width: parent.width
+                    visible: notesInput.text === "" && !notesInput.preeditText
+                    text: "Keep notes, prompts, commands, or text you want nearby.\nEnter to finish · Shift+Enter for a new line"
+                    color: Theme.subtext
+                    wrapMode: Text.WordWrap
+                }
+
                 onActiveFocusChanged: {
-                    if (!activeFocus && root.presented
-                            && root.Window && root.Window.window && root.Window.window.visible) {
+                    if (!activeFocus && root.Window && root.Window.window && root.Window.window.visible) {
                         root.exitEditMode();
                     }
                 }

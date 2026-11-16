@@ -11,20 +11,16 @@ BarButton {
     required property var timer
 
     readonly property bool isSet: root.timer.isSet
-    // In a crowded bar: the time left alone.
-    property bool compact: false
 
     iconName: root.isSet && root.timer.paused ? "media-pause" : "timer"
-    iconColor: Theme.accent
-    text: !root.isSet ? (root.timer.name || "New timer")
-        : (root.timer.name !== "" && !root.compact ? root.timer.name + "  " : "") + Format.clock(root.timer.remainingSeconds)
+    tone: "accent"
+    // In a crowded bar, the time left alone.
+    detail: root.isSet && root.timer.name !== "" ? root.timer.name + "  " : ""
+    text: !root.isSet ? (root.timer.name || "New timer") : Format.clock(root.timer.remainingSeconds)
     tabularDigits: true
     label: !root.isSet ? "Set this timer"
         : (root.timer.name || "Timer") + " · " + (root.timer.paused ? "paused"
             : "ends at " + Format.time(new Date(root.timer.endsAtMs)))
-    onWheeled: delta => {
-        if (delta)
-            TimerService.add(root.timer, delta > 0 ? 60 : -60);
-    }
+    onScrolled: direction => TimerService.add(root.timer, direction * 60)
     onRightClicked: TimerService.toggle(root.timer)
 }

@@ -1,5 +1,6 @@
 pragma Singleton
 import QtQuick
+import "ThemeProvider.js" as ThemeProvider
 
 QtObject {
     id: root
@@ -59,7 +60,7 @@ QtObject {
 
     readonly property color accent:    _p.accent
     // Text on the accent: the base or the text color, whichever reads better on it.
-    readonly property color onAccent:  root.contrast(_p.accent, _p.crust) >= root.contrast(_p.accent, _p.text) ? _p.crust : _p.text
+    readonly property color onAccent:  ThemeProvider.readableOn(String(_p.accent), String(_p.crust), String(_p.text))
 
     readonly property color pink:      _p.pink
 
@@ -109,6 +110,9 @@ QtObject {
     readonly property int borderRadius:  3
     readonly property int surfaceRadius: 16
     readonly property int borderWidth:   1
+    // Lines that must read at a glance: the focus ring, a slider's handle, a floating
+    // surface's frame and its accent edge.
+    readonly property int outlineWidth:  2
 
     // ── Interaction states ──────────────────────────────────
     // Neutral controls rest on controlFill/controlBorder and use cardHover on hover.
@@ -129,6 +133,12 @@ QtObject {
     // Menus, tooltips, and hover labels: small popups over a surface.
     readonly property color popupFill:   root.card
     readonly property color popupBorder: root.surface2
+    // Around the control the keyboard is on, from Tab; never shown for a click.
+    readonly property color focusRing:   root.accent
+    // The empty part of a slider's, a switch's, or a progress bar's track.
+    readonly property color trackFill:   root.alpha(root.surface2, 0.5)
+    // The frame of a floating surface, as the bar and its dropdowns.
+    readonly property color surfaceFrame: root.mix(root.surface2, root.overlay, 0.12)
 
     // ── Animation ───────────────────────────────────────────
     // Off in power saver: transitions jump to their end and nothing pulses or blinks.
@@ -137,6 +147,16 @@ QtObject {
     readonly property int animDuration:     root.motion ? 200 : 0
     readonly property int animDurationSlow: root.motion ? 350 : 0
     readonly property int animEasing:       Easing.OutCubic
+    // Leaving is quicker than coming, and speeds up as it goes, as a toast or the OSD fades out.
+    readonly property int animDurationExit: root.motion ? 140 : 0
+    readonly property int animEasingExit:   Easing.InCubic
+    // A transient card, as a toast or the OSD, comes in from a little smaller, overshooting
+    // a touch, and leaves shrinking back to it.
+    readonly property real popScale:        0.96
+    readonly property int animEasingPop:    Easing.OutBack
+    // A no, as for a wrong password: side to side this far, settling over this long.
+    readonly property int shakeDistance:    12
+    readonly property int shakeDuration:    root.motion ? 260 : 0
 
     // ── Layout ──────────────────────────────────────────────
     // A bar dropdown's content; wider text gets wider panels.
@@ -145,22 +165,21 @@ QtObject {
     readonly property int backdropHeight:     1050
     readonly property int separatorThickness: 1
     readonly property color separator:        root.alpha(root.surface2, 0.72)
+    // Toasts' width, and how long the OSD stays after the last change and how high
+    // above the screen's edge.
+    readonly property int toastWidth:  400
+    readonly property int osdTimeout:  1200
+    readonly property int osdMargin:   64
 
     // ── Helpers ─────────────────────────────────────────────
     function alpha(color, value) {
         return Qt.rgba(color.r, color.g, color.b, value);
     }
 
-    // WCAG contrast ratio of two colors, 1 to 21.
-    function contrast(first, second) {
-        const luminance = value => {
-            const color = Qt.color(value);
-            const linear = channel => channel <= 0.04045 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
-            return 0.2126 * linear(color.r) + 0.7152 * linear(color.g) + 0.0722 * linear(color.b);
-        };
-        const a = luminance(first);
-        const b = luminance(second);
-        return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    // `first` blended `amount` (0 to 1) of the way to `second`, opaque.
+    function mix(first, second, amount) {
+        return Qt.rgba(first.r + (second.r - first.r) * amount, first.g + (second.g - first.g) * amount,
+            first.b + (second.b - first.b) * amount, 1);
     }
 
     function toneColor(tone) {

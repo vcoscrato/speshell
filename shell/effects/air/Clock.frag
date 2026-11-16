@@ -14,7 +14,7 @@ layout(std140, binding = 0) uniform buf {
     float hourTurn;     // each hand's turns from twelve, clockwise
     float minuteTurn;
     float secondTurn;
-    float seconds;      // 1 shows the riding leaf
+    float ticking;      // 1 shows the riding leaf
     float time;         // s, for the clouds and the wind
     vec4 cSky;
     vec4 cDeep;
@@ -28,21 +28,6 @@ layout(std140, binding = 0) uniform buf {
     vec4 cSkyBlue;
 } u;
 #include "../common/common.glsl"
-
-const float TAU = 6.2831853;
-
-vec2 at(float turn, float r) {
-    float a = turn * TAU;
-    return vec2(sin(a), -cos(a)) * r;
-}
-
-float turnOf(vec2 p) {
-    return fract(atan(p.x, -p.y) / TAU + 1.0);
-}
-
-vec2 handFrame(vec2 p, float turn) {
-    return rot(p, -turn * TAU) * vec2(1.0, -1.0);
-}
 
 // A leaf `len` long along y from 0, `w` wide: the lens of two arcs, with its midrib.
 // Returns (distance, across: -1..1 from one edge to the other).
@@ -112,7 +97,7 @@ void main() {
 
     // ── The riding leaf ──
     float rS = R * 0.68;
-    if (u.seconds > 0.5) {
+    if (u.ticking > 0.5) {
         float behind = fract(u.secondTurn - turn + 1.0);
         float tail = 1.0 - behind / 0.07;
         o = over(o, u.cWind.rgb, 0.45 * step(0.0, tail) * tail * cover(0.9 - abs(r - rS)));

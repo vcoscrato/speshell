@@ -1,8 +1,10 @@
 import QtQuick
+import "common/Colors.js" as Colors
 import "Flame.js" as Flame
 
 // Cel-shaded flames from a quarter-resolution fluid simulation. Fuel comes from a
-// simmering rim around `panelRect` and from the burn front at `burnR` around `origin`.
+// simmering rim around `panelRect` and from the burn front at `burnR` around `origin`,
+// all in the parent's coordinates, over whatever part of the parent this item covers.
 // The simulation steps once per rendered frame by the `time` passed since its last
 // step, so it runs at the same pace at any clock speed, frame rate, or display rate.
 Item {
@@ -19,7 +21,7 @@ Item {
     property bool clearBehind: true   // keep flames off the panel once the front has passed
     property real trail: 0            // px behind the front past which flames die fast; 0: no limit
 
-    property var theme: null
+    property var theme: Colors.fallback
     property color core: Flame.core(theme)
     property color mid: Flame.mid(theme)
     property color outer: Flame.outer(theme)
@@ -64,6 +66,7 @@ Item {
         property real dt: 0
         property real emit: root.emit
         property real frontFuel: root.frontFuel
+        property point offset: Qt.point(root.x, root.y)
         property size resolution: Qt.size(root.width, root.height)
         property rect panel: root.panelRect
         property real radius: root.radius
@@ -79,6 +82,7 @@ Item {
         anchors.fill: parent
         property var state: simState
         property real time: root.time
+        property point offset: Qt.point(root.x, root.y)
         property size resolution: Qt.size(width, height)
         property color cCore: root.core
         property color cMid: root.mid

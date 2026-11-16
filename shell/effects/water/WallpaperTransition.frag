@@ -25,7 +25,6 @@ layout(binding = 1) uniform sampler2D outgoingTex;
 layout(binding = 2) uniform sampler2D incomingTex;
 #include "../common/common.glsl"
 
-const float TAU = 6.2831853;
 const int FLUNG = 12;
 
 // Water seen from above in flat bands over `col`: a dark edge inside its outline,

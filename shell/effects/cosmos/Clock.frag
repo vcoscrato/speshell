@@ -15,7 +15,7 @@ layout(std140, binding = 0) uniform buf {
     float hourTurn;     // each hand's turns from twelve, clockwise
     float minuteTurn;
     float secondTurn;
-    float seconds;      // 1 shows the comet
+    float ticking;      // 1 shows the comet
     float time;         // s, for the corona and the star dust
     vec4 cSpace;
     vec4 cDeep;
@@ -31,19 +31,6 @@ layout(std140, binding = 0) uniform buf {
     vec4 cNebula;
 } u;
 #include "../common/common.glsl"
-
-const float TAU = 6.2831853;
-
-// The point at radius r, `turn` turns clockwise from twelve.
-vec2 at(float turn, float r) {
-    float a = turn * TAU;
-    return vec2(sin(a), -cos(a)) * r;
-}
-
-// Turns clockwise from twelve to p.
-float turnOf(vec2 p) {
-    return fract(atan(p.x, -p.y) / TAU + 1.0);
-}
 
 // A four-point star of radius r: an astroid, sharp along its axes.
 float sparkle(vec2 q, float r) {
@@ -109,7 +96,7 @@ void main() {
     o = over(o, quarter ? u.cText.rgb : u.cDim.rgb, cover(s));
 
     // ── The comet: a head on the outer orbit and a tail back along it ──
-    if (u.seconds > 0.5) {
+    if (u.ticking > 0.5) {
         vec2 head = at(u.secondTurn, rS);
         float behind = fract(u.secondTurn - turnOf(p) + 1.0);
         float tail = 1.0 - behind / 0.09;

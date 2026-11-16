@@ -11,7 +11,8 @@ T.ToolTip {
 
     x: parent ? (parent.width - width) / 2 : 0
     y: root.below ? (parent ? parent.height : 0) + Theme.spacingSmall : -height - Theme.spacingTiny
-    width: Math.min(implicitWidth, 260)
+    // Wrapped at three quarters of a panel.
+    width: Math.min(implicitWidth, Theme.panelWidth * 3 / 4)
     implicitWidth: implicitContentWidth + leftPadding + rightPadding
     implicitHeight: implicitContentHeight + topPadding + bottomPadding
     margins: Theme.spacingTiny

@@ -1,4 +1,5 @@
 import QtQuick
+import "common/Colors.js" as Colors
 import "Sugar.js" as Sugar
 
 // Sugar's knob for Speshell's sliders and switches. On a slider, frosting piped along
@@ -10,7 +11,7 @@ Item {
     id: root
 
     // ── Speshell effects API v1: knob ───────────────────────
-    property var theme: null
+    property var theme: Colors.fallback
     property bool pressed: false
     property bool hovered: false
     property bool checked: true

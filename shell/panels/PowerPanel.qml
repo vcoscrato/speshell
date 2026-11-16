@@ -10,34 +10,37 @@ import qs.services
 Card {
     id: root
 
-    property bool presented: false
-
     panel: "power"
     // The action waiting for a second click; empty when none is.
     property string pendingAction: ""
 
     // In two rows: what leaves the session waiting, and what ends it.
     readonly property var rows: [["lock", "sleep", "hibernate"], ["logout", "restart", "poweroff"]]
+    // Each action's name, icon, and tone.
+    readonly property var actions: ({
+        lock: { label: "Lock", icon: "lock", tone: "accent" },
+        sleep: { label: "Sleep", icon: "sleep", tone: "accent" },
+        hibernate: { label: "Hibernate", icon: "hibernate", tone: "accent" },
+        logout: { label: "Log out", icon: "logout", tone: "warning" },
+        restart: { label: "Restart", icon: "restart", tone: "warning" },
+        poweroff: { label: "Power off", icon: "power", tone: "error" }
+    })
 
-    headerActions: Row {
-        spacing: Theme.spacingTiny
-
+    headerActions: [
         HeaderButton {
             iconName: "config"
             tooltipText: "Edit config.ini"
             onClicked: ConfigService.openConfig()
-        }
+        },
 
         HeaderButton {
-            iconName: "refresh"
-            busy: SystemState.relaunching
-            enabled: SystemState.canRelaunch
-            tooltipText: "Relaunch Speshell " + SystemState.appVersion
-            onClicked: SystemState.relaunch()
+            iconName: "relaunch"
+            busy: PowerService.relaunching
+            enabled: PowerService.canRelaunch
+            tooltipText: "Relaunch Speshell " + PowerService.appVersion
+            onClicked: PowerService.relaunch()
         }
-    }
-
-    onPresentedChanged: if (!root.presented) root.cancelConfirmation()
+    ]
 
     // Lock runs at once. Otherwise the first click arms an action, and a second click
     // within the countdown runs it.
@@ -99,7 +102,7 @@ Card {
                     id: tile
 
                     required property string modelData
-                    readonly property var action: PowerService.actions[tile.modelData]
+                    readonly property var action: root.actions[tile.modelData]
                     readonly property bool pending: root.pendingAction === tile.modelData
 
                     width: (row.width - row.spacing * (row.shown.length - 1)) / row.shown.length

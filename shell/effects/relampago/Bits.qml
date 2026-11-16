@@ -1,4 +1,5 @@
 import QtQuick
+import "common/Colors.js" as Colors
 import "common"
 import "Bolt.js" as Bolt
 
@@ -8,7 +9,7 @@ import "Bolt.js" as Bolt
 Particles {
     id: root
 
-    property var theme: null
+    property var theme: Colors.fallback
 
     readonly property int spark: 0
     readonly property int smoke: 1
@@ -16,16 +17,6 @@ Particles {
     readonly property int strike: 3     // from the item's top; turn it with `angle`
     readonly property int arc: 4
     readonly property int glint: 5
-
-    function rnd(a, b) {
-        return a + Math.random() * (b - a);
-    }
-
-    // Starts a particle of `kind` (see spawn() in common/Particles.qml for `p`).
-    function emit(kind, p) {
-        p.props = { kind: kind, seed: Math.random() };
-        root.spawn(p);
-    }
 
     delegate: Component {
         ShaderEffect {

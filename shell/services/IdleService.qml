@@ -7,7 +7,7 @@ import Quickshell.Services.UPower
 
 // What idling does, by [Idle]: dim the screen and keyboard, lock, turn the displays
 // off, and sleep, each undone by input; apps' idle inhibitors hold it off, as Keep
-// awake does. Whatever puts the system to sleep, as closing the lid, locks first.
+// awake does. LockService locks before any sleep.
 Singleton {
     id: root
 
@@ -20,8 +20,6 @@ Singleton {
     // Sleep also waits for playing media.
     readonly property bool sleepAllowed: !MediaService.playing
     property bool screenOff: false
-    // logind is waiting on the lock to sleep.
-    property bool sleepHeld: false
 
     function setKeepAwake(on) {
         root.keepAwake = !!on;
@@ -34,10 +32,6 @@ Singleton {
         HyprlandService.dispatch("hl.dsp.dpms({ action = \"" + (off ? "off" : "on") + "\" })", off ? "dpms off" : "dpms on");
     }
 
-    function lock() {
-        LockService.lock();
-    }
-
     IdleMonitor {
         enabled: root.idling && root.settings.dimAfter > 0
         timeout: root.settings.dimAfter * 60
@@ -48,7 +42,7 @@ Singleton {
     IdleMonitor {
         enabled: root.idling && root.settings.lockAfter > 0
         timeout: root.settings.lockAfter * 60
-        onIsIdleChanged: if (isIdle) root.lock()
+        onIsIdleChanged: if (isIdle) LockService.lock()
     }
 
     IdleMonitor {
@@ -64,35 +58,10 @@ Singleton {
         onIsIdleChanged: if (isIdle && !PowerService.busy) PowerService.runAction("sleep")
     }
 
-    // Locks, then lets the system sleep once the lock covers every screen and has drawn
-    // a frame there, so waking shows the lock at once. logind waits 5 s at most.
+    // The displays come back on before the system sleeps, so the lock can draw there.
     Connections {
         target: SessionService
 
-        function onAboutToSleep() {
-            root.setScreenOff(false);
-            LockService.lock();
-            root.sleepHeld = true;
-            if (LockService.secure)
-                sleepRelease.restart();
-        }
-        function onResumed() { root.sleepHeld = false; }
-        function onLockRequested() { LockService.lock(); }
-        function onUnlockRequested() { LockService.unlock(); }
-    }
-
-    Connections {
-        target: LockService
-
-        function onSecureChanged() {
-            if (LockService.secure && root.sleepHeld)
-                sleepRelease.restart();
-        }
-    }
-
-    Timer {
-        id: sleepRelease
-        interval: 200
-        onTriggered: SessionService.releaseSleep()
+        function onAboutToSleep() { root.setScreenOff(false); }
     }
 }

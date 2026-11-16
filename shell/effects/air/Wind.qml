@@ -27,9 +27,9 @@ ShaderEffect {
     property real turbulence: 14
     property rect mask
     property real maskRadius: 10
-    property var theme: null
-    property color cBody: theme ? Qt.lighter(Colors.mix(theme.rosewater, theme.text, 0.15), 1.05) : "#f6f9fc"
-    property color cRim: theme ? Colors.mix(theme.blue, theme.accent, 0.15) : "#7fa6c8"
+    property var theme: Colors.fallback
+    property color cBody: Qt.lighter(Colors.mix(theme.rosewater, theme.text, 0.15), 1.05)
+    property color cRim: Colors.mix(theme.blue, theme.accent, 0.15)
     // The turbulence, worked out at an eighth of the resolution (Wind.drift.frag).
     property var drift: driftTex
     fragmentShader: Qt.resolvedUrl("qsb/Wind.qsb")

@@ -10,7 +10,9 @@ layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {
     mat4 qt_Matrix;
     float qt_Opacity;
-    vec2 resolution;
+    vec2 offset;        // px, where this item's top left lies on the screen
+    vec2 resolution;    // this item's size, px
+    float screenWidth;  // px
     float time;
     vec4 rect;          // px, the panel where it is drawn now
     float radius;       // its corner radius
@@ -52,7 +54,7 @@ vec2 speedLines(vec2 p, float k, float rowH, float density, float speed, float w
 }
 
 void main() {
-    vec2 p = qt_TexCoord0 * u.resolution;
+    vec2 p = u.offset + qt_TexCoord0 * u.resolution;
     vec2 c = u.rect.xy + u.rect.zw * 0.5;
     vec2 h = u.rect.zw * 0.5;
     float sd = sdRoundRect(p - c, h, u.radius);
@@ -67,7 +69,7 @@ void main() {
     // ── Speed dashes, far to near: all round the panel while it races, then only
     //    a few trailing off behind it ──
     if (u.lines > 0.0) {
-        float edgeFade = smoothstep(0.0, 160.0, p.x) * smoothstep(0.0, 160.0, u.resolution.x - p.x);
+        float edgeFade = smoothstep(0.0, 160.0, p.x) * smoothstep(0.0, 160.0, u.screenWidth - p.x);
         float behind = smoothstep(0.0, 30.0, u.rect.x - p.x) * exp(-max(0.0, u.rect.x - p.x - 40.0) / 140.0)
                      * (1.0 - smoothstep(h.y * 0.75, h.y * 0.95, abs(p.y - c.y)));
         for (int i = 0; i < 3; i++) {

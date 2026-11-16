@@ -6,15 +6,21 @@
 exec 2>&1
 
 join() {
-  local ssid=$1 kind=$2 uuid psk
+  local ssid=$1 kind=$2 uuid psk edited
   uuid=$(cat /proc/sys/kernel/random/uuid)
   set -- type wifi con-name "$ssid" connection.uuid "$uuid" ssid "$ssid"
   [ "$kind" = open ] || set -- "$@" wifi-sec.key-mgmt "$kind"
   nmcli connection add "$@" >/dev/null || exit 1
   if [ "$kind" = wpa-psk ] || [ "$kind" = sae ]; then
     IFS= read -r psk
-    printf 'set 802-11-wireless-security.psk %s\nsave persistent\nquit\n' "$psk" \
-      | nmcli connection edit uuid "$uuid" >/dev/null
+    # nmcli's editor can go on past a password it refuses, saying "Error: ...": either
+    # fails here, rather than trying a connection that can't work.
+    if ! edited=$(printf 'set 802-11-wireless-security.psk %s\nsave persistent\nquit\n' "$psk" \
+      | nmcli connection edit uuid "$uuid" 2>&1) || printf '%s\n' "$edited" | grep -q 'Error:'; then
+      printf '%s\n' "$edited" | grep -m1 'Error:'
+      nmcli connection delete uuid "$uuid" >/dev/null
+      exit 1
+    fi
   fi
   nmcli -w 45 connection up uuid "$uuid" && exit 0
   nmcli connection delete uuid "$uuid" >/dev/null
