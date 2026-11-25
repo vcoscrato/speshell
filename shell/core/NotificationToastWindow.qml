@@ -110,8 +110,9 @@ PanelWindow {
         delegate: Item {
             id: toastCard
             required property var modelData
-            // Replaced notifications update the live object in place.
-            readonly property var live: modelData.notification
+            // Replaced notifications update the live object in place. It closes before
+            // the toast fades out and goes then, so the copy shows from its close on.
+            property var live: modelData.notification
             // What it says now.
             readonly property var shown: toastCard.live ?? toastCard.modelData
             readonly property color toneColor: modelData.urgency === 2 ? Theme.error : Theme.accent
@@ -150,6 +151,7 @@ PanelWindow {
                 target: toastCard.live
                 function onSummaryChanged() { Qt.callLater(toastCard.startCountdown); }
                 function onBodyChanged() { Qt.callLater(toastCard.startCountdown); }
+                function onClosed() { toastCard.live = null; }
             }
 
             // Holds while the pointer rests on the toasts, and goes on from the expiry

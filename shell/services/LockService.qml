@@ -23,7 +23,8 @@ Singleton {
     property bool secure: false
     // Where PAM's conversation is: "idle", waiting for the password; "checking", PAM is
     // at work; "prompt", PAM asked something more, as a code or a new password, and
-    // waits for what's typed.
+    // waits for what's typed; "unlocking", the way is open and the lock screen plays its
+    // exit, which ends in unlock().
     property string phase: "idle"
     // PAM's question while the phase is "prompt", and whether its answer may show.
     property string prompt: ""
@@ -50,6 +51,11 @@ Singleton {
     property string answer: ""
 
     function lock() {
+        // Locking again while the lock screen leaves keeps it.
+        if (root.phase === "unlocking") {
+            unlockSafety.stop();
+            root.phase = "idle";
+        }
         if (root.locked)
             return;
         root.message = "";
@@ -63,7 +69,7 @@ Singleton {
 
     // Sends what's typed: the password, which starts PAM, or the answer PAM waits for.
     function submit() {
-        if (!root.locked || root.phase === "checking" || root.draft === "")
+        if (!root.locked || root.phase === "checking" || root.phase === "unlocking" || root.draft === "")
             return;
         root.message = "";
         root.messageIsError = false;
@@ -83,8 +89,21 @@ Singleton {
     }
 
     // After a password, or from logind (`loginctl unlock-session`), which already
-    // checked who asked.
+    // checked who asked: the lock screen leaves, then calls unlock().
+    function release() {
+        if (!root.locked || root.phase === "unlocking")
+            return;
+        if (pam.active)
+            pam.abort();
+        root.answer = "";
+        root.draft = "";
+        root.message = "";
+        root.phase = "unlocking";
+        unlockSafety.restart();
+    }
+
     function unlock() {
+        unlockSafety.stop();
         if (pam.active)
             pam.abort();
         root.phase = "idle";
@@ -95,6 +114,18 @@ Singleton {
         if (root.markerPath !== "")
             Quickshell.execDetached(["rm", "-f", root.markerPath]);
         SessionService.setLockedHint(false);
+    }
+
+    // The compositor refused the lock, or ended it: nothing covers the screens, so the
+    // session isn't locked, and the next lock() tries again.
+    function lockFailed() {
+        if (!root.locked)
+            return;
+        root.unlock();
+        if (root.sleepHeld)
+            SessionService.releaseSleep();
+        NotificationService.addInternalNotification("lock", "Could not lock the screen",
+            "The compositor refused the session lock.", true, 2);
     }
 
     function finishConversation() {
@@ -110,9 +141,10 @@ Singleton {
 
         onPamMessage: {
             if (!pam.responseRequired) {
+                // Each line PAM says this time stays, as faillock's lockout and its wait.
                 if (pam.message !== "") {
-                    root.message = pam.message;
-                    root.messageIsError = pam.messageIsError;
+                    root.message = root.message !== "" ? root.message + "\n" + pam.message : pam.message;
+                    root.messageIsError = root.messageIsError || pam.messageIsError;
                 }
                 return;
             }
@@ -129,18 +161,17 @@ Singleton {
 
         onCompleted: result => {
             if (result === PamResult.Success) {
-                root.unlock();
+                root.release();
                 return;
             }
             root.finishConversation();
             root.failures++;
-            // faillock's own wait outranks a plain "wrong password".
-            if (!root.messageIsError || root.message === "") {
+            // What PAM said, as faillock's lockout, outranks a plain "wrong password".
+            if (root.message === "")
                 root.message = result === PamResult.MaxTries ? "Too many tries. Wait a moment."
                     : result === PamResult.Failed ? "Wrong password"
                     : "Could not check the password.";
-                root.messageIsError = true;
-            }
+            root.messageIsError = true;
         }
 
         onError: error => {
@@ -163,12 +194,19 @@ Singleton {
         }
         function onResumed() { root.sleepHeld = false; }
         function onLockRequested() { root.lock(); }
-        function onUnlockRequested() { root.unlock(); }
+        function onUnlockRequested() { root.release(); }
     }
 
     onSecureChanged: {
         if (root.secure && root.sleepHeld)
             sleepRelease.restart();
+    }
+
+    // Bounds the lock screen's exit, should no screen report its end.
+    Timer {
+        id: unlockSafety
+        interval: 3000
+        onTriggered: root.unlock()
     }
 
     Timer {

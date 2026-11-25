@@ -90,7 +90,7 @@ function parseTheme(id, text, effects) {
             continue;
         if (colorKeys.indexOf(keys[i]) < 0)
             errors.push("line " + color.line + ": unknown color '" + keys[i] + "'");
-        else if (!/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(color.value))
+        else if (!/^#[0-9a-fA-F]{6}$/.test(color.value))
             errors.push("line " + color.line + ": " + keys[i] + " must be #rrggbb");
         else
             theme.colors[keys[i]] = color.value;

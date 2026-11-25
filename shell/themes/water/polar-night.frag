@@ -1,8 +1,8 @@
 #version 440
 #extension GL_GOOGLE_include_directive : enable
-// Polar night: aurora curtains ripple over moonlit glacier peaks and are mirrored
-// in a still polar sea. An ice city of domes and a tall tower glows warm on the
-// far shore, faceted icebergs drift, both mirrored too, a canoe carries a lantern
+// Polar night: folded aurora curtains, rays rising off them, hang over moonlit
+// glacier peaks and are mirrored in a still polar sea. An ice city of domes and a
+// tall tower glows warm on the far shore, lopsided icebergs drift, both mirrored too, a canoe carries a lantern
 // home, and snow falls over a drifted bank in the foreground.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
@@ -16,49 +16,113 @@ layout(std140, binding = 0) uniform buf {
 
 const float HORIZON = 0.34;
 
-// Aurora over the sky at q: rgb, and how strongly it shows (0..1).
-vec4 aurora(vec2 q, float aspect) {
-    vec4 best = vec4(0.0);
+// The base line of aurora ribbon i at s (0..1 along it, left to right): it
+// sways back and forth as it runs, folding over itself where it doubles back.
+vec2 ribbonBase(float s, int i) {
+    if (i == 0)
+        return vec2(mix(1.0, 1.9, s) + 0.035 * sin(s * 16.0 + 3.0) * (0.6 + vnoise(vec2(s * 4.0, 1.0))),
+                    mix(0.49, 0.53, s) + 0.012 * sin(s * 7.0 + 0.4));
+    if (i == 1)
+        return vec2(mix(0.36, 1.92, s) + 0.11 * sin(s * 13.0 + 4.1) * (0.5 + vnoise(vec2(s * 3.0, 2.0))),
+                    mix(0.6, 0.86, s * s) + 0.025 * sin(s * 9.0 + 2.0));
+    return vec2(mix(0.5, 1.88, s) + 0.17 * sin(s * 10.0 + 0.6) * (0.55 + 0.7 * vnoise(vec2(s * 2.5, 3.0))),
+                mix(0.84, 0.74, s) - 0.17 * 4.0 * s * (1.0 - s) * (1.0 - 0.4 * s) + 0.02 * sin(s * 8.0 + 5.0));
+}
+
+// Aurora light at q: x the total glow; y the height within the curtain (0 at its
+// lower edge, 1 near its top), and z the strength of the ray there, of the
+// brightest sheet at q.
+vec3 auroraGlow(vec2 q) {
+    float total = 0.0, best = 0.0;
+    vec3 g = vec3(0.0, 2.0, 0.0);
     for (int i = 0; i < 3; i++) {
         float fi = float(i);
-        float yb = 0.55 + 0.05 * fi + 0.07 * sin(q.x * 2.1 + fi * 1.9) + 0.035 * sin(q.x * 5.3 + fi * 3.7);
-        float hgt = (0.2 + 0.08 * fi) * (0.6 + 0.6 * vnoise(vec2(q.x * 3.0, fi * 4.0)));
-        float rel = (q.y - yb) / hgt;
-        if (rel < 0.0 || rel > 1.8)
-            continue;
-        float span = smoothstep(0.05 + 0.4 * fi, 0.35 + 0.4 * fi, q.x) * smoothstep(aspect - 0.1 * fi, aspect - 0.5 - 0.2 * fi, q.x);
-        // A smooth curtain in flat tiers, brightest at its lower edge and fading
-        // through fainter ones toward its top, with thin rays of light rising
-        // through it and past it, each dying out at its own height.
-        float ray = band(vnoise(vec2(q.x * 130.0 + fi * 13.0, fi)), 0.72);
-        float rayTop = 1.0 + 0.75 * vnoise(vec2(q.x * 45.0 + fi * 7.0, fi + 9.0));
-        // The faint tier is the same curtain drawn taller, so it thins out at its
-        // ends as the curtain does.
-        float s1 = pow(max(0.0, 1.0 - rel / 1.3), 1.3) * span * (1.0 - 0.2 * fi);
-        float rn = 0.6 * vnoise(vec2(q.x * 130.0 + fi * 13.0, fi)) + 0.4 * vnoise(vec2(q.x * 390.0, fi + 3.0));
-        vec4 c = vec4(rgb(56, 156, 170), s1 > 0.12 ? 0.3 : 0.0);
-        if (rel > 1.0) {
-            // Thinning as it rises, so each ends in a point.
-            float up = (rel - 1.0) / max(rayTop - 1.0, 1e-3);
-            float thin = band(rn, 0.7 + 0.25 * up) * step(0.45, vnoise(vec2(q.x * 18.0, fi + 5.0)));
-            float k = thin * step(0.3, span) * step(up, 1.0) * (up < 0.45 ? 0.3 : 0.16);
-            if (k > c.a)
-                c = vec4(rgb(84, 214, 176), k);
-        } else {
-            float s0 = pow(1.0 - rel, 1.3) * span * (1.0 - 0.2 * fi);
-            vec3 cc = s0 > 0.55 ? rgb(150, 250, 200) : (s0 > 0.3 ? rgb(84, 214, 176) : rgb(56, 156, 170));
-            cc = mix(cc, s0 > 0.55 ? rgb(214, 255, 236) : rgb(140, 240, 200), ray * 0.7 * smoothstep(1.0, 0.2, rel));
-            cc = mix(cc, rgb(214, 255, 236), cover(0.03 - rel) * step(0.3, s0));
-            float k = s0 > 0.3 ? 1.0 : (s0 > 0.12 ? 0.55 : 0.0);
-            // The rays carry the faint tiers up with them.
-            k = max(k, band(rn, 0.7) * step(0.12, s1) * (s0 > 0.04 ? 0.55 : 0.3));
-            if (k > c.a)
-                c = vec4(cc, k);
+        float span = i == 0 ? 0.9 : (i == 1 ? 1.56 : 1.38);
+        float x0 = i == 0 ? 1.0 : (i == 1 ? 0.36 : 0.5);
+        float tall = i == 0 ? 0.05 : (i == 1 ? 0.09 : 0.13);
+        float lean = 0.08 * (fi - 1.0);
+        float s0 = (q.x - x0) / span;
+        float m = 0.32 / span;
+        float lo = clamp(s0 - m, 0.0, 1.0), hi = clamp(s0 + m, 0.0, 1.0);
+        float ds = (hi - lo) / 80.0;
+        vec2 b = ribbonBase(lo, i);
+        float fPrev = b.x + lean * (q.y - b.y) - q.x;
+        // Every place the sheet crosses this column: each is a layer of light.
+        for (int k = 1; k <= 80; k++) {
+            float s = lo + ds * float(k);
+            vec2 bb = ribbonBase(s, i);
+            float f = bb.x + lean * (q.y - bb.y) - q.x;
+            if (fPrev * f <= 0.0 && fPrev != f) {
+                float sr = s - ds * f / (f - fPrev);
+                vec2 base = ribbonBase(sr, i);
+                float hgt = tall * (0.65 + 0.7 * vnoise(vec2(sr * 6.0, fi + 4.0)));
+                float rel = (q.y - base.y) / hgt;
+                if (rel >= 0.0 && rel < 2.5) {
+                    // Seen edge-on where it folds, the sheet glows brighter.
+                    float slope = abs(f - fPrev) / ds / span;
+                    float edgeOn = clamp(inversesqrt(max(slope, 0.05)), 1.0, 1.4);
+                    float ends = smoothstep(0.0, 0.16, sr) * smoothstep(1.0, 0.8, sr);
+                    // Its top drapes in slow, gentle waves.
+                    float drape = rel * (0.75 + 0.45 * vnoise(vec2(sr * 22.0, fi + 9.0)) + 0.12 * vnoise(vec2(sr * 45.0, fi + 17.0)))
+                                + rel * rel * 0.5 * (vnoise(vec2(sr * 13.0, fi + 5.0)) - 0.4);
+                    // A few broad, soft rays of uneven width and spacing, each fading
+                    // out at its own height; lost where the fold packs them too close.
+                    float rf = 28.0 * sr / (1.0 - 0.25 * fi) + fi * 7.3;
+                    rf += 1.2 * vnoise(vec2(rf * 0.25, fi + 2.0));
+                    float cell = floor(rf);
+                    float hb = hash(vec2(cell, fi + 11.0)), hw = hash(vec2(cell, fi + 12.0)), hl = hash(vec2(cell, fi + 13.0));
+                    float across = abs(fract(rf) - 0.5 - 0.25 * (hw - 0.5)) / mix(0.22, 0.42, hw);
+                    float ray = (1.0 - smoothstep(0.0, 1.0, across)) * max(0.0, hb * 1.6 - 0.6);
+                    ray *= exp(-rel / mix(0.8, 2.2, hl)) * smoothstep(0.25, 0.6, slope) * ends;
+                    float glow = (exp(-2.0 * drape) + 0.3 * exp(-70.0 * rel)) * ends * edgeOn * (i == 0 ? 0.6 : (i == 1 ? 0.8 : 1.0));
+                    total += glow;
+                    if (glow > best) {
+                        best = glow;
+                        g.y = rel;
+                        g.z = ray;
+                    }
+                }
+            }
+            fPrev = f;
         }
-        if (c.a > best.a)
-            best = c;
     }
-    return best;
+    g.x = total;
+    return g;
+}
+
+// The aurora at q in flat tiers of light, from the glow g: rgb, and how strongly
+// it shows (0..1). A thin lit rim along its lower edge, then light green, green,
+// teal higher and a faint violet fringe at the top, with broad rays of light
+// rising through it and fading out in steps.
+vec4 auroraTiers(vec3 g) {
+    float t1 = band(g.x + 0.04 * g.z, 0.11), t2 = band(g.x + 0.04 * g.z, 0.15);
+    float t3 = band(g.x, 0.32), t4 = band(g.x, 0.66), t5 = band(g.x, 1.2);
+    float ray1 = band(g.z, 0.3 + 0.2 * min(g.y, 1.5)) * t2, ray2 = band(g.z, 0.55 + 0.3 * min(g.y, 1.5)) * t2;
+    vec3 c = rgb(150, 112, 214);
+    float a = 0.28 * t1;
+    c = mix(c, rgb(50, 160, 164), t2);
+    a = mix(a, 0.42, t2);
+    c = mix(c, rgb(84, 212, 166), t3);
+    a = mix(a, 0.75, t3);
+    c = mix(c, rgb(118, 232, 178), t4);
+    a = mix(a, 0.9, t4);
+    c = mix(c, mix(c, rgb(190, 250, 220), 0.22), ray1);
+    c = mix(c, mix(c, rgb(190, 250, 220), 0.22), ray2);
+    a = mix(a, min(a + 0.1, 1.0), ray1);
+    c = mix(c, rgb(176, 246, 210), t5);
+    a = mix(a, 1.0, t5);
+    return vec4(c, a);
+}
+
+// The aurora supersampled, as its folds turn in less than a pixel.
+vec4 aurora(vec2 q, float px) {
+    vec4 acc = vec4(0.0);
+    for (int i = 0; i < 4; i++) {
+        vec2 o = (vec2(mod(float(i), 2.0), floor(float(i) / 2.0)) - 0.5) * 0.5 * px;
+        vec4 c = auroraTiers(auroraGlow(q + o));
+        acc += vec4(c.rgb * c.a, c.a);
+    }
+    return vec4(acc.rgb / max(acc.a, 1e-4), acc.a * 0.25);
 }
 
 // The main peaks of ridge(), without its small bumps, for shading by slope.
@@ -76,25 +140,25 @@ vec3 range(vec3 col, vec2 q, float h, float hL, float hR, vec3 lit, vec3 shade, 
     return mix(col, c, inside);
 }
 
-// A faceted iceberg around x = c on the waterline, `w` half wide, `ht` tall; its
-// faces lit by the moon or in shade, mirrored in the water below.
-vec3 berg(vec3 col, vec2 q, float c, float w, float ht, float seed, float water) {
-    float dx = (q.x - c) / w;
-    if (abs(dx) > 1.0)
+// A lopsided, faceted iceberg peaking at x = c on the waterline, reaching `wl` to
+// the left and `wr` to the right, `ht` tall: a face lit by the moon (left), a
+// half-lit one and one in shade, split by ridges slanting down from the peak,
+// mirrored in the water below.
+vec3 berg(vec3 col, vec2 q, float c, float wl, float wr, float ht, float seed, float water) {
+    float dx = q.x - c;
+    if (dx < -wl || dx > wr)
         return col;
-    float k = floor((dx + 1.0) * 3.0);
-    float f0 = hash(vec2(k, seed)), f1 = hash(vec2(k + 1.0, seed));
-    float tf = fract((dx + 1.0) * 3.0);
-    float prof = mix(f0, f1, tf) * 0.5 + 0.5;
-    float h = water + ht * prof * pow(1.0 - abs(dx), 0.5);
-    bool litFace = f1 < f0;
-    vec3 face = litFace ? rgb(214, 232, 244) : rgb(110, 150, 186);
-    if (q.y >= water) {
+    float t = dx < 0.0 ? -dx / wl : dx / wr;
+    float prof = clamp((1.0 - t) * (1.0 + 0.7 * zig(dx / (wl + wr) * 6.0, seed)), 0.0, 1.0);
+    float h = water + ht * pow(prof, 0.85);
+    float y = q.y >= water ? q.y : 2.0 * water - q.y + 0.004 * sin(q.y * 400.0);
+    float down = (water + ht - y) / ht;
+    float ridge = (0.1 + 0.25 * hash(vec2(seed, 1.0))) * wr * down;
+    vec3 face = dx < ridge ? rgb(214, 232, 244) : (dx < ridge + (0.35 + 0.2 * hash(vec2(seed, 2.0))) * wr * down ? rgb(140, 176, 206) : rgb(98, 136, 174));
+    if (q.y >= water)
         col = mix(col, face, below(h, q.y));
-    } else {
-        float my = 2.0 * water - q.y + 0.004 * sin(q.y * 400.0);
-        col = mix(col, mix(face, rgb(16, 36, 56), 0.55), below(h, my) * cover(q.y - water + ht * 0.8));
-    }
+    else
+        col = mix(col, mix(face, rgb(16, 36, 56), 0.55), below(h, y) * cover(q.y - water + ht * 0.8));
     return col;
 }
 
@@ -137,11 +201,12 @@ void main() {
         float stars = max(starField(q, 0.012, 0.35, 1.0, 0.0011, minR, aa),
                           starField(q + 0.37, 0.03, 0.45, 7.0, 0.0019, minR, aa));
         col = mix(col, rgb(226, 238, 246), stars * smoothstep(0.42, 0.7, q.y));
-        vec4 a = aurora(q, aspect);
+        vec4 a = aurora(q, 1.0 / u.resolution.y);
         col = mix(col, a.rgb, a.a);
         // The moon and its halo.
         float dm = length(q - moon);
-        col = mix(col, mix(col, rgb(180, 210, 230), 0.12), cover(0.12 - dm));
+        col = mix(col, mix(col, rgb(150, 190, 218), 0.08), cover(0.13 - dm));
+        col = mix(col, mix(col, rgb(170, 204, 226), 0.12), cover(0.085 - dm));
         col = mix(col, rgb(234, 242, 248), cover(0.045 - dm));
         col = mix(col, rgb(196, 212, 226), cover(0.045 - dm) * band(vnoise((q - moon) * 60.0), 0.66));
 
@@ -191,7 +256,7 @@ void main() {
         float ripple = 0.006 * sin(q.y * 520.0 + q.x * 30.0) * (0.3 + t);
         vec2 m = vec2(q.x + ripple, 2.0 * HORIZON - q.y);
         float breakup = band(vnoise(vec2(q.x * 12.0, q.y * 260.0)), 0.35);
-        vec4 a = aurora(m, aspect);
+        vec4 a = auroraTiers(auroraGlow(m));
         col = mix(col, mix(a.rgb, rgb(16, 40, 60), 0.5), a.a * 0.45 * breakup);
         // Mirrored mountains, dark.
         float h0 = 0.36 + 0.2 * ridge(m.x + 1.0, 2.4, 3.0);
@@ -215,9 +280,9 @@ void main() {
     }
 
     // Icebergs on the waterline, with their reflections.
-    col = berg(col, q, aspect * 0.12, 0.11, 0.09, 1.0, HORIZON - 0.02);
-    col = berg(col, q, aspect * 0.86, 0.15, 0.13, 2.0, HORIZON - 0.04);
-    col = berg(col, q, aspect * 0.72, 0.05, 0.04, 3.0, HORIZON - 0.09);
+    col = berg(col, q, aspect * 0.1, 0.08, 0.15, 0.085, 1.0, HORIZON - 0.02);
+    col = berg(col, q, aspect * 0.87, 0.19, 0.1, 0.14, 2.0, HORIZON - 0.04);
+    col = berg(col, q, aspect * 0.71, 0.03, 0.065, 0.04, 3.0, HORIZON - 0.09);
 
     // A canoe with a lantern, gliding home.
     vec2 cn = vec2(aspect * 0.45, 0.17);

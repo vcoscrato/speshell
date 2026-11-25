@@ -18,7 +18,7 @@ scan() {
     for ini in "$dir"/*/theme.ini; do
       [ -f "$ini" ] || continue
       printf 'theme\t%s\n' "${ini%/theme.ini}"
-      sed 's/^/ini\t/' "$ini"
+      awk '{ print "ini\t" $0 }' "$ini"
     done
     find -L "$dir" -mindepth 2 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) \
       -printf 'wall\t%p\n'

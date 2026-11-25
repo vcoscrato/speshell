@@ -95,6 +95,7 @@ PanelWindow {
         }
         EffectsService.picked(button, pointer || null);
         dropdown.show(panel, button);
+        PanelService.dropdownOpened(root.screenName);
     }
 
     function closeDropdown() {
@@ -166,6 +167,11 @@ PanelWindow {
                 root.closeDropdown();
             else if (dropdown.panel !== panel || dropdown.button !== button)
                 root.toggleDropdown(panel, button, null);
+        }
+
+        function onDropdownOpened(screen) {
+            if (screen !== root.screenName)
+                root.closeDropdown();
         }
 
         function onDismissRequested(closed) {

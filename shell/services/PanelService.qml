@@ -33,6 +33,8 @@ Singleton {
     signal requested(string panel, string screen, bool toggle)
     // The bars close their dropdowns; one that had one open sets `closed.any`.
     signal dismissRequested(var closed)
+    // The bar on the screen named `screen` opened a dropdown; the others close theirs.
+    signal dropdownOpened(string screen)
 
     function has(panel) {
         return Object.prototype.hasOwnProperty.call(root.panels, panel);

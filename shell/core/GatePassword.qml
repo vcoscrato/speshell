@@ -28,6 +28,11 @@ Column {
         if (password.text !== root.draft)
             password.text = root.draft;
     }
+    // The field forgets its text while hidden, as on the login screen's other displays.
+    onVisibleChanged: {
+        if (root.visible && password.text !== root.draft)
+            password.text = root.draft;
+    }
 
     Field {
         id: password

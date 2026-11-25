@@ -15,6 +15,9 @@ ModalWindow {
     property string phase: ""
     readonly property bool presenting: root.phase !== ""
     property int selectedIndex: 0
+    // Where the pointer was last seen over the results, in the window, or null since
+    // opening: rows follow the pointer only as it moves, not as they move under it.
+    property var pointer: null
     // Latched per presentation so an effects change, e.g. from a theme picked while it
     // closes, lets the old effects finish their exit.
     property Component transition: null
@@ -73,6 +76,7 @@ ModalWindow {
         root.targetScreen = HyprlandService.focusedScreen();
         LauncherService.setQuery("");
         root.selectedIndex = 0;
+        root.pointer = null;
         closeSafetyTimer.stop();
         if (!root.presenting)
             root.transition = EffectsService.launcherTransition;
@@ -103,6 +107,15 @@ ModalWindow {
             return;
         if (LauncherService.activate(root.results[root.selectedIndex]))
             LauncherService.close();
+    }
+
+    // The pointer over row `index`, in `area`: selects it once the pointer has moved.
+    function hover(index, area) {
+        const at = area.mapToItem(null, area.mouseX, area.mouseY);
+        const moved = root.pointer !== null && (at.x !== root.pointer.x || at.y !== root.pointer.y);
+        root.pointer = at;
+        if (moved)
+            root.selectedIndex = index;
     }
 
     function iconPath(result) {
@@ -338,7 +351,8 @@ ModalWindow {
                         enabled: resultRow.modelData.activatable !== false
                         hoverEnabled: true
                         cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                        onEntered: root.selectedIndex = resultRow.index
+                        onEntered: root.hover(resultRow.index, resultMouse)
+                        onPositionChanged: root.hover(resultRow.index, resultMouse)
                         onClicked: {
                             root.selectedIndex = resultRow.index;
                             root.activateSelected();

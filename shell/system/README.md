@@ -37,7 +37,7 @@ run rustup default stable
 ```
 
 - `use MODULE...` brings in other modules, and the ones they use.
-- A bare name is a package, from the repositories or the AUR (installed through paru or yay when there is one), even one named like a line word, such as `file`; only `linger` alone is the line. A group is not a package: list its packages.
+- A bare name is a package, from the repositories or the AUR (installed through paru or yay when there is one), even one named like a line word, such as `file`; only `linger` alone is the line. A name an installed package provides, as an AUR package's `-git` does, is met by that package. A group is not a package: list its packages.
 - `service UNIT` enables a system unit, and `user-service UNIT` one of yours. `%u` in UNIT is your user name, as in `speshell-greeter-theme@%u.path`.
 - `group GROUP` puts you in GROUP, from your next login.
 - `linger` starts your user services at boot, without a login.
@@ -65,7 +65,7 @@ A `run` line is for what no other line can say, since what it does stays when th
 5. Puts you in the modules' groups, starts your services at boot when a module asks, and enables the services that aren't enabled.
 6. Runs the `run` lines this machine hasn't.
 
-One apply or update runs at a time. `update` updates the whole system and then applies, going on unasked unless the plan takes something away (disables a service, leaves a group, removes or demotes a package, or unlinks, deletes, or puts back a file), which it asks about as apply does. Packages installed but never declared are only reported: declare them, or remove them with `apply --remove PACKAGE`, which stops when a module declares the package or it isn't explicitly installed.
+One apply or update runs at a time. `update` updates the whole system and then applies, going on unasked unless the plan takes something away (disables a service, leaves a group, stops starting your services at boot, removes or demotes a package, or unlinks, deletes, or puts back a file), which it asks about as apply does. Packages installed but never declared are only reported: declare them, or remove them with `apply --remove PACKAGE`, which stops when a module declares the package or it isn't explicitly installed.
 
 `apply` and `update` ask as pacman, paru, and sudo always do, so they run in a terminal. What the last apply left is in `~/.local/share/speshell/system/state.json`.
 

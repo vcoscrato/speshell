@@ -36,10 +36,13 @@ Card {
 
     function isBusy(dev) {
         return dev.state === BluetoothDeviceState.Connecting
-            || dev.state === BluetoothDeviceState.Disconnecting;
+            || dev.state === BluetoothDeviceState.Disconnecting
+            || dev === BluetoothService.pairing;
     }
 
     function deviceSubtitle(dev) {
+        if (dev === BluetoothService.pairing) return "Pairing…";
+        if (dev === BluetoothService.pairFailed) return "Could not pair";
         if (dev.state === BluetoothDeviceState.Connecting) return "Connecting…";
         if (dev.state === BluetoothDeviceState.Disconnecting) return "Disconnecting…";
         const parts = [dev.connected ? "Connected" : (dev.paired ? "Paired" : "Available")];
@@ -49,6 +52,8 @@ Card {
     }
 
     function deviceActions(dev) {
+        if (dev === BluetoothService.pairing)
+            return [{ text: "Cancel", enabled: true, actionId: "cancel" }];
         const busy = root.isBusy(dev);
         if (dev.connected)
             return [{ text: "Disconnect", enabled: !busy, actionId: "disconnect" }];
@@ -95,6 +100,7 @@ Card {
                 required property var modelData
                 title: deviceRow.modelData.name
                 subtitle: root.deviceSubtitle(deviceRow.modelData)
+                subtitleColor: deviceRow.modelData === BluetoothService.pairFailed ? Theme.error : Theme.subtext
                 iconName: BluetoothService.deviceIcon(deviceRow.modelData)
                 current: deviceRow.modelData.connected
                 busy: root.isBusy(deviceRow.modelData)
@@ -104,6 +110,8 @@ Card {
                 onActionTriggered: actionId => {
                     if (actionId === "connect" || actionId === "disconnect")
                         BluetoothService.connectDevice(deviceRow.modelData, actionId === "connect");
+                    else if (actionId === "cancel")
+                        BluetoothService.cancelPairing();
                 }
 
                 Behavior on opacity {

@@ -31,7 +31,9 @@ ShellRoot {
     property var theme: null
     property string draft: ""
     // Where greetd's conversation is, as LockService's: "idle", waiting for the password;
-    // "checking", at work; "prompt", PAM asked something more and waits for what's typed.
+    // "checking", at work; "prompt", PAM asked something more and waits for what's typed;
+    // "starting", the session is ready and the gate plays its exit; "launching", greetd
+    // starts the session.
     property string phase: "idle"
     property string prompt: ""
     property bool promptVisible: false
@@ -53,7 +55,7 @@ ShellRoot {
 
     // Sends what's typed: the password, which starts a session, or the answer PAM waits for.
     function submit() {
-        if (root.phase === "checking" || root.draft === "" || root.user === "" || !root.current)
+        if ((root.phase !== "idle" && root.phase !== "prompt") || root.draft === "" || root.user === "" || !root.current)
             return;
         root.message = "";
         root.messageIsError = false;
@@ -151,7 +153,11 @@ ShellRoot {
         root.pickDefaults();
     }
 
+    // Once the first screen's gate has left.
     function launch() {
+        if (root.phase !== "starting")
+            return;
+        root.phase = "launching";
         const entry = root.current;
         stateFile.setText(JSON.stringify({ user: root.user, session: root.session }));
         Greetd.launch(entry.command, [
@@ -179,9 +185,10 @@ ShellRoot {
 
         function onAuthMessage(message, error, responseRequired, echoResponse) {
             if (!responseRequired) {
+                // Each line PAM says this time stays, as faillock's lockout and its wait.
                 if (message !== "") {
-                    root.message = message;
-                    root.messageIsError = error;
+                    root.message = root.message !== "" ? root.message + "\n" + message : message;
+                    root.messageIsError = root.messageIsError || error;
                 }
                 return;
             }
@@ -197,10 +204,11 @@ ShellRoot {
         }
 
         function onAuthFailure(message) {
-            root.fail(message !== "" ? message : "Wrong password");
+            // What PAM said, as faillock's lockout, outranks greetd's "Authentication failure".
+            root.fail(root.message !== "" ? root.message : message !== "" ? message : "Wrong password");
         }
 
-        function onReadyToLaunch() { root.launch(); }
+        function onReadyToLaunch() { root.phase = "starting"; }
 
         function onError(error) {
             root.fail("Could not log in: " + error);
@@ -273,6 +281,8 @@ ShellRoot {
                 wallpaper: root.theme ? root.theme.wallpaper || "" : ""
                 failures: root.failures
                 footnote: HyprlandService.keyboardLayouts > 1 ? HyprlandService.keyboardLayout : ""
+                leaving: root.phase === "starting" || root.phase === "launching"
+                onDeparted: root.launch()
 
                 Item {
                     visible: window.primary

@@ -6,8 +6,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Bluetooth
 
-// The default Bluetooth adapter: on and off, discovery with a timeout, and an icon
-// for each kind of device.
+// The default Bluetooth adapter: on and off, discovery with a timeout, connecting
+// (pairing a new device first), and an icon for each kind of device.
 Singleton {
     id: root
 
@@ -35,11 +35,44 @@ Singleton {
         discoveryTimeout.stop();
     }
 
+    // The device a connect is pairing first, and the last one that failed to pair; null
+    // when none.
+    property var pairing: null
+    property var pairFailed: null
+
+    // A device not yet paired is paired first, then trusted so it reconnects on its own,
+    // then connected.
     function connectDevice(device, on) {
-        if (on)
-            device.connect();
-        else
+        if (!on) {
             device.disconnect();
+            return;
+        }
+        root.pairFailed = null;
+        if (device.paired) {
+            device.connect();
+            return;
+        }
+        root.pairing = device;
+        device.pair();
+    }
+
+    function cancelPairing() {
+        if (root.pairing)
+            root.pairing.cancelPair();
+    }
+
+    // When the device is paired, or its pairing has ended without, whichever is heard first.
+    function settlePairing() {
+        const device = root.pairing;
+        if (!device || (device.pairing && !device.paired))
+            return;
+        root.pairing = null;
+        if (device.paired) {
+            device.trusted = true;
+            device.connect();
+        } else {
+            root.pairFailed = device;
+        }
     }
 
     // BlueZ names a device's class with a freedesktop icon name; map it to ours.
@@ -84,6 +117,18 @@ Singleton {
     onScanningChanged: {
         if (!root.scanning)
             discoveryTimeout.stop();
+    }
+
+    Connections {
+        target: root.pairing
+
+        function onPairedChanged() {
+            root.settlePairing();
+        }
+
+        function onPairingChanged() {
+            root.settlePairing();
+        }
     }
 
     Timer {

@@ -32,11 +32,18 @@ class Installed:
 class Machine:
     """pacman's database as the plan reads it."""
 
-    def __init__(self, explicit=(), dependencies=(), needed_by=None, owners=None, cached=()):
+    def __init__(self, explicit=(), dependencies=(), needed_by=None, owners=None, cached=(), provides=None, groups=()):
         needed_by = needed_by or {}
+        self.provides, self.groups = provides or {}, set(groups)
         self.installed = {name: Installed(needed_by.get(name, ())) for name in [*explicit, *dependencies]}
         self.explicit = set(explicit)
         self.owners, self.cached = owners or {}, set(cached)
+
+    def provider(self, name):
+        return name if name in self.installed else self.provides.get(name, "")
+
+    def group(self, name):
+        return name in self.groups
 
     def owner(self, path):
         return self.owners.get(path, "")
@@ -254,6 +261,21 @@ class Planning(SystemTest):
             self.kinds(plan), [("demote", "kept"), ("remove", "gone"), ("install", "new"), ("explicit", "vim")]
         )
         self.assertEqual(plan.undeclared, ["loose"])
+
+    def test_a_declared_name_an_installed_package_provides_is_that_package(self):
+        write("base.conf", "quickshell\njack\nxorg\n")
+        machine = Machine(
+            explicit=["quickshell-git"],
+            dependencies=["pipewire-jack"],
+            provides={"quickshell": "quickshell-git", "jack": "pipewire-jack"},
+            groups=["xorg"],
+        )
+        plan = self.plan(machine)
+        self.assertEqual(self.kinds(plan), [("explicit", "pipewire-jack")])
+        self.assertEqual(
+            (plan.undeclared, [p.message for p in plan.problems]),
+            ([], ["xorg is a group, not a package: list its packages"]),
+        )
 
     def test_home_files(self):
         write("base.conf", "".join(f"file ~/{name}\n" for name in ("new", "same", "differs", "linked")))

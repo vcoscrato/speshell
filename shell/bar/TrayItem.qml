@@ -21,14 +21,22 @@ Item {
         || root.modelData.title
         || root.modelData.id
         || "System tray icon"
+    // The icon by name from the icon theme, and, when the app names a folder of its own
+    // (`?path=`), the file there, tried once the theme has no such icon.
+    readonly property string iconSource: root.modelData.icon ? root.modelData.icon.toString() : ""
     readonly property string iconPath: {
-        const icon = root.modelData.icon;
-        if (!icon)
-            return "";
-        const s = icon.toString();
-        const pi = s.indexOf("?path=");
-        return pi !== -1 ? s.substring(0, pi) : s;
+        const pi = root.iconSource.indexOf("?path=");
+        return pi !== -1 ? root.iconSource.substring(0, pi) : root.iconSource;
     }
+    readonly property string iconFile: {
+        const pi = root.iconSource.indexOf("?path=");
+        if (pi === -1)
+            return "";
+        const name = root.iconPath.substring(root.iconPath.lastIndexOf("/") + 1);
+        return "file://" + decodeURIComponent(root.iconSource.substring(pi + 6)) + "/" + name;
+    }
+    property bool themeMissing: false
+    onIconSourceChanged: root.themeMissing = false
 
     function activate() {
         if (root.modelData.onlyMenu && root.modelData.hasMenu)
@@ -73,10 +81,14 @@ Item {
             anchors.centerIn: parent
             width: Theme.iconSizeMedium
             height: Theme.iconSizeMedium
-            visible: root.iconPath !== ""
-            source: root.iconPath
+            visible: root.iconPath !== "" && status !== Image.Error
+            source: root.themeMissing ? root.iconFile : root.iconPath
             sourceSize: Qt.size(Theme.iconSizeMedium, Theme.iconSizeMedium)
             fillMode: Image.PreserveAspectFit
+            onStatusChanged: {
+                if (status === Image.Error && !root.themeMissing && root.iconFile !== "")
+                    root.themeMissing = true;
+            }
         }
 
         AppIcon {

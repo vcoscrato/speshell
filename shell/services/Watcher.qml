@@ -18,6 +18,9 @@ Process {
 
     function follow() {
         root.restartTimer.stop();
+        // From the attempt, so one that fails to start counts as stopping at once.
+        if (root.watching && !root.running)
+            root.startedAt = Date.now();
         root.running = root.watching;
     }
 
@@ -26,7 +29,6 @@ Process {
         root.follow();
     }
     Component.onCompleted: root.follow()
-    onStarted: root.startedAt = Date.now()
     onRunningChanged: {
         if (root.running || !root.watching)
             return;

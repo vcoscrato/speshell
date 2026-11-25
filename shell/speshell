@@ -26,12 +26,15 @@ fi
 # Prints the call's output. A frozen instance still accepts IPC connections but never
 # answers, so give up after a few seconds; that exits with status 124. An instance
 # without the target, as before its config loads, says so and exits 0; that is 3 here.
+# One without the function, or whose function takes other arguments, as one started
+# before an update, says so too; that is 4.
 ipc_try() {
   local output
   output="$(timeout 3 /usr/bin/quickshell ipc "${display_args[@]}" -p "$app_dir" call -- "$@" 2>/dev/null)" || return
-  if [[ "$output" == "Target not found." ]]; then
-    return 3
-  fi
+  case "$output" in
+    "Target not found.") return 3 ;;
+    "Function not found."|"Too few arguments"*|"Too many arguments"*) return 4 ;;
+  esac
   if [[ -n "$output" ]]; then
     printf '%s\n' "$output"
   fi
@@ -87,6 +90,10 @@ ipc_call() {
   ipc_try "$@" || status=$?
   if (( status == 0 )); then
     return 0
+  fi
+  if (( status == 4 )); then
+    printf 'speshell: the running Speshell has no %s %s as called; restart it if it predates an update\n' "$1" "${2:-}" >&2
+    return 1
   fi
   if (( status == 124 )); then
     # A busy instance may answer a moment later: ask it something harmless once more

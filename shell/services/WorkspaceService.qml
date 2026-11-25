@@ -48,8 +48,9 @@ Singleton {
 
         const byId = {};
         const focusOrder = {};
+        // Hyprland 0.57 gives special workspaces no id, and earlier ones a negative one.
         const add = (id, name, monitor) => {
-            if (byId[id] || id <= 0)
+            if (!(id > 0) || byId[id])
                 return;
             byId[id] = {
                 id: id,
@@ -89,7 +90,8 @@ Singleton {
     function readWindows(monitors, clients) {
         const shownSpecials = monitors.map(monitor => monitor.specialWorkspace ? monitor.specialWorkspace.name : "");
         return clients
-            .filter(client => client.mapped !== false && client.workspace && client.workspace.id !== -1)
+            .filter(client => client.mapped !== false && client.workspace
+                && (client.workspace.id > 0 || String(client.workspace.name || "").indexOf("special:") === 0))
             .sort((a, b) => (a.focusHistoryID ?? Infinity) - (b.focusHistoryID ?? Infinity))
             .map(client => {
                 const name = String(client.workspace.name || client.workspace.id);

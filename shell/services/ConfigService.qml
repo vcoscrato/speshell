@@ -12,7 +12,8 @@ import "Shell.js" as Shell
 Singleton {
     id: root
 
-    // "idle" before the first load, "loading", "valid", or "invalid".
+    // "idle" before the first load, "loading", "valid", or "invalid" (kept through the
+    // loads that follow, until one finds the file fixed).
     property string status: "idle"
     // The config.ini loaded: by section, as Config.js builds it. Null while it loads or
     // when it is invalid.
@@ -224,11 +225,16 @@ Singleton {
         command: Shell.script("config.sh", [Shell.localPath(Qt.resolvedUrl("../config.example.ini"))])
         stdout: StdioCollector { id: loaderOutput }
         stderr: StdioCollector { id: loaderErrors }
+        // While config.ini is invalid it stays so, its errors shown, until a load finds
+        // it fixed: a save that is still wrong leaves the error window as it was, behind
+        // the editor.
         onStarted: {
+            root.clearFeedback();
+            if (root.invalid)
+                return;
             root.status = "loading";
             root.config = null;
             root.errors = [];
-            root.clearFeedback();
         }
         onExited: exitCode => root.finishLoad(loaderOutput.text, exitCode, loaderErrors.text)
     }

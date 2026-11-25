@@ -411,7 +411,7 @@ Singleton {
     Timer {
         interval: 15000
         repeat: true
-        running: root.accessPoints.length > 0
+        running: root.accessPoints.some(point => root.nowMs - point.seenMs <= root.listMaxAgeMs)
         onTriggered: root.nowMs = Date.now()
     }
 }

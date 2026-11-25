@@ -143,8 +143,8 @@ def link_atomically(source, target):
 
 
 def linked(target, source):
-    """Whether TARGET is a link to SOURCE."""
-    return os.path.islink(target) and os.path.exists(target) and os.path.samefile(target, source)
+    """Whether TARGET is SOURCE: a link to it, or reached through a link to its directory."""
+    return os.path.exists(target) and os.path.samefile(target, source)
 
 
 def links_into_config(target):
@@ -289,8 +289,9 @@ class Config:
         if id in self.on:
             return
         if id in chain:
+            through = chain[chain.index(id) + 1 :]
             self.problem(
-                f"{id}.conf", 0, f"{id} brings itself in, through {' and '.join(chain[chain.index(id) + 1 :])}"
+                f"{id}.conf", 0, f"{id} brings itself in" + (f", through {' and '.join(through)}" if through else "")
             )
             return
         for name, _ in self.modules[id].uses:
@@ -405,12 +406,24 @@ class Machine:
             import pyalpm
         except ImportError:
             raise Stop("pyalpm is missing; install it with pacman -S pyalpm") from None
-        handle = pyalpm.Handle("/", "/var/lib/pacman")
-        self.installed = {package.name: package for package in handle.get_localdb().pkgcache}
+        self.pyalpm = pyalpm
+        self.db = pyalpm.Handle("/", "/var/lib/pacman").get_localdb()
+        self.installed = {package.name: package for package in self.db.pkgcache}
         self.explicit = {
             name for name, package in self.installed.items() if package.reason == pyalpm.PKG_REASON_EXPLICIT
         }
         self.owners = None
+
+    def provider(self, name):
+        """The installed package that is NAME or provides it, as an AUR package's -git does, or ""."""
+        if name in self.installed:
+            return name
+        package = self.pyalpm.find_satisfier(self.db.pkgcache, name)
+        return package.name if package else ""
+
+    def group(self, name):
+        """Whether installed packages belong to a group named NAME."""
+        return bool(self.db.read_grp(name))
 
     def owner(self, path):
         """The package that owns the file at PATH, or ""."""
@@ -427,7 +440,8 @@ class Machine:
             conf = Path("/etc/pacman.conf").read_text()
         except OSError:
             conf = ""
-        directories = re.findall(r"^\s*CacheDir\s*=\s*(.+?)\s*$", conf, re.M) or ["/var/cache/pacman/pkg"]
+        lines = re.findall(r"^\s*CacheDir\s*=\s*(.+?)\s*$", conf, re.M)
+        directories = [directory for line in lines for directory in line.split()] or ["/var/cache/pacman/pkg"]
         for directory in directories:
             for archive in Path(directory).glob(f"{name}-{package.version}-{package.arch}.pkg.tar*"):
                 if archive.suffix != ".sig":
@@ -601,9 +615,16 @@ class Plan:
 
     def plan_packages(self, removing):
         installed, explicit = self.machine.installed, self.machine.explicit
+        # What each declared name is installed as: itself, or a package that provides it.
+        self.present = {name: self.machine.provider(name) for name in self.wanted}
+        provided = {have: name for name, have in self.present.items() if have}
         for name in removing:
-            if name in self.wanted:
-                problem = f"{self.wanted[name]} declares {name}; speshell system remove {name} takes it out first"
+            if name in self.wanted or name in provided:
+                declared = name if name in self.wanted else provided[name]
+                problem = f"{self.wanted[declared]} declares {declared}" + (
+                    f", which {name} provides" if declared != name else ""
+                )
+                problem += f"; speshell system remove {declared} takes it out first"
             elif name not in installed:
                 problem = f"{name} is not installed"
             elif name not in explicit:
@@ -612,7 +633,7 @@ class Plan:
                 continue
             self.problems.append(Problem("", 0, f"--remove {name}: {problem}"))
         declared = set(self.state["packages"])
-        for name in sorted(explicit - self.wanted.keys()):
+        for name in sorted(explicit - self.wanted.keys() - provided.keys()):
             if name in declared or name in removing:
                 # A package another one needs stays as its dependency; the rest go, with
                 # what only they needed.
@@ -624,10 +645,13 @@ class Plan:
             else:
                 self.undeclared.append(name)
         for name, id in self.wanted.items():
-            if name not in installed:
+            have = self.present[name]
+            if not have and self.machine.group(name):
+                self.problems.append(Problem(f"{id}.conf", 0, f"{name} is a group, not a package: list its packages"))
+            elif not have:
                 self.add("install", name, id)
-            elif name not in explicit:
-                self.add("explicit", name, id)
+            elif have not in explicit:
+                self.add("explicit", have, id)
 
     def plan_files(self):
         for target, placed in self.files.items():
@@ -883,7 +907,7 @@ class Apply:
         if names:
             step(f"Marking {len(names)} as explicitly installed")
             run(["pacman", "-D", "--asexplicit", "--", *names], root=True)
-        self.state["packages"] = list(self.plan.wanted)
+        self.state["packages"] = list(dict.fromkeys([*self.plan.wanted, *filter(None, self.plan.present.values())]))
         save_state(self.state)
 
     def files(self):
@@ -941,7 +965,11 @@ class Apply:
                 record.update(size=stat.st_size, mtime=int(stat.st_mtime))
             elif not hidden(target):
                 continue
-            record["original"] = target in kept or bool(self.state["files"].get(target, {}).get("original"))
+            # A record from before originals were kept doesn't say whether its copy replaced one,
+            # and keeps not saying, so its file stays when its line goes.
+            previous = self.state["files"].get(target)
+            if target in kept or not previous or "original" in previous:
+                record["original"] = target in kept or bool(previous and previous.get("original"))
             files[target] = record
         self.state["files"] = files
         save_state(self.state)
@@ -1199,7 +1227,7 @@ def home_source(file):
     for id in config.on:
         for placed in config.modules[id].files:
             if placed.target == target and target.startswith(f"{HOME}/"):
-                if os.path.islink(target) or not os.path.isfile(target):
+                if linked(target, placed.source) or os.path.islink(target) or not os.path.isfile(target):
                     raise Stop(f"{shown(target)} is not a file of its own; there is nothing to adopt or restore")
                 return target, placed.source
     raise Stop(f"no module of {HOST} links {shown(target)}")

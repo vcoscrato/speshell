@@ -11,8 +11,16 @@ import qs.services
 Scope {
     id: root
 
+    // A lock the compositor refused or ended reads unlocked, with no signal but secure's.
+    function checkLock() {
+        if (LockService.locked && !sessionLock.locked)
+            LockService.lockFailed();
+    }
+
     WlSessionLock {
         id: sessionLock
+
+        onSecureChanged: root.checkLock()
 
         locked: LockService.locked
 
@@ -24,6 +32,8 @@ Scope {
                 wallpaper: ThemeService.shownWallpaper
                 failures: LockService.failures
                 footnote: HyprlandService.keyboardLayouts > 1 ? HyprlandService.keyboardLayout : ""
+                leaving: LockService.phase === "unlocking"
+                onDeparted: LockService.unlock()
 
                 Label {
                     role: "title"
@@ -60,6 +70,7 @@ Scope {
         function onLockedChanged() {
             if (!LockService.locked)
                 return;
+            Qt.callLater(root.checkLock);
             PanelService.dismiss();
             LauncherService.close();
             ThemeService.closeGallery();

@@ -110,7 +110,9 @@ Singleton {
     function entryOf(notification) {
         if (root.isInternal(notification))
             return null;
-        return WindowService.entryFor(notification.desktopEntry) ?? WindowService.entryFor(notification.appName);
+        const entry = WindowService.entryFor(notification.desktopEntry) ?? WindowService.entryFor(notification.appName);
+        // Speshell's tools notify as Speshell, which has no window to go to.
+        return entry && entry.id !== "speshell" ? entry : null;
     }
 
     // A click runs the default action, then brings the app's window forward, from the
