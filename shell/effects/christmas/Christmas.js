@@ -1,7 +1,7 @@
 .pragma library
 .import "common/Colors.js" as Colors
 
-// Natal's colors, from a theme (`theme` as Theme.qml names it).
+// Christmas's colors, from a theme (`theme` as Theme.qml names it).
 
 // Fresh snow, lit by the moon, and in shade.
 function snow(theme) {

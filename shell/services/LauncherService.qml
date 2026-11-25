@@ -8,7 +8,7 @@ import "BangProvider.js" as BangProvider
 import "Shell.js" as Shell
 
 // The launcher's state and results: apps, open windows and apps hidden in the tray,
-// themes, the calculator, bangs, web searches, its own commands (the theme gallery,
+// the calculator, bangs, web searches, its own commands (the theme gallery,
 // mirroring, applying and updating the system), and what activating each does. Launch
 // counts order the apps. Results are searched only while it shows.
 Singleton {
@@ -78,27 +78,6 @@ Singleton {
                 payload: { entry: entry }
             }
         })));
-    }
-
-    // The themes, as buildExtraIndex() items; one opens the gallery at it.
-    function themeItems() {
-        return ThemeService.themes.map(theme => ({
-            id: "theme:" + theme.id,
-            title: theme.name,
-            detail: "",
-            keywords: "theme " + theme.id + " " + theme.effects,
-            result: {
-                id: "theme:" + theme.id,
-                kind: "theme",
-                title: theme.name,
-                subtitle: theme.id === ThemeService.themeId ? "Theme in use" : theme.description || "Theme",
-                iconName: "palette",
-                iconSource: "",
-                badge: "THEME",
-                activatable: true,
-                payload: { theme: theme.id }
-            }
-        }));
     }
 
     function close() {
@@ -197,7 +176,7 @@ Singleton {
             return { id: command.id, title: command.title, keywords: command.bang + " " + command.keywords, result: command };
         });
         const apps = AppProvider.search(root.appIndex.concat(AppProvider.buildExtraIndex(
-            extras.concat(root.windowItems(), root.themeItems()))), trimmed, root.usage, 100);
+            extras.concat(root.windowItems()))), trimmed, root.usage, 100);
         root.results = apps.length === 0 && trimmed !== ""
             ? BangProvider.searchResult("?" + trimmed, root.launcherConfig)
             : apps;
@@ -270,10 +249,6 @@ Singleton {
         }
         if (result.kind === "command" && payload.command === "theme") {
             ThemeService.openGallery();
-            return true;
-        }
-        if (result.kind === "theme") {
-            ThemeService.openGallery("themes", payload.theme);
             return true;
         }
         // In a terminal, which stays for the result: `speshell system` asks as pacman and sudo do.

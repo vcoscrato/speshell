@@ -200,7 +200,7 @@ ModalWindow {
                 id: searchBox
                 large: true
                 iconName: "search"
-                placeholder: "Search apps and themes, calculate, ! for commands, ? for the web"
+                placeholder: "Search apps, calculate, ! for commands, ? for the web"
 
                 onTextChanged: {
                     LauncherService.setQuery(text);

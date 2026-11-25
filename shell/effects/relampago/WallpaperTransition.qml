@@ -2,10 +2,12 @@ import QtQuick
 import "common"
 import "Bolt.js" as Bolt
 
-// Relâmpago wallpaper transition: a cartoon bolt strikes down the screen, bursting
-// in a starburst where it lands, and splits the old wallpaper along its path; the
-// two halves race off to either side, their torn edges inked and glowing, speed
-// dashes streaming off them and embers spilling into the gap.
+// Relâmpago wallpaper transition: a fat cartoon bolt strikes down the screen, the
+// picture jolts through a two-tone impact frame and a flash, a starburst bursts
+// where it lands, and the old wallpaper splits along its path; arcs snap across the
+// gap as the two halves are flung off to either side, tipping outward, their torn
+// edges inked, scorched, and glowing, speed lines streaming off them and sparks
+// spilling into the gap.
 WallpaperStage {
     id: root
 
@@ -16,8 +18,8 @@ WallpaperStage {
 
     // The bolt's path, its forks, and its embers, worked out once (WallpaperTransition.tear.frag):
     // a texel for each row of the screen and one past it, and room for the 4 forks
-    // and 32 embers.
-    readonly property int columns: Math.max(Math.ceil(height) + 2, 4 + 2 * 32)
+    // and 32 embers, two texels each.
+    readonly property int columns: Math.max(Math.ceil(height) + 2, 2 * 4 + 2 * 32)
     // How far the halves have split, and the gap between them, as the shader has them.
     readonly property real split: Math.max(0, Math.min(1, (progress - 0.16) / 0.84))
     readonly property real gap: width * 0.72 * Math.pow(split, 2.1)
@@ -46,7 +48,7 @@ WallpaperStage {
     // Which embers reach each band of 16 rows this frame (WallpaperTransition.embers.frag).
     ShaderEffect {
         id: embersPass
-        visible: root.split > 0 && root.split < 0.95
+        visible: root.split > 0 && root.split < 0.32
         width: root.bands
         height: 16
         blending: false

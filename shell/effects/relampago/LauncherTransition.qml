@@ -5,9 +5,10 @@ import "Bolt.js" as Bolt
 // Relâmpago launcher transition, drawn like a cartoon: the launcher races in from
 // the left, stretched by its speed, in a streak of glossy red with a bolt decal
 // through it, brakes hard, leaving skid marks and a shower of sparks, and squashes
-// to a stop with a comic starburst, in puffs of tire smoke, as lightning strikes all
-// around it. While open, speed dashes trail off behind it, electricity crackles
-// along its border, and now and then a bolt strikes it.
+// to a stop with a comic starburst, in puffs of tire smoke, as lightning strikes it
+// twice. While open, speed lines trail off behind it in gusts, electricity crackles
+// along its border, and now and then a bolt strikes it, bursting where it lands and
+// sending a charge racing round the border.
 // Closing, it squats, stretches, and tears away to the right on two trails of fire.
 LauncherStage {
     id: root
@@ -32,7 +33,12 @@ LauncherStage {
     property real fireAge: -1                  // s since it tore away; < 0 before
     property real sparkOwed: 0
     property bool primed: false
-    property real nextStrike: 1.2              // s until lightning strikes the open panel
+    property real nextStrike: 1.6              // s until lightning strikes the open panel
+    // The last two bolts to strike the border: where, s since they landed (< 0
+    // before, long past at first), and a seed; strikes take turns between them.
+    property vector4d hitA: Qt.vector4d(0, 0, 9, 0)
+    property vector4d hitB: Qt.vector4d(0, 0, 9, 0)
+    property bool hitTurn: false
     // Whether it had stopped, and was leaving, as of the last step.
     property bool wasStopped: false
     property bool wasLeaving: false
@@ -81,6 +87,10 @@ LauncherStage {
             root.skidAge += dt;
         if (root.fireAge >= 0)
             root.fireAge += dt;
+        if (root.hitA.z < 1)
+            root.hitA = Qt.vector4d(root.hitA.x, root.hitA.y, root.hitA.z + dt, root.hitA.w);
+        if (root.hitB.z < 1)
+            root.hitB = Qt.vector4d(root.hitB.x, root.hitB.y, root.hitB.z + dt, root.hitB.w);
         // Sparks off the rear while braking hard.
         if (root.leave === 0 && root.enter < root.arriveEnd && x > -320) {
             root.sparkOwed += Math.abs(v) * dt;
@@ -95,7 +105,7 @@ LauncherStage {
         if (root.active && root.enter >= 1 && root.leave === 0) {
             root.nextStrike -= dt;
             if (root.nextStrike <= 0) {
-                root.nextStrike = bits.rnd(0.9, 2.2);
+                root.nextStrike = bits.rnd(2.2, 4.2);
                 root.strikeBorder(0);
             }
         }
@@ -113,13 +123,13 @@ LauncherStage {
         root.stretchVel -= 4.5;
         const x0 = root.panelRect.x, w = root.panelRect.width;
         for (let i = 0; i < 6; i++)
-            bits.emit(bits.smoke, { x: x0 + w * bits.rnd(0.05, 0.3), y: root.floorY + bits.rnd(0, 12),
-                                    vx: bits.rnd(-90, -20), vy: bits.rnd(-50, -10), drag: 1.5,
-                                    life: bits.rnd(0.9, 1.3), size: Math.round(bits.rnd(64, 104)), delay: i * 0.03 });
+            bits.emit(bits.smoke, { x: x0 + w * bits.rnd(-0.08, 0.06), y: root.floorY + bits.rnd(8, 18),
+                                    vx: bits.rnd(-220, -80), vy: bits.rnd(-45, -10), drag: 1.8,
+                                    life: bits.rnd(1.0, 1.4), size: Math.round(bits.rnd(70, 120)), delay: i * 0.035 });
         for (let i = 0; i < 4; i++)
-            bits.emit(bits.smoke, { x: x0 + w * bits.rnd(0.72, 0.92), y: root.floorY + bits.rnd(0, 10),
-                                    vx: bits.rnd(-30, 50), vy: bits.rnd(-40, -10), drag: 1.5,
-                                    life: bits.rnd(0.7, 1.0), size: Math.round(bits.rnd(48, 76)), delay: 0.04 + i * 0.03 });
+            bits.emit(bits.smoke, { x: x0 + w * bits.rnd(0.9, 1.04), y: root.floorY + bits.rnd(8, 16),
+                                    vx: bits.rnd(50, 140), vy: bits.rnd(-40, -10), drag: 1.8,
+                                    life: bits.rnd(0.8, 1.1), size: Math.round(bits.rnd(50, 84)), delay: 0.05 + i * 0.04 });
         for (let i = 0; i < 10; i++)
             bits.emit(bits.spark, { x: x0 + w * bits.rnd(0.78, 0.95), y: root.floorY + 6, vx: bits.rnd(60, 320),
                                     vy: bits.rnd(-260, -60), gravity: 800, life: bits.rnd(0.35, 0.6),
@@ -128,30 +138,40 @@ LauncherStage {
         behind.emit(behind.star, { x: x0 + w + 6, y: root.floorY - root.panelRect.height * 0.35, life: 0.32,
                                    size: Math.round(Math.min(200, root.panelRect.height * 0.55)), angle: bits.rnd(0, 360) });
         bits.emit(bits.glint, { x: x0 + 18, y: root.panelRect.y + 6, life: 0.45, size: 30, delay: 0.12 });
-        // Lightning strikes it from all around as it stops.
-        for (let i = 0; i < 4; i++)
-            root.strikeBorder(0.03 + i * bits.rnd(0.05, 0.09));
+        // Lightning strikes it twice as it stops.
+        const left = Math.random() < 0.5;
+        root.strikeBorder(0.04, left ? -0.08 : 0.55, left ? 0.45 : 1.08);
+        root.strikeBorder(bits.rnd(0.18, 0.26), left ? 0.55 : -0.08, left ? 1.08 : 0.45);
     }
 
-    // A bolt striking a random point of the panel's border from outside, mostly from
-    // above, after `delay` s.
-    function strikeBorder(delay) {
-        let r = root.panelRect, side = Math.random(), x, y, angle;
-        if (side < 0.5) {
-            x = r.x + r.width * bits.rnd(0.1, 0.9); y = r.y; angle = 0;
-        } else if (side < 0.7) {
-            x = r.x; y = r.y + r.height * bits.rnd(0.15, 0.85); angle = -90;
-        } else if (side < 0.9) {
-            x = r.x + r.width; y = r.y + r.height * bits.rnd(0.15, 0.85); angle = 90;
-        } else {
-            x = r.x + r.width * bits.rnd(0.1, 0.9); y = r.y + r.height; angle = 180;
+    // A bolt striking down from the sky onto a random point along the panel's top,
+    // or a top corner, after `delay` s. It lands bare, and the track draws where it hits.
+    function strikeBorder(delay, from, to) {
+        const r = root.panelRect, k = root.panelRadius * 0.29;
+        const f = bits.rnd(from === undefined ? -0.08 : from, to === undefined ? 1.08 : to);
+        // Past either end of the top it lands on the corner's curve, slanting in from that side.
+        const x = r.x + Math.max(k, Math.min(r.width - k, r.width * f));
+        const y = r.y + (f < 0 || f > 1 ? k : 0);
+        const angle = (f < 0 ? -30 : f > 1 ? 30 : 0) + bits.rnd(-18, 18);
+        const life = bits.rnd(0.5, 0.62);
+        bits.emit(bits.bareStrike, { x: x, y: y, life: life, size: Math.round(bits.rnd(520, 720)),
+                                     angle: angle, delay: delay });
+        // It lands a few hundredths of a second into its life.
+        const land = delay + life * 0.07;
+        const hit = Qt.vector4d(x, y, -land, Math.random());
+        if (root.hitTurn)
+            root.hitB = hit;
+        else
+            root.hitA = hit;
+        root.hitTurn = !root.hitTurn;
+        const out = angle * Math.PI / 180;
+        for (let i = 0; i < 4; i++) {
+            const a = out - Math.PI / 2 + bits.rnd(-1.1, 1.1);
+            const v = bits.rnd(120, 260);
+            bits.emit(bits.spark, { x: x, y: y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, gravity: 700,
+                                    life: bits.rnd(0.3, 0.5), size: Math.round(bits.rnd(16, 24)), orient: true,
+                                    delay: land });
         }
-        bits.emit(bits.strike, { x: x, y: y, life: bits.rnd(0.4, 0.55), size: Math.round(bits.rnd(260, 440)),
-                                 angle: angle + bits.rnd(-25, 25), delay: delay });
-        for (let i = 0; i < 3; i++)
-            bits.emit(bits.spark, { x: x, y: y, vx: bits.rnd(-200, 200), vy: bits.rnd(-220, 40), gravity: 700,
-                                    life: bits.rnd(0.25, 0.45), size: Math.round(bits.rnd(16, 24)), orient: true,
-                                    delay: delay + 0.04 });
     }
 
     // Tore away: a burnout, smoke and sparks flung back off the rear.
@@ -168,17 +188,17 @@ LauncherStage {
                                     gravity: 800, life: bits.rnd(0.3, 0.5), size: Math.round(bits.rnd(18, 26)), orient: true });
     }
 
-    // ── Around the panel: speed lines, crackle, skid marks, and fire ──
+    // ── Around the panel: speed lines, crackle, strikes, skid marks, and fire ──
     // Over the whole screen while it races; once it stands, only round the panel and
     // the dashes trailing behind it, which fade out within 700 px.
     ShaderEffect {
         readonly property bool standing: root.leave === 0 && calm >= 1
         readonly property real fromX: Math.max(0, root.panelRect.x - 700)
         x: standing ? fromX : 0
-        y: standing ? root.panelRect.y - 30 : 0
-        width: standing ? root.panelRect.x + root.panelRect.width + 30 - fromX : root.width
-        height: standing ? root.panelRect.height + 60 : root.height
-        visible: lines > 0 || skid > 0 || fire > 0
+        y: standing ? root.panelRect.y - 50 : 0
+        width: standing ? root.panelRect.x + root.panelRect.width + 50 - fromX : root.width
+        height: standing ? root.panelRect.height + 100 : root.height
+        visible: lines > 0 || skid > 0 || fire > 0 || root.hitA.z < 0.75 || root.hitB.z < 0.75
         property point offset: Qt.point(x, y)
         property size resolution: Qt.size(width, height)
         property real screenWidth: root.width
@@ -197,6 +217,8 @@ LauncherStage {
         property real fire: root.fireAge < 0 ? 0 : Math.max(0, Math.min(1, 1 - (root.fireAge - 0.18) / 0.42))
         property point fireSpan: Qt.point(root.panelRect.x + root.panelRect.width * 0.2, root.rear)
         property real trackY: root.floorY
+        property vector4d hitA: root.hitA
+        property vector4d hitB: root.hitB
         property color cLine: root.theme.text
         property color cCore: Bolt.core(root.theme)
         property color cGlow: Bolt.glow(root.theme)

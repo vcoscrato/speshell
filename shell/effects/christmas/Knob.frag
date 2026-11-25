@@ -1,6 +1,6 @@
 #version 440
 #extension GL_GOOGLE_include_directive : enable
-// Natal's knob: a glass bauble, cel-shaded round under one light, a crimped metal
+// Christmas's knob: a glass bauble, cel-shaded round under one light, a crimped metal
 // cap on its neck and a gilt band round its middle set with garnets, all rolling
 // with its travel while the light and the window's sheen stay put. On a slider, the
 // filled track behind it is a dark ribbon strung with fairy lights: a green wire from

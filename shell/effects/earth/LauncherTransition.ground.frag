@@ -1,60 +1,75 @@
 #version 440
 #extension GL_GOOGLE_include_directive : enable
 // A crack along the ground line, rock chips flung from it, and cel-shaded dust
-// puffs billowing along it.
-layout(location = 0) in vec2 qt_TexCoord0;
+// puffs billowing along it. The chips are boxes of their own after the band of the
+// crack and dust in the same mesh (LauncherTransition.ground.vert), which places the
+// puffs too.
+layout(location = 0) in vec4 v;
+layout(location = 1) in vec4 d0;
+layout(location = 2) in vec4 d1;
+layout(location = 3) in vec4 d2;
+layout(location = 4) in vec4 d3;
+layout(location = 5) in vec4 d4;
+layout(location = 6) in vec4 d5;
+layout(location = 7) in vec4 d6;
 layout(location = 0) out vec4 fragColor;
-layout(std140, binding = 0) uniform buf {
-    mat4 qt_Matrix;
-    float qt_Opacity;
-    vec2 resolution;
-    vec2 offset;       // px, this item's top-left on screen
-    vec2 origin;       // px, crack center on the ground line
-    float crackLen;    // px, half length
-    float crackOpen;   // 0..1
-    float burst;       // s since the debris burst (< 0 before)
-    float dust;        // 0..1 dust puff progress
-    float spread;      // px, half width the dust spans
-    vec4 cDust;
-    vec4 cDustShade;
-    vec4 cRock;
-    vec4 cDark;
-} u;
-#include "../common/common.glsl"
+#include "LauncherTransition.ground.glsl"
+
+// Puff `c` (center and radius) at p: its coverage and, lit from above, its shade.
+// Its lumpy cauliflower outline, from two noise octaves, reaches at most 0.32 of its
+// radius past the circle: a pixel well clear of that skips it.
+void addPuff(vec2 p, vec3 c, float fi, float grow, inout float cover_, inout float shade) {
+    vec2 rel = p - c.xy;
+    float r = c.z;
+    if (dot(rel, rel) > pow(r * 1.32 + 4.0, 2.0))
+        return;
+    float ang = atan(rel.y, rel.x);
+    float lumps = (vnoise(vec2(ang * 2.2 + fi * 7.0, grow)) - 0.5) * 0.45 * r
+                + (vnoise(vec2(ang * 6.0 + fi * 3.0, 0.0)) - 0.5) * 0.18 * r;
+    float d = length(rel) - r - lumps;
+    float k = cover(-d);
+    cover_ = max(cover_, k);
+    // The lower part of each puff is in shade.
+    shade = max(shade, k * cover(rel.y - r * 0.2));
+}
+
+// A rock chip: a cut stone, lit on top, outlined.
+vec4 rockChip(vec2 p) {
+    float ang = d0.z;
+    vec2 lp = mat2(cos(ang), -sin(ang), sin(ang), cos(ang)) * (p - d0.xy);
+    float size = d0.w;
+    float d = max(max(abs(lp.x) - size, abs(lp.y) - size * 0.7), (lp.x + lp.y) * 0.75 - size * 0.55);
+    float chip = cover(-d) * v.w;
+    float rim = cover(-d + 1.5) * v.w;
+    vec3 col = mix(u.cDark.rgb * rim, lp.y < 0.0 ? u.cDust.rgb : u.cRock.rgb, chip);
+    return vec4(col, rim);
+}
 
 void main() {
-    vec2 p = u.offset + qt_TexCoord0 * u.resolution;
+    vec2 p = v.xy;
+    if (v.z > 0.5) {
+        fragColor = rockChip(p) * u.qt_Opacity;
+        return;
+    }
     vec3 col = vec3(0.0);
     float a = 0.0;
 
     // Dust: puffs along the ground that swell, rise a little, and thin out.
     if (u.dust > 0.0 && u.dust < 1.0) {
         float cover_ = 0.0, shade = 0.0;
-        for (int i = 0; i < 9; i++) {
-            float fi = float(i);
-            float x = u.origin.x + (fi / 8.0 - 0.5) * 2.0 * u.spread + (hash(vec2(fi, 4.0)) - 0.5) * 60.0;
-            float grow = 1.0 - pow(1.0 - u.dust, 2.5);
-            float r = mix(8.0, 20.0 + 26.0 * hash(vec2(fi, 5.0)), grow);
-            vec2 cp = vec2(x + (x - u.origin.x) * 0.35 * grow, u.origin.y - r * 0.4 - 46.0 * grow * hash(vec2(fi, 6.0)));
-            // Lumpy cauliflower outline from two noise octaves, which reach at most
-            // 0.32 r past the circle: a pixel well clear of that skips the puff.
-            vec2 rel = p - cp;
-            if (dot(rel, rel) > pow(r * 1.32 + 4.0, 2.0))
-                continue;
-            float ang = atan(rel.y, rel.x);
-            float lumps = (vnoise(vec2(ang * 2.2 + fi * 7.0, grow)) - 0.5) * 0.45 * r
-                        + (vnoise(vec2(ang * 6.0 + fi * 3.0, 0.0)) - 0.5) * 0.18 * r;
-            float d = length(rel) - r - lumps;
-            float k = cover(-d);
-            cover_ = max(cover_, k);
-            // Lit from above: the lower part of each puff is in shade.
-            shade = max(shade, k * cover(rel.y - r * 0.2));
-        }
+        float grow = grown();
+        addPuff(p, d0.xyz, 0.0, grow, cover_, shade);
+        addPuff(p, vec3(d0.w, d1.xy), 1.0, grow, cover_, shade);
+        addPuff(p, vec3(d1.zw, d2.x), 2.0, grow, cover_, shade);
+        addPuff(p, d2.yzw, 3.0, grow, cover_, shade);
+        addPuff(p, d3.xyz, 4.0, grow, cover_, shade);
+        addPuff(p, vec3(d3.w, d4.xy), 5.0, grow, cover_, shade);
+        addPuff(p, vec3(d4.zw, d5.x), 6.0, grow, cover_, shade);
+        addPuff(p, d5.yzw, 7.0, grow, cover_, shade);
+        addPuff(p, d6.xyz, 8.0, grow, cover_, shade);
         float thin = 1.0 - smoothstep(0.3, 0.75, u.dust);
-        float dustA = cover_ * thin * 0.55;
-        col = mix(u.cDust.rgb, u.cDustShade.rgb, shade);
-        a = dustA;
-        col *= a;
+        a = cover_ * thin * 0.55;
+        col = mix(u.cDust.rgb, u.cDustShade.rgb, shade) * a;
     }
 
     // Crack: a jagged dark seam with a pale lip, which strays at most 16 px from the
@@ -72,30 +87,6 @@ void main() {
         a = max(a, lip * 0.8);
         col = mix(col, u.cDark.rgb, seam);
         a = max(a, seam);
-    }
-
-    // Rock chips: flung up from the crack, tumbling under gravity.
-    if (u.burst > 0.0 && u.burst < 1.2) {
-        for (int i = 0; i < 14; i++) {
-            float fi = float(i);
-            vec2 h = hash2(vec2(fi, 9.0));
-            vec2 start = vec2(u.origin.x + (h.x - 0.5) * 1.6 * u.crackLen, u.origin.y);
-            vec2 vel = vec2((h.x - 0.5) * 420.0, -380.0 - 260.0 * h.y);
-            vec2 pos = start + vel * u.burst + vec2(0.0, 1400.0) * u.burst * u.burst * 0.5;
-            // A chip reaches at most 1.3 times its size (at most 12 px) from its middle.
-            if (dot(p - pos, p - pos) > 400.0)
-                continue;
-            float ang = u.burst * (h.y - 0.5) * 16.0;
-            vec2 lp = mat2(cos(ang), -sin(ang), sin(ang), cos(ang)) * (p - pos);
-            float size = 4.0 + 8.0 * hash(vec2(fi, 11.0));
-            float d = max(max(abs(lp.x) - size, abs(lp.y) - size * 0.7), (lp.x + lp.y) * 0.75 - size * 0.55);
-            float fade = 1.0 - smoothstep(0.8, 1.2, u.burst);
-            float chip = cover(-d) * fade;
-            float rim = cover(-d + 1.5) * fade;
-            col = mix(col, u.cDark.rgb, rim);
-            col = mix(col, lp.y < 0.0 ? u.cDust.rgb : u.cRock.rgb, chip);
-            a = max(a, rim);
-        }
     }
     fragColor = vec4(col, a) * u.qt_Opacity;
 }

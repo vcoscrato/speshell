@@ -1,6 +1,6 @@
 #version 440
 #extension GL_GOOGLE_include_directive : enable
-// Natal backdrop, drawn once over a surface's base color: a winter pine night. The top
+// Christmas backdrop, drawn once over a surface's base color: a winter pine night. The top
 // is plain night; lower down the sky steps a little lighter toward a far snowfield, where
 // small firs stand in stands and gaps. Below where a panel's controls sit, larger firs,
 // each its own, carry snow on every tier, lit on the moon's side, and a snow bank with a

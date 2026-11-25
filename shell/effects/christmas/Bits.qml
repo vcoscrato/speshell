@@ -1,9 +1,9 @@
 import QtQuick
 import "common/Colors.js" as Colors
 import "common"
-import "Natal.js" as Natal
+import "Christmas.js" as Christmas
 
-// Natal's particles: glints, snowflakes that grow and break, tiny flakes, and a warm
+// Christmas's particles: glints, snowflakes that grow and break, tiny flakes, and a warm
 // bloom of fairy lights, each a small shader drawn by its age. See Bits.frag.
 Particles {
     id: root
@@ -22,12 +22,12 @@ Particles {
             property real kind: 0
             property real turn: 0
             property real size: width
-            property color cSnow: Natal.snow(root.theme)
-            property color cIce: Natal.ice(root.theme)
-            property color cShade: Natal.pineDeep(root.theme)
+            property color cSnow: Christmas.snow(root.theme)
+            property color cIce: Christmas.ice(root.theme)
+            property color cShade: Christmas.pineDeep(root.theme)
             property color cSheen: root.theme.text
-            property color cGlow: Natal.glow(root.theme)
-            property color cGold: Natal.gold(root.theme)
+            property color cGlow: Christmas.glow(root.theme)
+            property color cGold: Christmas.gold(root.theme)
             fragmentShader: Qt.resolvedUrl("qsb/Bits.qsb")
         }
     }

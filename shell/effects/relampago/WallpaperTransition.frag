@@ -1,11 +1,14 @@
 #version 440
 #extension GL_GOOGLE_include_directive : enable
-// The old wallpaper split by lightning, like a cartoon. A bold bolt, outlined in
-// rubber, strikes down the screen in big zigzags, everything flashes, and a comic
-// starburst bursts where it lands; then the image tears apart along the bolt's path
-// and the two halves race off to either side, crisp, their torn edges inked and
-// glowing hot and cooling, speed dashes streaming off them and embers spilling into
-// the gap where the new wallpaper shows.
+// The old wallpaper split by lightning, like a cartoon. A fat bolt, outlined in
+// rubber and banded from a white-hot core through yellow to orange, strikes down the
+// screen in jagged zigzags, forking; for an instant the picture turns to a two-tone
+// impact frame, then flashes and shakes, and a comic starburst bursts where it lands.
+// The image tears apart along the bolt's path, arcs of electricity snapping across the
+// widening gap, and the two halves are flung off to either side, tipping outward
+// about their bottom corners, crisp: their torn edges inked, scorched, and glowing
+// hot and cooling, speed lines streaming off them and sparks spilling into the gap
+// where the new wallpaper shows.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {
@@ -28,7 +31,8 @@ layout(binding = 3) uniform sampler2D embers;   // WallpaperTransition.embers.fr
 #include "../common/common.glsl"
 #include "Tear.glsl"
 
-const float STRIKE = 0.1;       // the bolt reaching the bottom
+const float STRIKE = 0.08;      // the bolt reaching the bottom
+const float IMPACT = 0.06;      // how long the impact frame holds after it
 const float SPLIT = 0.16;       // the halves starting to move
 
 // Where the bolt crosses height y (px), from its table: exact at each row's middle,
@@ -76,81 +80,131 @@ void main() {
     vec2 p = qt_TexCoord0 * u.resolution;
     float t = u.progress;
     float W = u.resolution.x, H = u.resolution.y;
-    float tx = tearX(p.y);
-    float slope = tearX(p.y + 1.0) - tx;
-    float norm = 1.0 / sqrt(1.0 + slope * slope);
     float s = span(t, SPLIT, 1.0);
     float gap = W * 0.72 * pow(s, 2.1);
+    float tilt = 0.12 * pow(s, 1.6);
     float heat = 1.0 - span(t, 0.3, 0.95);
+    // The jolt of the strike, dying away as the halves start to move.
+    float jolt = exp(-max(t - STRIKE, 0.0) * 28.0) * step(STRIKE, t);
+    vec2 shake = 9.0 * jolt * vec2(sin(t * 260.0), cos(t * 190.0 + 1.0));
+    float tx = tearX(p.y);
 
-    // Each half, sampled crisp: inked along its torn edge, and inside the ink a band
-    // of heat that narrows and cools from white-hot to red.
     vec4 col = vec4(0.0);
+    // ── Arcs of electricity snapping across the gap as it opens, under the halves,
+    //    which cover their ends ──
+    if (s > 0.0 && s < 0.4) {
+        float flick = floor(t * 1.15 * 22.0);
+        for (int i = 0; i < 3; i++) {
+            float fi = float(i);
+            float y0 = H * (0.18 + 0.3 * fi + 0.12 * hash(vec2(fi, u.seed * 31.0)));
+            if (abs(p.y - y0) > 46.0 || abs(p.x - tx) > gap + 60.0)
+                continue;
+            float x = p.x - tx;
+            float f = clamp(x / (gap + 60.0) * 0.5 + 0.5, 0.0, 1.0);
+            #define ARC(x) (y0 - 18.0 * sin(PI * f) + 26.0 * zig((x) / 31.0, flick + fi * 7.0) * sin(PI * f) \
+                + 7.0 * zig((x) / 9.0, flick + fi * 7.0 + 3.0))
+            float ay = ARC(x);
+            float ay2 = ARC(x + 1.0);
+            #undef ARC
+            float d = abs(p.y - ay) / sqrt(1.0 + (ay2 - ay) * (ay2 - ay));
+            float on = step(0.25, hash(vec2(flick, fi + 5.0))) * (1.0 - smoothstep(0.25, 0.4, s));
+            float w = 1.6 * (1.0 - s * 2.0);
+            col = over(col, u.cRubber.rgb, cover(w + 2.5 - d) * on);
+            col = over(col, u.cGlow.rgb, cover(w + 1.2 - d) * on);
+            col = over(col, u.cCore.rgb, cover(w - d) * on);
+        }
+    }
+
+    // ── Each half, flung out and tipping about its bottom outer corner, sampled
+    //    crisp: inked along its torn edge, scorched inside the ink, and inside that a
+    //    band of heat that narrows and cools from white-hot to red ──
     for (int side = 0; side < 2; side++) {
         float dir = side == 0 ? -1.0 : 1.0;
-        vec2 src = p - vec2(dir * gap, 0.0);
-        float own = (side == 0 ? tx - src.x : src.x - tx) * norm;   // px inside, < 0 past its edge
+        vec2 pivot = vec2(side == 0 ? 0.0 : W, H);
+        vec2 src = pivot + rot(p - vec2(dir * gap, 0.0) - shake - pivot, -dir * tilt);
+        float ex = tearX(src.y);
+        float slope = tearX(src.y + 1.0) - ex;
+        float own = (side == 0 ? ex - src.x : src.x - ex) / sqrt(1.0 + slope * slope);  // px inside, < 0 past its edge
         if (own > -2.0) {
-            vec4 half_ = texture(source, src / u.resolution) * cover(own);
+            vec2 uv = clamp(src / u.resolution, vec2(0.0), vec2(1.0));
+            vec4 half_ = texture(source, uv) * cover(own);
             if (s > 0.0) {
                 float ink = 2.5 * smoothstep(0.0, 0.05, s);
-                float hw = ink + 9.0 * heat;
+                float soot = 1.0 - smoothstep(0.0, 12.0 + 22.0 * vnoise(vec2(src.y / 23.0, float(side) * 9.0)), own - ink);
+                half_.rgb = mix(half_.rgb, u.cRubber.rgb * half_.a, soot * 0.55 * smoothstep(0.0, 0.08, s));
+                float hw = ink + 10.0 * heat;
                 vec3 hot = mix(u.cPaint.rgb, u.cEdge.rgb, band(heat, 0.35));
-                hot = mix(hot, u.cGlow.rgb, band(heat, 0.6) * (1.0 - band(own, ink + 4.0 * heat)));
-                hot = mix(hot, u.cCore.rgb, band(heat, 0.8) * (1.0 - band(own, ink + 1.5 * heat)));
+                hot = mix(hot, u.cGlow.rgb, band(heat, 0.6) * (1.0 - band(own, ink + 4.5 * heat)));
+                hot = mix(hot, u.cCore.rgb, band(heat, 0.8) * (1.0 - band(own, ink + 1.8 * heat)));
                 half_.rgb = mix(half_.rgb, hot * half_.a, cover(hw - own) * step(0.02, heat));
                 half_.rgb = mix(half_.rgb, u.cRubber.rgb * half_.a, cover(ink - own));
             }
             col = half_ + col * (1.0 - half_.a);
         }
-        // Speed dashes streaming off the edge, back the way it came.
-        if (own < 0.0 && s > 0.0 && heat > 0.0) {
-            float rowH = 22.0;
-            float row = floor(p.y / rowH);
+        // Speed lines streaming off the edge into the gap as it is flung, back the way
+        // it came, each tapering from its head at the edge to a point, gone within
+        // about a fifth of a second so the new wallpaper is left clean.
+        float burst = 1.0 - smoothstep(0.08, 0.2, s);
+        if (own < 0.0 && s > 0.0 && burst > 0.0) {
+            float rowH = 30.0;
+            float row = floor(src.y / rowH);
             vec3 h = vec3(hash(vec2(row, 7.0 + float(side))), hash(vec2(row, 9.0 + float(side))),
                           hash(vec2(row, 11.0 + float(side))));
-            if (h.x < 0.22) {
-                float back = -own;
-                float len = (30.0 + gap * 0.18) * mix(0.4, 1.0, h.y) * heat;
-                float w = mix(2.0, 4.0, h.z) * sqrt(heat);
-                float cy = (row + 0.5) * rowH;
-                float d = length(vec2(max(0.0, max(w + 6.0 - back, back - len)), p.y - cy)) - w;
-                vec3 dc = h.z < 0.4 ? u.cGlow.rgb : h.z < 0.75 ? u.cEdge.rgb : u.cPaint.rgb;
+            if (h.x < 0.32) {
+                // Hugging the edge, and longer the faster it goes.
+                float back = -own - 2.0;
+                float len = (30.0 + 260.0 * s) * mix(0.4, 1.0, h.y) * burst;
+                float w = mix(1.6, 3.2, h.z) * burst;
+                float cy = (row + 0.5 + 0.4 * (h.y - 0.5)) * rowH;
+                float taper = mix(1.0, 0.12, clamp(back / max(len, 1.0), 0.0, 1.0));
+                float d = length(vec2(back - clamp(back, 0.0, len), src.y - cy)) - w * taper;
+                vec3 dc = h.z < 0.55 ? u.cGlow.rgb : u.cEdge.rgb;
                 vec4 dsh = over(vec4(0.0), u.cRubber.rgb, cover(1.5 - d));
                 dsh = over(dsh, dc, cover(-d));
-                col = dsh * smoothstep(0.0, 0.3, heat) * (1.0 - col.a) + col;
+                col = dsh * (1.0 - col.a) + col;
             }
         }
     }
 
-    // Embers spilling into the gap, carried apart and falling.
-    // Embers stay within the gap's reach of the tear, so most pixels skip them.
-    if (s > 0.0 && s < 0.95 && abs(p.x - tx) < gap + 0.3 * W) {
+    // ── Sparks spilling into the gap, carried apart and falling, each a fat
+    //    teardrop along its flight. They stay within the gap's reach of the tear,
+    //    so most pixels skip them ──
+    if (s > 0.0 && s < 0.32 && abs(p.x - tx) < gap + 0.3 * W) {
         float bx = (floor(p.y / BAND) + 0.5) / u.bands;
         for (int i = 0; i < SLOTS; i++) {
             vec4 e = texture(embers, vec2(bx, (float(2 * i) + 0.5) / float(2 * SLOTS)));
             if (e.z < 0.0)
                 break;
-            if (abs(p.y - e.y) > 6.0)
+            if (abs(p.y - e.y) > REACH)
                 continue;
-            vec2 ep = e.xy;
-            vec2 lt = texture(embers, vec2(bx, (float(2 * i) + 1.5) / float(2 * SLOTS))).xy;
-            float life = lt.x;
+            vec4 lt = texture(embers, vec2(bx, (float(2 * i) + 1.5) / float(2 * SLOTS)));
             float r = e.z;
-            float d = length(p - ep);
+            vec2 tail = e.xy - lt.zw * r * 3.6;
+            vec2 pa = p - tail, ba = e.xy - tail;
+            float k = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-4), 0.0, 1.0);
+            float d = length(pa - ba * k) - r * mix(0.15, 0.75, k * k);
             vec3 ec = mix(u.cEdge.rgb, u.cGlow.rgb, lt.y);
-            col = mix(col, vec4(u.cRubber.rgb, 1.0), cover(r + 1.2 - d) * life);
-            col = mix(col, vec4(ec, 1.0), cover(r - d) * life);
+            ec = mix(ec, u.cCore.rgb, step(0.8, k));
+            col = mix(col, vec4(u.cRubber.rgb, 1.0), cover(1.2 - d) * lt.x);
+            col = mix(col, vec4(ec, 1.0), cover(-d) * lt.x);
         }
     }
 
-    // The flash the bolt throws.
-    float flash = smoothstep(0.0, STRIKE, t) * (1.0 - smoothstep(STRIKE, 0.42, t));
-    col.rgb += u.cCore.rgb * col.a * 0.45 * flash * flash;
-    col.rgb = min(col.rgb, vec3(col.a));
+    // ── The impact frame: for an instant as it lands, the picture printed in comic
+    //    halftone, ink dots as big as it is dark on paper lit by the bolt; then a
+    //    flash that dies ──
+    if (t > STRIKE && t < STRIKE + IMPACT) {
+        float lum = dot(col.rgb, vec3(0.3, 0.55, 0.15)) / max(col.a, 1e-3);
+        vec2 q = rot(p, 0.785) / 9.0;
+        float r = 0.66 * sqrt(clamp(1.08 - lum * 1.25, 0.0, 1.0));
+        float dot_ = cover((r - length(fract(q) - 0.5)) * 9.0);
+        col.rgb = mix(mix(u.cGlow.rgb, u.cCore.rgb, 0.55), u.cRubber.rgb, dot_) * col.a;
+    }
+    float flash = step(STRIKE + IMPACT, t) * (1.0 - smoothstep(STRIKE + IMPACT, 0.22, t));
+    col.rgb = mix(col.rgb, u.cCore.rgb * col.a, 0.22 * flash);
 
-    // A comic starburst where it lands, popping out and shrinking away.
-    float kb = span(t, STRIKE * 0.85, 0.5);
+    // ── A comic starburst where it lands, popping out and shrinking away ──
+    float kb = span(t, STRIKE * 0.9, 0.5);
     if (kb > 0.0 && kb < 1.0) {
         float pk = clamp(kb / 0.25, 0.0, 1.0);
         float sc = (1.0 + 2.7 * pow(pk - 1.0, 3.0) + 1.7 * pow(pk - 1.0, 2.0)) * (1.0 - smoothstep(0.5, 1.0, kb));
@@ -168,28 +222,53 @@ void main() {
         }
     }
 
-    // The bolt, striking down, holding, and blinking out.
-    float on = (1.0 - step(0.45, t)) * (step(t, 0.3) + step(0.5, fract((t - 0.3) / 0.15 * 2.0 + 0.25)));
+    // ── The bolt, striking down, holding, and blinking out: fat and tapering,
+    //    banded from a white-hot core through yellow to an orange edge inside its
+    //    ink, in a glow of two flat rings; jagged forks splay off it ──
+    float on = (1.0 - step(0.45, t)) * max(step(t, 0.3), step(0.5, fract((t - 0.3) / 0.15 * 2.0 + 0.25)));
     float tip = H * min(1.0, t / STRIKE);
-    if (on > 0.0 && p.y < tip + 12.0) {
-        float w = mix(13.0, 6.0, p.y / H) * (1.0 - 0.6 * s);
-        float d = abs(p.x - tx) * norm - w;
-        // Forks running off its corners, straight and pointed.
-        for (int i = 0; i < FORKS; i++) {
-            vec4 fork = traits(float(i));
-            float len = fork.z;
-            float side = fork.w;
-            vec2 a = fork.xy;
-            vec2 m = a + vec2(side * len * 0.55, len * 0.5);
-            vec2 b = m + vec2(-side * len * 0.15, len * 0.5);
-            float f = clamp((p.y - a.y) / len, 0.0, 1.0);
-            d = min(d, min(sdSeg(p, a, m), sdSeg(p, m, b)) - mix(3.5, 0.5, f));
+    if (on > 0.0 && p.y < tip + 30.0 && abs(p.x - tx) < 320.0) {
+        // The path as straight runs between rows 24 px apart, near enough to it under
+        // the stroke, and exact round its corners, where a row's slope is not.
+        float y0 = floor(p.y / 24.0) * 24.0 - 72.0;
+        vec2 prev = vec2(texture(tear, vec2((max(y0, 0.0) + 0.5) / u.columns, 0.25)).x, y0);
+        float dm = 1e5;
+        for (int k = 1; k <= 7; k++) {
+            float yk = y0 + float(k) * 24.0;
+            vec2 cur = vec2(texture(tear, vec2((clamp(yk, 0.0, H) + 0.5) / u.columns, 0.25)).x, yk);
+            dm = min(dm, sdSeg(p, prev, cur));
+            prev = cur;
+        }
+        float w = mix(22.0, 9.0, p.y / H) * (1.0 - 0.55 * s);
+        float d = dm - w;
+        float wb = w;
+        // Forks, read from the table, near where they could be.
+        {
+            for (int i = 0; i < FORKS; i++) {
+                vec4 f0 = traits(float(2 * i));
+                if (p.y < f0.y - 30.0)
+                    continue;
+                vec4 f1 = traits(float(2 * i + 1));
+                float len = f1.w - f0.y;
+                float fw = 8.0 * (1.0 - 0.55 * s);
+                float df = min(min(sdSeg(p, f0.xy, f0.zw), sdSeg(p, f0.zw, f1.xy)), sdSeg(p, f1.xy, f1.zw));
+                float fd = df - fw * mix(1.0, 0.1, clamp((p.y - f0.y) / max(len, 1.0), 0.0, 1.0));
+                if (fd < d) {
+                    d = fd;
+                    wb = fw;
+                }
+            }
         }
         d = max(d, p.y - tip);
-        vec4 b = over(vec4(0.0), u.cEdge.rgb, cover(10.0 - d) * 0.3);
-        b = over(b, u.cRubber.rgb, cover(3.0 - d));
-        b = over(b, u.cGlow.rgb, cover(-d));
-        b = over(b, u.cCore.rgb, cover(-d - 3.5));
+        float inner = -d / wb;          // 0 at its edge .. 1 along its middle
+        // Its light on what lies round it, in two rings.
+        float ring = cover(34.0 - d) * 0.35 + cover(15.0 - d) * 0.4;
+        col.rgb += (col.rgb * 0.8 + u.cGlow.rgb * 0.1 * col.a) * ring * on;
+        col.rgb = min(col.rgb, vec3(col.a));
+        vec4 b = over(vec4(0.0), u.cRubber.rgb, cover(3.5 - d));
+        b = over(b, u.cEdge.rgb, cover(-d));
+        b = over(b, u.cGlow.rgb, cover(inner - 0.28) * cover(-d));
+        b = over(b, u.cCore.rgb, cover(inner - 0.62) * cover(-d));
         col = b * on + col * (1.0 - b.a * on);
     }
 

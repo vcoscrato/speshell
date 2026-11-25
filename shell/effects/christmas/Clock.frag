@@ -1,6 +1,6 @@
 #version 440
 #extension GL_GOOGLE_include_directive : enable
-// Natal's clock face: an evergreen wreath seen from above. Fir sprigs in three layers,
+// Christmas's clock face: an evergreen wreath seen from above. Fir sprigs in three layers,
 // each casting shade on the one under it, each sprig a spray of needles swept toward its
 // tip and lit on the side toward the light; holly leaves and red berries at the hours,
 // more at twelve, three, and nine, and a red bow at six. Inside, a night with a few

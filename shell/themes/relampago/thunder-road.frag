@@ -2,10 +2,11 @@
 #extension GL_GOOGLE_include_directive : enable
 // Thunder road: a two-lane desert highway runs straight to the horizon at dusk.
 // Red mesas and buttes stand along it, lit orange on the sunset side, while a
-// thunderstorm towers over the left and a bolt strikes the plain. Telephone poles
-// march along the road, a neon arrow glows at a roadside stop, saguaros stand in
-// the scrub, and the tail lights of something very fast streak away down the
-// right lane.
+// thunderstorm towers over the left and a fat cartoon bolt strikes the plain in a
+// flash. Long banks of drifted sand roll across the desert, lit along their crests.
+// Telephone poles march along the road, a neon arrow glows at a roadside stop,
+// saguaros stand in the scrub, and something very fast races off toward the
+// horizon down the right lane, its tail lights streaking back from it.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {
@@ -28,28 +29,21 @@ vec3 sky(float t) {
 }
 
 // Where a bolt that falls from y0 to y1 around a line from x0 to x1 is at height y:
-// kinked by a coarse zig and a fine one.
+// kicked out in bold zigzags, with smaller kinks along each run.
 float boltX(float y, float x0, float x1, float y0, float y1, float amp, float seed) {
-    return mix(x0, x1, (y0 - y) / (y0 - y1)) + amp * (zig(y / 0.035, seed) + 0.45 * zig(y / 0.011, seed + 3.0));
+    return mix(x0, x1, (y0 - y) / (y0 - y1)) + amp * (zig(y / 0.045, seed) + 0.22 * zig(y / 0.015, seed + 3.0));
 }
 
-// The distance from p to that bolt, straight runs between the corners where either
-// zig kinks, and how far along it p is (0..1 from the top).
+// The distance from p to that bolt, straight runs between its corners, which all fall
+// on rows 0.015 apart, and how far along it p is (0..1 from the top).
 vec2 boltDist(vec2 p, float x0, float x1, float y0, float y1, float amp, float seed) {
     float d = 1e3;
-    float k0 = floor(p.y / 0.011);
+    float k0 = floor(p.y / 0.015);
     for (int j = -2; j <= 2; j++) {
-        float ya = (k0 + float(j)) * 0.011, yb = ya + 0.011;
+        float ya = (k0 + float(j)) * 0.015, yb = ya + 0.015;
         vec2 a = vec2(boltX(ya, x0, x1, y0, y1, amp, seed), ya);
         vec2 b = vec2(boltX(yb, x0, x1, y0, y1, amp, seed), yb);
-        // At most one coarse corner falls between two fine ones.
-        float ym = ceil(ya / 0.035) * 0.035;
-        if (ym < yb) {
-            vec2 m = vec2(boltX(ym, x0, x1, y0, y1, amp, seed), ym);
-            d = min(d, min(sdSeg(p, a, m), sdSeg(p, m, b)));
-        } else {
-            d = min(d, sdSeg(p, a, b));
-        }
+        d = min(d, sdSeg(p, a, b));
     }
     return vec2(d, (y0 - p.y) / (y0 - y1));
 }
@@ -257,10 +251,10 @@ void main() {
                 on = o.xy;
         }
         float glow = exp(-length((on - vec2(bx0, 0.62)) * vec2(1.0, 1.4)) * 6.0);
-        float g1 = step(0.38, glow), g2 = step(0.62, glow);
-        dark = mix(mix(dark, rgb(78, 62, 126), g1), rgb(106, 88, 162), g2);
-        midc = mix(mix(midc, rgb(110, 92, 162), g1), rgb(146, 128, 200), g2);
-        litc = mix(mix(litc, rgb(160, 140, 210), g1), rgb(212, 198, 244), g2);
+        float g1 = step(0.4, glow), g2 = step(0.68, glow);
+        dark = mix(mix(dark, rgb(66, 50, 104), g1), rgb(84, 66, 128), g2);
+        midc = mix(mix(midc, rgb(96, 76, 140), g1), rgb(120, 98, 168), g2);
+        litc = mix(mix(litc, rgb(144, 116, 182), g1), rgb(178, 150, 214), g2);
 
         int from = stormDist(q, FRONT) < 0.0 ? FRONT : stormDist(q, MID) < 0.0 ? MID : 0;
         float lb = from == 0 ? 0.022 : 0.014;
@@ -282,37 +276,6 @@ void main() {
     // The underside, glowing with the sunset beneath.
     float belly = stormBelly(q.x);
     col = mix(col, rgb(214, 96, 92), fill(q.y - belly - 0.006) * fill(belly - q.y) * fill(dAll));
-
-    // ── The bolt: from the cloud base down to the plain, branching ──
-    float boltTop = base;
-    vec2 bolt = boltDist(q, bx0, aspect * 0.24, boltTop, HORIZON - 0.012, 0.05, 1.0);
-    float halo = 0.0;
-    float core = 0.0;
-    if (bolt.y > 0.0 && bolt.y < 1.0) {
-        core = cover(0.0034 - bolt.x);
-        halo = exp(-bolt.x / 0.012);
-    }
-    // Branches: shorter, thinner forks off the main channel.
-    for (int i = 0; i < 4; i++) {
-        float fi = float(i);
-        float yb = boltTop - (0.06 + 0.15 * hash(vec2(fi, 21.0))) * (boltTop - HORIZON);
-        float len = (0.06 + 0.08 * hash(vec2(fi, 22.0)));
-        float side = mod(fi, 2.0) < 1.0 ? -1.0 : 1.0;
-        // Rooted on the main channel, less its own kink there.
-        float xb = boltX(yb, bx0, aspect * 0.24, boltTop, HORIZON - 0.012, 0.05, 1.0)
-                 - 0.02 * (zig(yb / 0.035, 7.0 + fi) + 0.45 * zig(yb / 0.011, 10.0 + fi));
-        vec2 br = boltDist(q, xb, xb + side * len * 0.9, yb, yb - len, 0.02, 7.0 + fi);
-        if (br.y > 0.0 && br.y < 1.0) {
-            float w = 0.0016 * (1.0 - br.y);
-            core = max(core, cover(w - br.x));
-            halo = max(halo, 0.6 * (1.0 - br.y) * exp(-br.x / 0.008));
-        }
-    }
-    col = mix(col, mix(col, rgb(255, 150, 60), 0.6), band(halo, 0.25) * 0.7);
-    col = mix(col, rgb(255, 214, 70), band(halo, 0.55));
-    col = mix(col, rgb(255, 252, 232), core);
-    // Where it strikes, a flash on the plain.
-    float strike = exp(-length((q - vec2(aspect * 0.24, HORIZON)) * vec2(1.0, 4.0)) * 24.0);
 
     // ── Mesas and buttes, far to near, losing their dusk haze as they come closer.
     //    The faces toward the sun are lit orange; strata band their walls. They part
@@ -356,11 +319,74 @@ void main() {
         col = mix(col, rgb(226, 120, 96), below(baseY + 0.01 + 0.012 * billows(q.x + fl * 2.0, 5.0, 60.0 + fl), q.y) * (0.35 - 0.1 * fl));
     }
 
+    // ── The bolt: a fat cartoon bolt from the cloud base down to the plain in front
+    //    of the mesas, forking, banded from a white-hot core through yellow to an
+    //    orange edge, in two flat rings of glow ──
+    float boltTop = base;
+    float bx1 = aspect * 0.235;
+    vec2 bolt = boltDist(q, bx0, bx1, boltTop, HORIZON - 0.012, 0.075, 1.0);
+    // Its stroke's half width less the distance to it (> 0 inside), cut off square at
+    // its ends, and that half width.
+    float run = boltTop - HORIZON + 0.012;
+    float bwid = mix(0.0085, 0.005, clamp(bolt.y, 0.0, 1.0));
+    float bw = min(bwid - bolt.x, min(bolt.y + 0.1, 1.0 - bolt.y) * run);
+    // Forks: shorter, thinner, kinked, off the main channel's corners.
+    for (int i = 0; i < 3; i++) {
+        float fi = float(i);
+        float yb = boltTop - (0.12 + 0.26 * fi + 0.06 * hash(vec2(fi, 21.0))) * (boltTop - HORIZON);
+        yb = floor(yb / 0.045 + 0.5) * 0.045;
+        float len = 0.035 + 0.04 * hash(vec2(fi, 22.0));
+        float x = boltX(yb, bx0, bx1, boltTop, HORIZON - 0.012, 0.075, 1.0);
+        float side = x > mix(bx0, bx1, (boltTop - yb) / (boltTop - HORIZON + 0.012)) ? 1.0 : -1.0;
+        float xb = x - 0.024 * (zig(yb / 0.045, 7.0 + fi) + 0.22 * zig(yb / 0.015, 10.0 + fi));
+        vec2 br = boltDist(q, xb, xb + side * len * 0.9, yb, yb - len, 0.024, 7.0 + fi);
+        float w = 0.004 * (1.0 - clamp(br.y, 0.0, 1.0)) + 0.0004;
+        float fw = min(w - br.x, min(br.y, 1.0 - br.y) * len);
+        if (fw > bw) {
+            bw = fw;
+            bwid = w;
+        }
+    }
+    // It leaves from inside the cloud, which hides its top.
+    float bd = -bw;                                 // distance from its edge, < 0 inside
+    float clear = 1.0 - fill(dAll);
+    col = mix(col, mix(col, rgb(255, 170, 80), 0.3), cover(bwid * 3.2 - bd) * clear);
+    col = mix(col, mix(col, rgb(255, 206, 110), 0.45), cover(bwid * 1.4 - bd) * clear);
+    col = mix(col, rgb(255, 128, 40), cover(-bd) * clear);
+    col = mix(col, rgb(255, 214, 60), cover(-bd - bwid * 0.3) * clear);
+    col = mix(col, rgb(255, 252, 232), cover(-bd - bwid * 0.62) * clear);
+    // Where it strikes, a flash on the plain.
+    float strike = exp(-length((q - vec2(bx1, HORIZON)) * vec2(1.0, 4.0)) * 18.0);
+
     // ── The desert plain, banded by distance, with scrub and the strike's flash ──
     if (q.y < HORIZON) {
         float z = 1.0 / max(HORIZON - q.y, 1e-4);         // depth
         float dist = clamp((HORIZON - q.y) / HORIZON, 0.0, 1.0);
-        vec3 ground = mix(rgb(214, 118, 82), rgb(146, 66, 48), steps(pow(dist, 0.6), 6.0));
+        vec3 ground = mix(rgb(222, 128, 86), rgb(206, 112, 78), steps(pow(dist / 0.15, 0.6), 3.0));
+        // Long banks of drifted sand, far to near, each a step darker, lit along its
+        // crest by the sunset, brightest toward the sun, and shading down its face.
+        for (int k = 0; k < 3; k++) {
+            float fk = float(k);
+            float d0 = k == 0 ? 0.15 : k == 1 ? 0.38 : 0.68;
+            float amp = mix(0.012, 0.055, fk * 0.5);
+            float f = mix(5.0, 2.6, fk * 0.5);
+            #define CREST(x) (HORIZON * (1.0 - d0) + amp * (0.55 * sin((x) * f + fk * 2.1) \
+                + 0.45 * vnoise5(vec2((x) * f * 1.9 + fk * 7.3, fk * 3.0)) - 0.2))
+            float crest = CREST(q.x);
+            float inBank = fill(q.y - crest);
+            if (inBank > 0.0) {
+                // Lit broadly where the crest falls away toward the sun, thinly elsewhere.
+                float sunward = smoothstep(0.0, -0.25, (CREST(q.x + 0.01) - crest) / 0.01 * sign(sun.x - q.x));
+                float face = (crest - q.y) / (HORIZON * mix(0.1, 0.26, fk * 0.5));
+                vec3 bc = k == 0 ? rgb(200, 106, 74) : k == 1 ? rgb(178, 88, 62) : rgb(148, 68, 50);
+                bc = mix(bc, bc * 0.88, band(face, 0.55));
+                vec3 rim = mix(rgb(232, 134, 90), rgb(255, 180, 114), exp(-abs(q.x - sun.x) * 1.4));
+                float rw = mix(0.002, 0.005, fk * 0.5) * mix(0.6, 2.6, sunward);
+                bc = mix(bc, rim, 1.0 - band(crest - q.y, rw));
+                ground = mix(ground, bc, inBank);
+            }
+            #undef CREST
+        }
         // Long dunes of shadow, flattened by distance.
         float dune = vnoise(vec2(q.x * z * 0.12, z * 0.25));
         ground = mix(ground, ground * 0.92, band(dune, 0.6));
@@ -388,19 +414,38 @@ void main() {
         float dash = step(0.45, fract(z * 0.55));
         float center = (1.0 - band(abs(rx), lineW)) * dash;
         asphalt = mix(asphalt, rgb(255, 200, 44), center);
-        // Tail lights streaking away in the right lane, one red, its twin, and a
-        // yellow trail between them.
+        // Tail lights streaking back from the car racing off in the right lane, one
+        // red, its twin, and a yellow trail between them, bright behind it and fading
+        // toward us.
+        const float CAR = 0.11;                            // the car's distance, as dist
+        float along = smoothstep(CAR, CAR + 0.05, dist) * (1.0 - smoothstep(0.55, 0.95, dist));
         for (int i = 0; i < 3; i++) {
-            float lane = i == 0 ? 0.38 : i == 1 ? 0.62 : 0.5;
+            float lane = i == 0 ? 0.36 : i == 1 ? 0.64 : 0.5;
             float w = i == 2 ? 0.014 : 0.02;
-            float trail = (1.0 - band(abs(rx - lane), w)) * smoothstep(0.02, 0.5, dist) * smoothstep(1.0, 0.75, dist);
+            float trail = (1.0 - band(abs(rx - lane), w)) * along;
             asphalt = mix(asphalt, i == 2 ? rgb(255, 196, 60) : rgb(255, 64, 54), trail * (i == 2 ? 0.55 : 0.85));
-            asphalt = mix(asphalt, mix(asphalt, rgb(255, 120, 80), 0.4), (1.0 - band(abs(rx - lane), w * 3.0)) * smoothstep(0.02, 0.5, dist) * smoothstep(1.0, 0.75, dist) * 0.35);
+            asphalt = mix(asphalt, mix(asphalt, rgb(255, 120, 80), 0.4), (1.0 - band(abs(rx - lane), w * 3.0)) * along * 0.35);
         }
         // Gravel shoulders.
         float shoulder = cover((1.18 - abs(rx)) * halfW) * (1.0 - road);
         col = mix(col, mix(rgb(160, 92, 70), rgb(118, 64, 52), steps(dist, 3.0)), shoulder);
         col = mix(col, asphalt, road);
+
+        // The car: a low wedge from behind, a darker cabin on it, two tail lights
+        // glowing at its corners, and a puff of dust off its wheels.
+        float cy = HORIZON - CAR * HORIZON;
+        float cw = 0.52 * CAR * HORIZON;                   // the road's half width there
+        vec2 cq = vec2(q.x - (vpx + 0.5 * cw), q.y - cy);
+        float body = max(abs(cq.x) - cw * 0.36 + max(cq.y, 0.0) * 0.6, abs(cq.y - cw * 0.08) - cw * 0.085);
+        float cabin = max(abs(cq.x) - cw * 0.2 + (cq.y - cw * 0.17) * 0.9, abs(cq.y - cw * 0.22) - cw * 0.06);
+        col = mix(col, mix(col, rgb(214, 140, 104), 0.5), cover(cw * 0.25 - length((cq - vec2(-cw * 0.3, cw * 0.05)) * vec2(0.8, 1.6))) * 0.7);
+        col = mix(col, rgb(38, 20, 34), cover(-min(body, cabin)));
+        col = mix(col, rgb(70, 40, 62), cover(-cabin) * 0.8);
+        for (int i = 0; i < 2; i++) {
+            vec2 lq = cq - vec2((float(i) * 2.0 - 1.0) * cw * 0.27, cw * 0.1);
+            col = mix(col, mix(col, rgb(255, 80, 60), 0.45), cover(cw * 0.12 - length(lq)));
+            col = mix(col, rgb(255, 210, 170), cover(cw * 0.045 - length(lq * vec2(0.6, 1.0))));
+        }
     }
 
     // ── Telephone poles marching along the left side, two wires sagging between
@@ -481,7 +526,7 @@ void main() {
         float d = saguaro(q, b, h, fi + 1.0);
         vec3 cc = i < 2 ? rgb(46, 24, 34) : rgb(84, 40, 52);
         col = mix(col, cc, cover(-d));
-        // A sunlit edge on the side toward the sun, and ribs down the trunk.
+        // A sunlit edge on the side toward the sun.
         float lit = saguaro(q + vec2(0.012 * h, 0.0), b, h, fi + 1.0);
         col = mix(col, i < 2 ? rgb(170, 70, 56) : rgb(196, 92, 70), cover(-d) * cover(lit) * 0.9);
     }

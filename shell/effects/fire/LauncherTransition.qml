@@ -4,9 +4,11 @@ import "Flame.js" as Flame
 import "common"
 
 // Fire launcher transition: an ember flares and throws sparks, a burning edge sweeps the panel into
-// view, and flames simmer around it while open, embers drifting up off them, now and
-// then a curl of smoke, and their warm light on the air over the panel. Closing burns a hole through the
-// middle of the panel that spreads outward until it is gone. Reopening mid-exit
+// view, and a low bed of flame simmers along its top while open, tongues licking up out
+// of it in front of a deeper row, embers drifting up off them, now and then a curl of
+// smoke, and their warm light on the air over the panel. Closing, the simmer burns down
+// into the edge while a hole burns through the middle of the panel and spreads outward
+// in tongues of flame until it is gone. Reopening mid-exit
 // opens it the usual way: the hole's burning edge dies down while a new front sweeps
 // in from the ember's corner and fills the hole, the unburnt panel staying put.
 // Closing again before it is done sweeps that front back, then the hole burns on.
@@ -27,7 +29,6 @@ Item {
     readonly property real sweepTime: 0.8
     readonly property real burnTime: 0.55
     readonly property real tailTime: 0.35     // flames left burning after the panel is gone
-    readonly property real simmer: 0.55       // rim flame strength while open
     readonly property real emberRate: 9       // embers off the crown per second while open
 
     readonly property color core: Flame.core(root.theme)
@@ -41,6 +42,10 @@ Item {
     property real nextSmoke: 1.2
     // The flames' light, easing after how fully they simmer.
     property real glow: 0
+    // The rim's fuel: lit as the entrance front sets out, the edge catching behind it,
+    // and running out over a moment once the launcher closes.
+    property real fuel: 0
+    readonly property real fuelTarget: root.active && !root.refill && root.sweep > 0 ? 1 : 0
 
     // sweep: 0..1 progress of the entrance front; burn: 0..1 progress of the exit hole;
     // refill: reopened mid-exit, the entrance front is filling the hole.
@@ -81,6 +86,7 @@ Item {
         id: clock
         onAdvanced: dt => {
             root.glow += (root.simmering - root.glow) * Math.min(1, dt * 5);
+            root.fuel = root.fuelTarget > root.fuel ? Math.min(1, root.fuel + dt / 0.4) : Math.max(0, root.fuel - dt / 0.3);
             if (root.active) {
                 if (root.sparkPending && root.phaseAge < root.igniteTime)
                     return;
@@ -137,17 +143,19 @@ Item {
         }
     }
 
-    // The flames' warm light on the air over the panel's top edge, under them.
+    // The flames' warm light on the air over the panel's top edge and round its top
+    // corners, under them.
     ShaderEffect {
-        readonly property real reach: 70
+        readonly property real inset: 40
         visible: strength > 0.005
-        x: root.panelRect.x - 40
+        x: root.panelRect.x - inset
         y: root.panelRect.y - reach
-        width: root.panelRect.width + 80
-        height: reach
+        width: root.panelRect.width + 2 * inset
+        height: reach + root.panelRadius
         property size resolution: Qt.size(width, height)
-        property real edge: reach
-        property real inset: 40
+        property rect panel: Qt.rect(inset, reach, root.panelRect.width, root.panelRect.height)
+        property real radius: root.panelRadius
+        property real reach: 70
         property real time: clock.simTime
         property real strength: root.glow
         property color cGlow: Flame.glow(root.theme)
@@ -163,14 +171,21 @@ Item {
         width: Math.ceil((root.panelRect.x + root.panelRect.width + 200) / 4) * 4 - x
         height: parent.height
         readonly property bool exiting: root.burn > 0 && !root.refill
-        readonly property real kindled: exiting ? 0 : root.sweep
         time: clock.simTime
-        emit: root.active ? root.simmer * Math.max(0, Math.min(1, (kindled - 0.5) / 0.5)) : 0
+        emit: exiting ? (root.fuel > 0 ? 1 : 0) : root.fuel
         frontFuel: (root.sweep > 0 && root.sweep < 1) || (exiting && root.burn < 1) ? 1 : 0
         panelRect: root.panelRect
         radius: root.panelRadius
         origin: exiting ? root.burnOrigin : root.revealOrigin
         burnR: exiting ? root.burnR : root.revealR
+        // The hole burns in separate tongues off its edge, guttering out just behind it.
+        sparse: exiting ? 1 : 0
+        trail: exiting ? 64 : 0
+        kindle: !exiting
+        // As it runs out, the rim's flames burn down into the edge, tips first, rather
+        // than lifting off it.
+        douse: exiting ? 1 - root.fuel : 0
+        layered: true
         core: root.core
     }
 
@@ -225,6 +240,7 @@ Item {
         property color cHot: root.core
         property color cChar: Flame.charred(root.theme, false)
         property color cScorch: Flame.scorch(root.theme)
+        property real soot: 0
         fragmentShader: Qt.resolvedUrl("qsb/Burn.qsb")
     }
 

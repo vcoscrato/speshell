@@ -17,6 +17,7 @@ Particles {
     readonly property int strike: 3     // from the item's top; turn it with `angle`
     readonly property int arc: 4
     readonly property int glint: 5
+    readonly property int bareStrike: 6 // a strike landing without its burst
 
     delegate: Component {
         ShaderEffect {

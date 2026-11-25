@@ -1,9 +1,9 @@
 import QtQuick
 import "common"
 import "common/Colors.js" as Colors
-import "Natal.js" as Natal
+import "Christmas.js" as Christmas
 
-// Natal launcher transition: the launcher opens at once through a skin of frost that
+// Christmas launcher transition: the launcher opens at once through a skin of frost that
 // thaws away from many points, leaving a rime of frost feathers outside its corners
 // and edges. While it is open a string of fairy lights is hung round it, a run along
 // its top and then swag by swag, outside its edge; the bulbs light up in turn and
@@ -92,11 +92,11 @@ LauncherStage {
         property real bulbs: root.bulbs
         property real hangStart: root.hangStart
         property real hangGap: root.hangTime / Math.max(1, root.topRuns + root.swags)
-        property color cWire: Colors.mix(Natal.pineDeep(root.theme), root.theme.crust, 0.3)
-        property color cWireLit: Natal.pine(root.theme)
-        property color cSocket: Natal.pineDeep(root.theme)
-        property color cSocketLit: Natal.pineLight(root.theme)
-        readonly property var palette: Natal.bulbs(root.theme)
+        property color cWire: Colors.mix(Christmas.pineDeep(root.theme), root.theme.crust, 0.3)
+        property color cWireLit: Christmas.pine(root.theme)
+        property color cSocket: Christmas.pineDeep(root.theme)
+        property color cSocketLit: Christmas.pineLight(root.theme)
+        readonly property var palette: Christmas.bulbs(root.theme)
         property color cBulb0: palette[0]
         property color cBulb1: palette[1]
         property color cBulb2: palette[2]
@@ -104,8 +104,8 @@ LauncherStage {
         property color cBulb4: palette[4]
         property color cGlint: root.theme.text
         property color cDark: root.theme.crust
-        property color cSnow: Natal.snow(root.theme)
-        property color cSnowShade: Natal.snowShade(root.theme)
+        property color cSnow: Christmas.snow(root.theme)
+        property color cSnowShade: Christmas.snowShade(root.theme)
         property color cSnowLit: root.theme.text
         vertexShader: Qt.resolvedUrl("qsb/LauncherTransition.decor.vert.qsb")
         fragmentShader: Qt.resolvedUrl("qsb/LauncherTransition.decor.qsb")
@@ -133,17 +133,17 @@ LauncherStage {
         property real leave: root.leave
         property vector4d lift: Qt.vector4d(0, root.liftY, 1 - 0.25 * Math.pow(root.up, 1.5), root.tilt * 0.13 * Math.pow(root.up, 1.3))
         property real fade: 1 - root.span(root.leave, 0.82, 1)
-        property color cFrost: Colors.mix(Natal.ice(root.theme), root.theme.bg, 0.3)
-        property color cIce: Natal.ice(root.theme)
+        property color cFrost: Colors.mix(Christmas.ice(root.theme), root.theme.bg, 0.3)
+        property color cIce: Christmas.ice(root.theme)
         property color cFrostLit: root.theme.text
-        property color cPaper: Natal.berry(root.theme)
-        property color cPaperDeep: Natal.berryDeep(root.theme)
-        property color cPaperLit: Colors.mix(Natal.berry(root.theme), root.theme.rosewater, 0.22)
+        property color cPaper: Christmas.berry(root.theme)
+        property color cPaperDeep: Christmas.berryDeep(root.theme)
+        property color cPaperLit: Colors.mix(Christmas.berry(root.theme), root.theme.rosewater, 0.22)
         property color cPaperBack: Colors.mix(root.theme.text, root.theme.rosewater, 0.4)
         property color cPaperBackShade: Colors.mix(cPaperBack, root.theme.overlay, 0.45)
-        property color cGold: Natal.gold(root.theme)
-        property color cGoldDeep: Natal.goldDeep(root.theme)
-        property color cGoldLit: Colors.mix(Natal.gold(root.theme), root.theme.text, 0.5)
+        property color cGold: Christmas.gold(root.theme)
+        property color cGoldDeep: Christmas.goldDeep(root.theme)
+        property color cGoldLit: Colors.mix(Christmas.gold(root.theme), root.theme.text, 0.5)
         property color cShadow: root.theme.crust
         fragmentShader: Qt.resolvedUrl("qsb/LauncherTransition.qsb")
     }

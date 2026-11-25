@@ -9,6 +9,11 @@
 // rolls instead of jumping between a few shades. A ring of dust turns under the
 // bigger ones and pebbles circle them.
 layout(location = 0) in vec2 p;
+layout(location = 1) in vec4 a0;   // its center, size, and index
+layout(location = 2) in vec4 a1;   // its seed, and how far it has risen and dropped
+layout(location = 3) in vec3 m0;   // its turn, as the columns of a rotation
+layout(location = 4) in vec3 m1;
+layout(location = 5) in vec3 m2;
 layout(location = 0) out vec4 fragColor;
 #include "Boulders.glsl"
 
@@ -41,15 +46,6 @@ void drawChip(inout vec3 col, inout float a, vec2 p, vec2 pos, float size, float
     over(col, a, withEdge, cover(-d + 0.6) * alpha);
 }
 
-// Rotation by Euler angles about x, then y, then z.
-mat3 rot3(vec3 e) {
-    vec3 c = cos(e), s = sin(e);
-    mat3 rx = mat3(1.0, 0.0, 0.0, 0.0, c.x, s.x, 0.0, -s.x, c.x);
-    mat3 ry = mat3(c.y, 0.0, -s.y, 0.0, 1.0, 0.0, s.y, 0.0, c.y);
-    mat3 rz = mat3(c.z, s.z, 0.0, -s.z, c.z, 0.0, 0.0, 0.0, 1.0);
-    return rz * ry * rx;
-}
-
 vec3 hash3(float x) {
     return vec3(hash(vec2(x, 1.3)), hash(vec2(x, 2.9)), hash(vec2(x, 4.7)));
 }
@@ -63,10 +59,10 @@ vec3 stoneTone(vec3 n, float id) {
 }
 
 void main() {
-    int i = int(u.piece);
-    float fi = u.piece;
-    float size, seed, rise, drop;
-    vec2 pos = boulder(i, size, seed, rise, drop);
+    vec2 pos = a0.xy;
+    float size = a0.z;
+    float fi = floor(a0.w + 0.5);
+    float seed = a1.x, rise = a1.y, drop = a1.z;
     vec3 col = vec3(0.0);
     float a = 0.0;
     vec2 light = normalize(vec2(-0.45, -1.0));
@@ -121,9 +117,7 @@ void main() {
         // below, so it is here where the lowest cap clears the highest floor, and
         // the face seen is the plane of that lowest cap. Each bound is linear in
         // the pixel, so its gradient turns depth gaps into px for the edges.
-        mat3 M = rot3(vec3(seed + u.time * (hash(vec2(fi, 2.3)) - 0.5) * 0.9,
-                           seed * 1.7 + u.time * (hash(vec2(fi, 4.1)) - 0.5) * 0.8,
-                           seed * 0.6 + u.time * (hash(vec2(fi, 5.9)) - 0.5) * 0.7));
+        mat3 M = mat3(m0, m1, m2);
         vec3 squash = vec3(1.15, 0.85, 0.95) * mix(vec3(0.9), vec3(1.1), hash3(fi + 9.0));
         float bounds[FACES];
         vec2 grads[FACES];
@@ -151,27 +145,27 @@ void main() {
         // The face seen is where the top cap stays lowest: its nearest seam is the
         // nearest line where another cap passes under it, and its share of the
         // rock's outline the nearest line where a floor passes over it.
-        float d = 1e9, seam = 1e9, kNext = kTop;
+        float d = 1e9, seam = 1e9, kNext = kTop, bNext = top;
+        vec2 gNext = gTop;
         vec3 nNext = nTop;
         for (int k = 0; k < FACES; k++) {
             float gap = (bounds[k] - top) / max(length(grads[k] - gTop), 1e-3);
             if (norms[k].z < 0.0)
                 d = min(d, -gap);
             else if (float(k) != kTop && gap < seam) {
-                seam = gap; nNext = norms[k]; kNext = float(k);
+                seam = gap; nNext = norms[k]; kNext = float(k); bNext = bounds[k]; gNext = grads[k];
             }
         }
         // Seen along the view, the rock is where every cap clears every floor: a
-        // convex polygon, each pair of a cap and a floor one of its half-planes.
-        // Only when a seam lies nearer than this face's own edge can another face
-        // end the rock sooner (one seen edge-on, say); then take the nearest line
-        // of any pair. A pixel past any line by a pixel or more is clear of it.
+        // convex polygon, each pair of a cap and a floor one of its half-planes, and
+        // the edge nearest a pixel belongs to a face seen there or close by. Only
+        // when a seam lies nearer than this face's own edge can the face past it end
+        // the rock sooner (one seen edge-on, say); then take the nearest line of its
+        // pairs too. A pixel past any line by a pixel or more is clear of it.
         if (d > -1.0 && seam < min(d, 2.0)) {
-            for (int i = 0; i < FACES; i++) {
-                for (int j = 0; j < FACES; j++) {
-                    if (norms[i].z > 0.0 && norms[j].z < 0.0)
-                        d = min(d, (bounds[i] - bounds[j]) / max(length(grads[i] - grads[j]), 1e-3));
-                }
+            for (int k = 0; k < FACES; k++) {
+                if (norms[k].z < 0.0)
+                    d = min(d, (bNext - bounds[k]) / max(length(gNext - grads[k]), 1e-3));
             }
         }
         if (d > -1.0) {

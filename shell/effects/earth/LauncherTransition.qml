@@ -60,12 +60,21 @@ LauncherStage {
     }
 
     // ── The panel as a rising slab; otherwise the real panel shows ──
+    // It covers only what shows of the slab: from just above its top down to the
+    // ground line.
     ShaderEffect {
+        id: slab
         visible: root.capturing && root.panel !== null
         x: root.panelRect.x - root.pad
-        y: root.panelRect.y - root.pad
+        y: Math.min(root.ground, root.panelRect.y + root.rise - root.pad)
         width: root.panelRect.width + 2 * root.pad
-        height: root.panelRect.height + 2 * root.pad
+        height: root.ground + 1 - y
+        // Four rows for the slab and four for each crumb, two from each of 42 columns
+        // (LauncherTransition.glsl).
+        property real rows: 4 * (1 + 2 * 42)
+        mesh: GridMesh {
+            resolution: Qt.size(1, slab.rows - 1)
+        }
         property var source: root.panelTexture
         property rect rect: Qt.rect(x, y, width, height)
         property rect panel: root.panelRect
@@ -78,18 +87,26 @@ LauncherStage {
         property color cMid: root.slabMid
         property color cDark: root.slabDark
         property color cEdge: Stone.tone(root.theme, "crust", 0.1)
+        vertexShader: Qt.resolvedUrl("qsb/LauncherTransition.vert.qsb")
         fragmentShader: Qt.resolvedUrl("qsb/LauncherTransition.qsb")
     }
 
-    // Crack, dust, and chips stay in a band around the ground line.
+    // Crack, dust, and chips stay in a band around the ground line: the chips rise
+    // at most 146 px and reach 16 px past their middles.
     ShaderEffect {
+        id: groundBand
         x: root.panelRect.x - 260
-        y: root.ground - 300
+        y: root.ground - 170
         width: root.panelRect.width + 520
-        height: 380
+        height: 250
         visible: root.capturing || root.dust < 1
-        property size resolution: Qt.size(width, height)
-        property point offset: Qt.point(x, y)
+        // Four rows for the band of the crack and dust and four for each of 14 chips
+        // (LauncherTransition.ground.glsl).
+        property real rows: 4 * (1 + 14)
+        mesh: GridMesh {
+            resolution: Qt.size(1, groundBand.rows - 1)
+        }
+        property rect rect: Qt.rect(x, y, width, height)
         property point origin: Qt.point(root.panelRect.x + root.panelRect.width / 2, root.ground)
         property real crackLen: root.crackLen
         property real crackOpen: root.crackOpen
@@ -100,6 +117,7 @@ LauncherStage {
         property color cDustShade: root.slabMid
         property color cRock: root.slabMid
         property color cDark: Stone.tone(root.theme, "bg", 0.1)
+        vertexShader: Qt.resolvedUrl("qsb/LauncherTransition.ground.vert.qsb")
         fragmentShader: Qt.resolvedUrl("qsb/LauncherTransition.ground.qsb")
     }
 

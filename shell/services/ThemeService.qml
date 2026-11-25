@@ -62,8 +62,6 @@ Singleton {
     // whose colors the shell wears meanwhile. Its effects stay the active theme's.
     property bool galleryShown: false
     property string galleryStart: "themes"
-    // The theme the gallery opens at, "" for the one in use.
-    property string galleryTheme: ""
     property string previewId: ""
     readonly property var previewTheme: root.previewId !== "" ? ThemeProvider.findTheme(root.themes, root.previewId) : null
     readonly property var shownColors: root.previewTheme ? root.previewTheme.colors : root.colors
@@ -96,12 +94,10 @@ Singleton {
         : null
 
     // Rescans on opening, so new themes and wallpapers show up. `start`: the step
-    // it opens on, "themes" by default; `themeId`: the theme it opens at, as the
-    // launcher's theme results ask, else the one in use.
-    function openGallery(start, themeId) {
+    // it opens on, "themes" by default.
+    function openGallery(start) {
         if (!root.galleryShown)
             root.scan();
-        root.galleryTheme = themeId || "";
         root.galleryStart = start || "themes";
         root.galleryShown = true;
     }

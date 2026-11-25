@@ -2,9 +2,9 @@ import QtQuick
 import "common"
 import "Sugar.js" as Sugar
 
-// Sugar wallpaper transition: a curtain of glaze pours down over the old wallpaper,
-// its drips running ahead and drops falling off them, and slides off the bottom with
-// the old wallpaper, leaving the new one above it.
+// Sugar wallpaper transition: glaze pours down over the old wallpaper, unevenly, in
+// tongues, its drips running ahead and beads falling off them, and slides off the
+// bottom with the old wallpaper, thinning behind it onto the new one.
 WallpaperStage {
     id: root
 

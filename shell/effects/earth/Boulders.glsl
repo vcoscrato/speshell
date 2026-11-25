@@ -1,6 +1,6 @@
 // What Boulders.vert and its fragment shaders share: the uniforms, and where each
-// piece is at the time, so the vertex shader can fit a quad to a piece and its
-// fragment shader draw just that piece.
+// piece is at the time, so the vertex shader can fit a box to each piece and hand
+// its fragment shader what it needs to draw just that piece.
 layout(std140, binding = 0) uniform buf {
     mat4 qt_Matrix;
     float qt_Opacity;
@@ -10,8 +10,8 @@ layout(std140, binding = 0) uniform buf {
     float ground;      // px, screen y of the ground line
     float lift;        // 0..1 entrance: rocks rise in turn
     float fall;        // 0..1 exit: rocks drop in turn
-    float kind;        // the piece's kind: 0 a far stone, 1 a boulder, 2 a dust mote
-    float piece;       // its index among its kind
+    float kind;        // the strip's pieces: 0 the dust bands and far stones, 1 the boulders, 2 the motes
+    float rows;        // its mesh's rows of vertices
     vec4 cLight;
     vec4 cMid;
     vec4 cDark;
@@ -22,6 +22,9 @@ layout(std140, binding = 0) uniform buf {
 const int ROCKS = 7;
 const int FAR = 14;
 const int MOTES = 26;
+const int BANDS = 2;
+// Each dust band's strip is this many quads long.
+const int SEGMENTS = 48;
 
 vec2 panelCenter() {
     return u.panel.xy + u.panel.zw * 0.5;
@@ -41,6 +44,19 @@ mat2 rot(float a) {
 float backOut(float x) {
     float c = 1.7;
     return 1.0 + (c + 1.0) * pow(x - 1.0, 3.0) + c * pow(x - 1.0, 2.0);
+}
+
+// ── Dust bands: ribbons trailing round the panel far out ──
+
+// Band j's rounded rect round the panel center (half size and corner radius), its
+// perimeter, and where its head is along it.
+vec2 bandRect(float fj, out float rr, out float P, out float head) {
+    float dist = 95.0 + 70.0 * fj;
+    vec2 hh = u.panel.zw * 0.5 + dist;
+    rr = min(10.0 + dist * 1.8, min(hh.x, hh.y));
+    P = rrPerimeter(hh, rr);
+    head = -u.time * (26.0 - 8.0 * fj) + fj * P * 0.5;
+    return hh;
 }
 
 // ── Far stones: small dark stones circling slowly well behind the boulders ──

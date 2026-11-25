@@ -6,8 +6,9 @@
 // curved spine with branches leaning toward its tip on both sides, longest near its
 // root, and barbs along the longer branches. Spines grow fastest, branches out from
 // them, barbs last, and the matte frost between fills in behind them, so the frost
-// arrives as a dendrite. Each crystal claims what it reaches first. The thaw spreads
-// from a few warm spots, lobed and ragged, thick ice last.
+// arrives as a dendrite. Each crystal claims what it reaches first, and what comes
+// late is hurried in, in the same order, so all of it is in by growEnd. The thaw spreads
+// from a few warm spots, gathering speed, lobed and ragged at two scales.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {
@@ -23,6 +24,7 @@ layout(std140, binding = 0) uniform buf {
     vec4 spot2;
     vec4 spot3;
     vec4 spot4;
+    vec4 spot5;
 } u;
 #include "../common/common.glsl"
 
@@ -128,7 +130,7 @@ void branches(vec2 q, float id, Spine s, float t0) {
 void crystal(vec2 p, float i, vec2 root, vec2 dir, float t0, float reach, float fan, int count) {
     vec2 rel = p - root;
     float r = length(rel);
-    float speed = 1.35 * reach / mix(0.62, 0.8, rnd(i, 1.0));
+    float speed = 1.6 * reach / mix(0.62, 0.8, rnd(i, 1.0));
     float fillSpeed = speed * 0.5;
     // Nothing of it can come earlier than its spines' fastest.
     if (t0 + max(r - reach * 0.4, 0.0) / speed > bestT)
@@ -185,10 +187,12 @@ float thawOf(vec2 p, vec4 s, float i) {
     vec2 rel = rot(p - s.xy, 0.5 * (rnd(i, 30.0) - 0.5)) * vec2(1.0, 1.6);
     float r = length(rel);
     vec2 dir = rel / max(r, 1.0);
-    // Lobed and ragged, never further than its plain reach.
-    float lobe = 1.0 - 0.45 * fbm(dir * 2.2 + vec2(i * 7.0, u.seed * 13.0));
+    // Lobed, and ragged along its edge, never further than its plain reach.
+    float lobe = 1.0 - 0.4 * fbm(dir * 2.2 + vec2(i * 7.0, u.seed * 13.0));
+    lobe *= 1.0 - 0.22 * fbm(p / (60.0 * S) + vec2(i * 3.0, u.seed * 7.0));
     float d = r * lobe / s.w / u.thawScale;
-    return s.z + (u.thawEnd - s.z) * pow(min(d, 1.0), 1.15);
+    // Slow to open, then spreading faster, so the last of the frost goes briskly.
+    return s.z + (u.thawEnd - s.z) * pow(min(d, 1.0), 0.8);
 }
 
 void main() {
@@ -224,7 +228,7 @@ void main() {
         float x = start + (k - first + 0.5 + 0.6 * (rnd(i, 5.0) - 0.5)) / n * len;
         vec2 root, inward;
         border(x, W, H, root, inward);
-        crystal(p, i, root, rot(inward, 0.7 * (rnd(i, 6.0) - 0.5)), mix(0.06, 0.32, rnd(i, 7.0)),
+        crystal(p, i, root, rot(inward, 0.7 * (rnd(i, 6.0) - 0.5)), mix(0.04, 0.24, rnd(i, 7.0)),
                 H * mix(0.28, 0.52, rnd(i, 8.0)), mix(1.1, 1.7, rnd(i, 9.0)), 2 + int(rnd(i, 10.0) * 1.99));
     }
     float nIn = clamp(floor(W / H * 3.4 + 0.5), 4.0, 8.0);
@@ -235,18 +239,21 @@ void main() {
         float i = 40.0 + k;
         vec2 root = vec2((k + 0.2 + 0.6 * rnd(i, 5.0)) / nIn * W, mix(0.22, 0.78, rnd(i, 6.0)) * H);
         float a = TAU * rnd(i, 7.0);
-        crystal(p, i, root, vec2(cos(a), sin(a)), mix(0.24, 0.44, rnd(i, 8.0)),
-                H * mix(0.24, 0.36, rnd(i, 9.0)), mix(2.0, 2.8, rnd(i, 10.0)), 3 + int(rnd(i, 11.0) * 1.99));
+        crystal(p, i, root, vec2(cos(a), sin(a)), mix(0.14, 0.3, rnd(i, 8.0)),
+                H * mix(0.28, 0.4, rnd(i, 9.0)), mix(2.0, 2.8, rnd(i, 10.0)), 3 + int(rnd(i, 11.0) * 1.99));
     }
-    // The fill a little blotchy, and all of it in by growEnd.
+    // The fill a little blotchy; past g0 what comes late is hurried in, its order kept,
+    // all of it by growEnd.
     float tf = bestT + 0.1 * (fbm(p / (80.0 * S) + u.seed * 17.0) - 0.5) * step(bestH, 0.0);
-    tf = min(tf, u.growEnd - 0.06 * vnoise(p / (40.0 * S)));
+    const float LATE = 0.32;
+    float g0 = u.growEnd - LATE;
+    tf = tf > g0 ? g0 + LATE * 0.97 * (1.0 - exp((g0 - tf) / LATE)) : tf;
 
-    float tt = min(min(thawOf(p, u.spot0, 0.0), thawOf(p, u.spot1, 1.0)),
-                   min(min(thawOf(p, u.spot2, 2.0), thawOf(p, u.spot3, 3.0)), thawOf(p, u.spot4, 4.0)));
-    // Thick ice thaws last; nothing thaws before it has frosted a while. Stored less
-    // a second, which half floats hold finer.
-    tt = min(tt + 0.1 * bestH, u.thawEnd);
-    tt = max(tt, tf + 0.1);
+    float tt = min(min(min(thawOf(p, u.spot0, 0.0), thawOf(p, u.spot1, 1.0)), min(thawOf(p, u.spot2, 2.0), thawOf(p, u.spot3, 3.0))),
+                   min(thawOf(p, u.spot4, 4.0), thawOf(p, u.spot5, 5.0)));
+    // Nothing thaws before it has frosted a while. Stored less a second, which half
+    // floats hold finer; the fronds' thick ice is left to the shader drawing it, so the
+    // thaw's slope stays smooth across them.
+    tt = min(max(tt, tf + 0.45), u.thawEnd);
     fragColor = vec4(tf, bestH, tt - 1.0, 1.0);
 }

@@ -102,12 +102,6 @@ ModalWindow {
         // Once loaded, so it arrives as the desktop under it already looks.
         root.backdropShown = !backdrop.busy;
         root.phase = "open";
-        // Another theme asked for comes in over the desktop as a move to it would.
-        const asked = ThemeService.galleryTheme;
-        if (asked !== "" && asked !== root.selectedId && ThemeProvider.findTheme(ThemeService.themes, asked)) {
-            root.select(asked);
-            root.showSelection();
-        }
     }
 
     // Closing without applying lets the wallpaper behind go with the interface.

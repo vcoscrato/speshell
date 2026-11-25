@@ -6,55 +6,30 @@
 // cracks it from the bottom middle out; then its shell crumbles off in chunks, top
 // first, each dropping, turning, and shrinking away with crumbs falling from it, to
 // leave the panel. Run backwards, the chunks fly back into place before it sinks.
-layout(location = 0) in vec2 qt_TexCoord0;
+// The crumbs are boxes of their own after the slab's in the same mesh
+// (LauncherTransition.vert), so the slab's pixels don't look for them.
+layout(location = 0) in vec4 v;     // the screen point (px), what this is (0 the slab, 1 a crumb), and a crumb's fade
+layout(location = 1) in vec4 piece; // a crumb's center on screen (px), turn, and size
+layout(location = 2) in vec4 ray0;  // each crack: its direction, length, and where its branch leaves it, signed by its side
+layout(location = 3) in vec4 ray1;
+layout(location = 4) in vec4 ray2;
+layout(location = 5) in vec4 ray3;
+layout(location = 6) in vec4 bends; // how far each crack has bent off its line where its branch leaves it
 layout(location = 0) out vec4 fragColor;
-layout(std140, binding = 0) uniform buf {
-    mat4 qt_Matrix;
-    float qt_Opacity;
-    vec4 rect;         // this item's rect on screen (px)
-    vec4 panel;        // panel rect at rest (px)
-    float radius;
-    float ground;      // px, screen y of the ground line
-    vec2 offset;       // px, slab displacement from rest
-    float cracks;      // 0..1 cracks spreading from the bottom middle
-    float crumble;     // 0 whole .. 1 every chunk gone
-    vec4 cLight;
-    vec4 cMid;
-    vec4 cDark;
-    vec4 cEdge;
-} u;
 layout(binding = 1) uniform sampler2D source;
-#include "../common/common.glsl"
+#include "LauncherTransition.glsl"
 
 const vec2 LIGHT = vec2(-0.55, -0.83);
-const float CHUNK = 64.0;
-const float JIT = 0.9;
-// How much of the crumble each chunk's own fall takes.
-const float W = 0.8;
 
-// The site of a cell's chunk, as voronoiSite() places it, so chunks break along the
-// cracks drawn between them.
-vec2 chunkSite(vec2 cell) {
-    return (cell + 0.5 + (hash2(cell) - 0.5) * JIT) * CHUNK;
+// Distance from q to the border of the chunk at site `a`, among the sites of the
+// 3x3 cells round q, as voronoiEdge() measures it but from sites already found.
+float edgeTo(vec2 q, vec2 a, vec2 b) {
+    return dot(b - a, b - a) < 1.0 ? 1e9 : dot((a + b) * 0.5 - q, normalize(b - a));
 }
 
-// Where the slab landed: the middle of its bottom edge, at rest.
-vec2 impact() {
-    return vec2(u.panel.x + u.panel.z * 0.5, u.panel.y + u.panel.w);
-}
-
-// How far from the impact a point on the slab is, 0..1 at its furthest corners.
-float reach(vec2 q) {
-    return clamp(distance(q, impact()) / max(length(vec2(u.panel.z * 0.5, u.panel.w)), 1.0), 0.0, 1.0);
-}
-
-// When the chunk around `site` starts to go, 0..1: outward from the impact, unevenly.
-float chunkStart(vec2 site) {
-    return clamp(0.55 * reach(site) + 0.45 * hash(site * 0.031), 0.0, 1.0);
-}
-
-float chunkAge(vec2 site) {
-    return clamp((u.crumble * (1.0 + W) - chunkStart(site)) / W, 0.0, 1.0);
+float chunkEdge(vec2 q, vec2 a, vec2 s0, vec2 s1, vec2 s2, vec2 s3, vec2 s4, vec2 s5, vec2 s6, vec2 s7, vec2 s8) {
+    return min(min(min(edgeTo(q, a, s0), edgeTo(q, a, s1)), min(edgeTo(q, a, s2), edgeTo(q, a, s3))),
+               min(min(edgeTo(q, a, s4), edgeTo(q, a, s5)), min(min(edgeTo(q, a, s6), edgeTo(q, a, s7)), edgeTo(q, a, s8))));
 }
 
 // The slab's outline at rest: the panel's shape with chipped edges, < 0 inside.
@@ -90,42 +65,61 @@ vec3 stone(vec2 q, vec2 c, float d) {
     return col;
 }
 
-// Distance to the cracks the landing sends up from `from`: a few jagged rays fanning
-// upward, each with a branch, grown to `grow` of their length.
-float landingCracks(vec2 q, vec2 from, float len, float grow) {
-    float d = 1e3;
-    for (int i = 0; i < 4; i++) {
-        float fi = float(i);
-        float a = -1.5708 + (fi - 1.5) * 0.62 + (hash(vec2(fi, 1.7)) - 0.5) * 0.35;
-        float L = len * mix(0.45, 0.95, hash(vec2(fi, 2.9)));
-        vec2 dir = vec2(cos(a), sin(a));
-        vec2 o = q - from;
-        float along = dot(o, dir);
-        float across = dot(o, vec2(-dir.y, dir.x));
-        float bend = zig(along / 34.0, fi) * 16.0 + zig(along / 9.0, fi + 7.0) * 4.0;
-        float reach = L * grow;
-        float main_ = along > 0.0 && along < reach ? abs(across - bend) : 1e3;
-        // Thinner toward its tip.
-        d = min(d, main_ - 1.4 * (1.0 - along / max(L, 1.0)));
-        // A branch off it, partway up.
-        float at = L * mix(0.3, 0.55, hash(vec2(fi, 4.1)));
-        float ba = a + (hash(vec2(fi, 5.3)) < 0.5 ? -0.7 : 0.7);
-        vec2 bdir = vec2(cos(ba), sin(ba));
-        vec2 bo = o - dir * at - vec2(-dir.y, dir.x) * (zig(at / 34.0, fi) * 16.0 + zig(at / 9.0, fi + 7.0) * 4.0);
-        float bal = dot(bo, bdir);
-        float bac = dot(bo, vec2(-bdir.y, bdir.x)) - zig(bal / 20.0, fi + 3.0) * 8.0;
-        float breach = (reach - at) * 0.6;
-        if (bal > 0.0 && bal < breach)
-            d = min(d, abs(bac) - 0.6 * (1.0 - bal / max(L * 0.6, 1.0)));
-    }
+// Distance from o (from where the slab landed) to one of the cracks the landing sends
+// up, a jagged ray with a branch (`ray` and `bend`, as the vertex shader works them
+// out), grown to `grow` of its length.
+float crack(vec2 o, vec4 ray, float bend0, float fi, float grow) {
+    vec2 dir = ray.xy;
+    float L = ray.z;
+    vec2 side = vec2(-dir.y, dir.x);
+    float along = dot(o, dir);
+    float across = dot(o, side);
+    // The crack bends at most 10 px off its line, and its branch reaches no further
+    // than 0.27 of its length to the side: a pixel well clear of both is clear of it.
+    float reach = L * grow;
+    if (along < -12.0 || along > reach + 12.0 || abs(across) > 24.0 + 0.3 * reach)
+        return 1e3;
+    float bend = zig(along / 34.0, fi) * 16.0 + zig(along / 9.0, fi + 7.0) * 4.0;
+    float main_ = along > 0.0 && along < reach ? abs(across - bend) : 1e3;
+    // Thinner toward its tip.
+    float d = main_ - 1.4 * (1.0 - along / max(L, 1.0));
+    // A branch off it, partway up, 0.7 rad to one side.
+    float at = abs(ray.w);
+    vec2 bdir = mat2(0.7648422, 0.6442177 * sign(ray.w), -0.6442177 * sign(ray.w), 0.7648422) * dir;
+    vec2 bo = o - dir * at - side * bend0;
+    float bal = dot(bo, bdir);
+    float bac = dot(bo, vec2(-bdir.y, bdir.x)) - zig(bal / 20.0, fi + 3.0) * 8.0;
+    float breach = (reach - at) * 0.6;
+    if (bal > 0.0 && bal < breach)
+        d = min(d, abs(bac) - 0.6 * (1.0 - bal / max(L * 0.6, 1.0)));
     return d;
 }
 
+// Distance to the cracks the landing sends up from where the slab landed: a few
+// jagged rays fanning upward, each with a branch, grown to `grow` of their length.
+float landingCracks(vec2 q, float grow) {
+    vec2 o = q - impact();
+    return min(min(crack(o, ray0, bends.x, 0.0, grow), crack(o, ray1, bends.y, 1.0, grow)),
+               min(crack(o, ray2, bends.z, 2.0, grow), crack(o, ray3, bends.w, 3.0, grow)));
+}
+
+// A crumb: a small tumbling chip, lit on top.
+vec4 crumbAt(vec2 p) {
+    vec2 o = rot(p - piece.xy, piece.z);
+    float dc = max(max(abs(o.x), abs(o.y) * 1.3), (o.x + o.y) * 0.8) - piece.w;
+    vec4 col = over(vec4(0.0), u.cEdge.rgb, cover(-dc + 0.9) * v.w);
+    return over(col, o.y < 0.0 ? mix(u.cMid.rgb, u.cLight.rgb, 0.5) : u.cMid.rgb, cover(-dc) * v.w);
+}
+
 void main() {
-    vec2 p = u.rect.xy + qt_TexCoord0 * u.rect.zw;
+    vec2 p = v.xy;
+    float aboveGround = smoothstep(0.75, -0.75, p.y - u.ground);
+    if (v.z > 0.5) {
+        fragColor = crumbAt(p) * aboveGround * u.qt_Opacity;
+        return;
+    }
     vec2 q = p - u.offset;                                 // point on the slab at rest
     vec2 c = u.panel.xy + u.panel.zw * 0.5;
-    float aboveGround = smoothstep(0.75, -0.75, p.y - u.ground);
     vec2 crackFrom = impact();
 
     // The panel itself, where the stone has gone.
@@ -133,27 +127,33 @@ void main() {
     vec4 col = texture(source, clamp((q - u.panel.xy) / u.panel.zw, 0.0, 1.0)) * cover(-dPanel);
 
     // ── Stone: each chunk standing, or crumbling away from where it stood ──
+    // The sites of the cells round q, from three rows above it to one below: a chunk
+    // falls up to about two and a half cells, so a falling one may come from that far
+    // up, and the three rows round q hold the chunk q stands in.
     vec2 g = floor(q / CHUNK);
-    vec2 own = chunkSite(g);
+    vec2 sites[15];
+    for (int j = 0; j < 5; j++)
+        for (int i = 0; i < 3; i++)
+            sites[j * 3 + i] = chunkSite(g + vec2(float(i - 1), float(j - 3)));
+    vec2 ownSite = sites[6];
     float bestD = 1e9;
-    for (int j = -1; j <= 1; j++)
-        for (int i = -1; i <= 1; i++) {
-            vec2 s = chunkSite(g + vec2(i, j));
-            float dd = dot(q - s, q - s);
-            if (dd < bestD) { bestD = dd; own = s; }
-        }
+    for (int k = 6; k < 15; k++) {
+        float dd = dot(q - sites[k], q - sites[k]);
+        if (dd < bestD) { bestD = dd; ownSite = sites[k]; }
+    }
     float stoneA = 0.0;
     vec3 stoneC = vec3(0.0);
-    if (u.crumble <= 0.0 || chunkAge(own) <= 0.0) {
+    if (u.crumble <= 0.0 || chunkAge(ownSite) <= 0.0) {
         float d = slabDist(q, c);
         float body = cover(-d);
         if (body > 0.0) {
             vec3 sc = stone(q, c, d);
             // The cracks: a few jagged ones run up from where it landed, and the chunk
             // borders open just before their chunks go.
-            float e = voronoiEdge(q, CHUNK, JIT);
-            float open = smoothstep(0.08, 0.0, chunkStart(own) - u.crumble * (1.0 + W)) * step(0.001, u.crumble);
-            float lc = landingCracks(q, crackFrom, u.panel.w * 1.05, u.cracks);
+            float e = chunkEdge(q, ownSite, sites[6], sites[7], sites[8], sites[9], sites[10], sites[11],
+                                sites[12], sites[13], sites[14]);
+            float open = smoothstep(0.08, 0.0, chunkStart(ownSite) - u.crumble * (1.0 + W)) * step(0.001, u.crumble);
+            float lc = u.cracks > 0.0 ? landingCracks(q, u.cracks) : 1e3;
             sc = mix(sc, mix(sc, u.cLight.rgb, 0.3), cover(2.6 - lc) * 0.6);
             sc = mix(sc, u.cEdge.rgb, cover(1.1 - lc));
             sc = mix(sc, mix(sc, u.cLight.rgb, 0.25), cover(2.4 - e) * open * 0.6);
@@ -165,26 +165,39 @@ void main() {
     if (u.crumble > 0.0) {
         float bestK = -1.0;
         vec2 bq = vec2(0.0);
-        // A chunk falls up to about two and a half cells, so look that far up for one.
-        for (int j = -3; j <= 1; j++)
-            for (int i = -1; i <= 1; i++) {
-                vec2 s = chunkSite(g + vec2(i, j));
-                float k = chunkAge(s);
-                if (k <= 0.0 || k >= 1.0)
-                    continue;
-                float h = hash(s * 0.017);
-                // Knocked away from the impact, then falling, and nearing as it tips forward.
-                vec2 away = normalize(s - crackFrom + vec2(0.0, -1.0));
-                vec2 drop = away * 18.0 * k + vec2((h - 0.5) * 10.0 * k, 150.0 * k * k);
-                float sc = 1.0 + 0.12 * k;
-                vec2 l = rot(q - s - drop, -(h - 0.5) * 1.8 * k) / sc;
-                vec2 qs = s + l;
-                if (dot(l, l) > CHUNK * CHUNK * 1.2)
-                    continue;
-                if (distance(voronoiSite(qs, CHUNK, JIT), s) > 0.5)
-                    continue;
-                if (k > bestK) { bestK = k; bq = qs; }
-            }
+        float bestE = 1e9;
+        for (int k = 0; k < 15; k++) {
+            vec2 s = sites[k];
+            float age = chunkAge(s);
+            if (age <= 0.0 || age >= 1.0)
+                continue;
+            float h = hash(s * 0.017);
+            // Knocked away from the impact, then falling, and nearing as it tips forward.
+            vec2 away = normalize(s - crackFrom + vec2(0.0, -1.0));
+            vec2 drop = away * 18.0 * age + vec2((h - 0.5) * 10.0 * age, 150.0 * age * age);
+            float sc = 1.0 + 0.12 * age;
+            vec2 l = rot(q - s - drop, -(h - 0.5) * 1.8 * age) / sc;
+            vec2 qs = s + l;
+            if (dot(l, l) > CHUNK * CHUNK * 1.2 || age <= bestK)
+                continue;
+            // Only where that point of the slab at rest lies in this chunk.
+            vec2 gs = floor(qs / CHUNK);
+            vec2 n[9];
+            vec2 near = s;
+            float nd = 1e9;
+            for (int y = 0; y < 3; y++)
+                for (int x = 0; x < 3; x++) {
+                    vec2 b = chunkSite(gs + vec2(float(x - 1), float(y - 1)));
+                    n[y * 3 + x] = b;
+                    float dd = dot(qs - b, qs - b);
+                    if (dd < nd) { nd = dd; near = b; }
+                }
+            if (distance(near, s) > 0.5)
+                continue;
+            bestK = age;
+            bq = qs;
+            bestE = chunkEdge(qs, s, n[0], n[1], n[2], n[3], n[4], n[5], n[6], n[7], n[8]);
+        }
         if (bestK > 0.0) {
             float d = slabDist(bq, c);
             float body = cover(-d);
@@ -192,7 +205,7 @@ void main() {
                 vec3 sc = stone(bq, c, d);
                 // Tipping forward out of the light: darker as it turns, outlined.
                 sc = mix(sc, u.cDark.rgb, 0.35 * smoothstep(0.0, 0.7, bestK));
-                float e = voronoiEdge(bq, CHUNK, JIT);
+                float e = bestE;
                 sc = mix(sc, mix(sc, u.cLight.rgb, 0.35), cover(3.0 - e) * (1.0 - smoothstep(0.0, 0.5, bestK)));
                 sc = mix(sc, u.cEdge.rgb, cover(1.3 - e));
                 body *= 1.0 - smoothstep(0.75, 1.0, bestK);
@@ -203,27 +216,5 @@ void main() {
     }
     col = over(col, stoneC, stoneA);
 
-    // ── Crumbs falling off the face as it crumbles ──
-    if (u.crumble > 0.0 && u.crumble < 1.0) {
-        const float COL = 30.0;
-        float cx = floor(q.x / COL);
-        for (int i = -1; i <= 1; i++)
-            for (int k = 0; k < 2; k++) {
-                float ci = cx + float(i);
-                vec2 h = hash2(vec2(ci, float(k) + 3.0));
-                vec2 start = vec2((ci + h.x) * COL, u.panel.y + 12.0 + h.y * (u.panel.w - 24.0));
-                float t0 = chunkStart(start);
-                float age = (u.crumble * (1.0 + W) - t0) * 0.9;
-                if (age <= 0.0 || age > 0.75)
-                    continue;
-                vec2 pos = start + vec2((h.x - 0.5) * 40.0 * age, 900.0 * age * age);
-                float size = mix(1.6, 3.4, hash(vec2(ci, float(k) + 9.0)));
-                vec2 o = rot(q - pos, age * 9.0 + h.x * 6.0);
-                float dc = max(max(abs(o.x), abs(o.y) * 1.3), (o.x + o.y) * 0.8) - size;
-                float fade = 1.0 - smoothstep(0.55, 0.75, age);
-                col = over(col, u.cEdge.rgb, cover(-dc + 0.9) * fade);
-                col = over(col, o.y < 0.0 ? mix(u.cMid.rgb, u.cLight.rgb, 0.5) : u.cMid.rgb, cover(-dc) * fade);
-            }
-    }
     fragColor = col * aboveGround * u.qt_Opacity;
 }

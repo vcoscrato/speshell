@@ -1,10 +1,10 @@
 import QtQuick
 
-// Natal effects: a launcher that thaws in through frost, is hung with fairy lights
+// Christmas effects: a launcher that thaws in through frost, is hung with fairy lights
 // and drifted with snow while open, and is wrapped as a present to close; wallpapers
 // frosted over and thawed; baubles and fairy lights on the sliders, and snowflakes
 // where you click.
-// A theme picks them with `effects = natal` in its theme.ini.
+// A theme picks them with `effects = christmas` in its theme.ini.
 QtObject {
     readonly property int apiVersion: 1
 

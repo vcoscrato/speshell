@@ -83,10 +83,12 @@ vec4 cherry(vec4 o, vec2 q, vec4 ch, vec2 light) {
     float land = max(0.0, (k - 0.7) / 0.3);
     // Its height over the border: falling, then a small hop after landing.
     float z = 1.0 - fall * fall + 0.2 * sin(PI * land) * (1.0 - land);
-    float R = CHERRY * (1.0 + 0.8 * z);
+    // Each cherry its own size, its stem bending its own way.
+    float own = hash(vec2(ch.z * 3.7, 4.2));
+    float R = CHERRY * mix(0.86, 1.12, own) * (1.0 + 0.8 * z);
     float fade = smoothstep(0.0, 0.25, k);
     vec2 n = vec2(cos(ch.z), sin(ch.z));
-    vec2 t = vec2(-n.y, n.x);
+    vec2 t = vec2(-n.y, n.x) * (own > 0.5 ? 1.0 : -1.0);
 
     // Its shadow on the frosting, apart from it and soft while it is high.
     vec2 sc = ch.xy - light * (1.5 + 16.0 * z);
@@ -114,7 +116,7 @@ vec4 cherry(vec4 o, vec2 q, vec4 ch, vec2 light) {
     float s = R / CHERRY;
     vec2 a = ch.xy + n * R * 0.25;
     vec2 m = a + n * R * 1.3;
-    vec2 e = a + n * R * 2.1 + t * R * 0.9;
+    vec2 e = a + n * R * mix(1.8, 2.3, fract(own * 7.0)) + t * R * mix(0.5, 1.0, fract(own * 13.0));
     float d = 1e3;
     vec2 prev = a;
     for (int j = 1; j <= 4; j++) {
@@ -166,7 +168,10 @@ void main() {
         float n = floor(perim / 16.0 + 0.5);
         float P = perim / n;
         float f = fract(s / P);
-        float w = SHELL * (0.3 + 0.7 * sin(PI * pow(f, 0.62)));
+        // Each shell a little fuller or leaner and leaning its own way, as a hand pipes.
+        float idx = mod(floor(s / P), n);
+        float w = SHELL * mix(0.88, 1.1, hash(vec2(idx, 3.1)))
+                * (0.3 + 0.7 * sin(PI * pow(f, mix(0.52, 0.74, hash(vec2(idx, 5.7))))));
         float head = u.pipe * perim;
         float d = abs(v) - w;
         // Not yet piped past the bag; a round end where it is.

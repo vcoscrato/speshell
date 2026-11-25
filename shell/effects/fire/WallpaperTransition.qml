@@ -3,8 +3,8 @@ import "Flame.js" as Flame
 import "common"
 
 // Fire wallpaper transition: the old wallpaper catches near the middle of the screen,
-// where the launcher was, and burns away outward to the new one, embers drifting up
-// off the burnt ground behind the front.
+// where the launcher was, and burns away outward to the new one in tongues of flame,
+// leaving char that clears in steps behind the front and embers drifting up off it.
 WallpaperStage {
     id: root
 
@@ -71,6 +71,7 @@ WallpaperStage {
         property color cHot: root.core
         property color cChar: Flame.charred(root.theme, true)
         property color cScorch: Flame.scorch(root.theme)
+        property real soot: 1
         fragmentShader: Qt.resolvedUrl("qsb/Burn.qsb")
     }
 
@@ -85,7 +86,7 @@ WallpaperStage {
         burnR: root.burnR
         fieldScale: root.fieldScale
         clearBehind: false
-        trail: 80 + 0.15 * root.frontSpeed
+        trail: 50 + 0.08 * root.frontSpeed
         core: root.core
     }
 

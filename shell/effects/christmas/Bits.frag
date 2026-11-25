@@ -1,6 +1,6 @@
 #version 440
 #extension GL_GOOGLE_include_directive : enable
-// One particle of Natal's small effects, by `kind`: 0 a glint, a four-pointed
+// One particle of Christmas's small effects, by `kind`: 0 a glint, a four-pointed
 // twinkle; 1 a snowflake that crystallizes from its middle, six dendrite arms growing
 // side branches as their tips pass, a different flake for each seed, that glints and
 // then breaks, its arms drifting apart and falling as they fade; 2 a tiny flake that

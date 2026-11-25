@@ -1,9 +1,9 @@
 import QtQuick
 import "common"
 import "common/Colors.js" as Colors
-import "Natal.js" as Natal
+import "Christmas.js" as Christmas
 
-// Natal's knob for Speshell's sliders and switches: a glass bauble with a metal cap
+// Christmas's knob for Speshell's sliders and switches: a glass bauble with a metal cap
 // and a gilt band, rolling as it travels. On a slider it trails a string of fairy
 // lights on a dark wire along the filled track, back to the track's start; on a
 // switch it draws the whole switch, a short string of bulbs dark when off and lit when
@@ -78,22 +78,22 @@ Item {
         // A slider's bauble is cranberry glass with a gilt band; a switch's is gilt
         // when on, with a cranberry band, and dull cranberry when off.
         readonly property real gilt: root.isSwitch ? root.fill : 0
-        readonly property color ball: Colors.mix(Colors.mix(Natal.berry(root.theme), root.theme.crust, 0.3), Natal.gold(root.theme), gilt)
-        readonly property color stripe: Colors.mix(Natal.goldDeep(root.theme), Natal.berry(root.theme), gilt)
-        property color cBall: root.isSwitch ? ball : Natal.berry(root.theme)
+        readonly property color ball: Colors.mix(Colors.mix(Christmas.berry(root.theme), root.theme.crust, 0.3), Christmas.gold(root.theme), gilt)
+        readonly property color stripe: Colors.mix(Christmas.goldDeep(root.theme), Christmas.berry(root.theme), gilt)
+        property color cBall: root.isSwitch ? ball : Christmas.berry(root.theme)
         property color cBallLight: Colors.mix(cBall, root.theme.text, 0.3)
         property color cBallShade: Colors.mix(cBall, root.theme.crust, 0.3)
         property color cBallDeep: Colors.mix(cBall, root.theme.crust, 0.58)
-        property color cBand: root.isSwitch ? stripe : Natal.gold(root.theme)
+        property color cBand: root.isSwitch ? stripe : Christmas.gold(root.theme)
         property color cBandShade: Colors.mix(cBand, root.theme.crust, 0.35)
-        property color cCap: Natal.goldDeep(root.theme)
-        property color cCapLight: Colors.mix(Natal.gold(root.theme), root.theme.text, 0.25)
+        property color cCap: Christmas.goldDeep(root.theme)
+        property color cCapLight: Colors.mix(Christmas.gold(root.theme), root.theme.text, 0.25)
         property color cSheen: root.theme.text
-        property color cGlow: Natal.glow(root.theme)
-        property color cNight: Colors.mix(root.theme.crust, Natal.pineDeep(root.theme), 0.3)
+        property color cGlow: Christmas.glow(root.theme)
+        property color cNight: Colors.mix(root.theme.crust, Christmas.pineDeep(root.theme), 0.3)
         property color cRim: Colors.mix(root.theme.crust, root.theme.overlay, 0.4)
-        property color cWire: Natal.pine(root.theme)
-        readonly property var bulbs: Natal.bulbs(root.theme)
+        property color cWire: Christmas.pine(root.theme)
+        readonly property var bulbs: Christmas.bulbs(root.theme)
         property color cBulb0: bulbs[0]
         property color cBulb1: bulbs[1]
         property color cBulb2: bulbs[2]

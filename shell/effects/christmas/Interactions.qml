@@ -1,7 +1,7 @@
 import QtQuick
 import "common/Colors.js" as Colors
 
-// Natal's effects on Speshell's controls. A dragged bauble now and then glints or
+// Christmas's effects on Speshell's controls. A dragged bauble now and then glints or
 // shakes off a little snow, and glints where it is let go. Picking something grows a
 // snowflake at the pointer, which glints and breaks into tiny flakes that drift down.
 // A switch turned on blooms warm round its bulbs; turned off, a few flakes puff off it.

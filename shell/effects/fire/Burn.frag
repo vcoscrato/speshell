@@ -4,7 +4,9 @@
 // behind a white-hot line, glow, and char band; ahead of the consume front it
 // scorches, chars, and glows, and behind that front it is gone. Refilling (reopened
 // mid-exit), the item shows wherever either front leaves it, the reveal front burns
-// only across the hole, and the consume front's scorch and glow die down.
+// only across the hole, and the consume front's scorch and glow die down. With
+// `soot`, the ground the consume front bares is left charred just behind it, clearing
+// in steps further back.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {
@@ -22,6 +24,7 @@ layout(std140, binding = 0) uniform buf {
     vec4 cHot;
     vec4 cChar;
     vec4 cScorch;       // what the consume front is about to take
+    float soot;         // 0..1 how dark the char left behind the consume front is
 } u;
 layout(binding = 1) uniform sampler2D source;
 #include "../common/common.glsl"
@@ -59,5 +62,13 @@ void main() {
     col = mix(col, u.cHot.rgb * content.a, max(under(r, 4.0, ar) * front, under(c, 3.0 * w, ac) * marks));
 
     float visible = mix(revealed * kept, max(revealed, kept), u.refill);
-    fragColor = vec4(col, content.a) * visible * u.qt_Opacity;
+    vec4 outc = vec4(col, content.a) * visible;
+    if (u.soot > 0.0) {
+        // Bands of their own wandering widths, so the char does not echo the front's.
+        float back = -c / (0.7 + 0.6 * vnoise(p / 70.0 + 3.7));
+        float soot = 0.45 * under(back, 34.0, ac) + 0.2 * under(back, 80.0, ac) + 0.12 * under(back, 135.0, ac);
+        soot *= u.soot * (1.0 - kept);
+        outc += vec4(u.cChar.rgb, 1.0) * soot * (1.0 - outc.a);
+    }
+    fragColor = outc * u.qt_Opacity;
 }
