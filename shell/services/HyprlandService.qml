@@ -80,6 +80,13 @@ Singleton {
         root.hyprctl(["switchxkblayout", "all", String(index)]);
     }
 
+    // Switches to the next layout, or with -1 the one before, round the list.
+    function stepKeyboardLayout(direction) {
+        const count = root.keyboardLayouts;
+        if (count > 1)
+            root.switchKeyboardLayout((root.keyboardLayoutIndex + direction + count) % count);
+    }
+
     // A Lua string literal, for Lua dispatchers and `hyprctl eval`.
     function luaQuote(value) {
         return "\"" + String(value || "")

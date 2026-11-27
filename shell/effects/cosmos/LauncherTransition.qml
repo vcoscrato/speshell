@@ -86,10 +86,16 @@ Item {
     readonly property real cometPace: 4
     readonly property real cometLead: cometCycle / 2 - 1.3 * cometPace
     property point comet
-    property point cometBack
     property real cometDepth: 0
     property real cometNear: 0
     property real cometShow: 0
+    // The dust tail's spine after the head, relative to it (px), two points to a vector,
+    // and the farthest it reaches.
+    property vector4d cometTail01
+    property vector4d cometTail23
+    property vector4d cometTail45
+    property vector4d cometTail67
+    property real cometReach: 0
 
     onActiveChanged: {
         if (active) {
@@ -144,14 +150,32 @@ Item {
 
     function moveComet() {
         const v = cometInPlane(time);
-        const was = onScreen(cometInPlane(time - 0.1));
-        comet = onScreen(v);
-        const bx = was.x - comet.x, by = was.y - comet.y;
-        const bl = Math.max(1e-3, Math.hypot(bx, by));
-        cometBack = Qt.point(bx / bl, by / bl);
+        const head = onScreen(v);
+        comet = head;
         const r = Math.hypot(v.x, v.y);
         cometDepth = v.y / r;
         cometNear = 1.5 * scale / r;
+        // The dust tail: grains shed over the last second, each somewhat behind the head
+        // along its path and blown out from the panel's light since, the older the
+        // farther, so the tail grows near the panel and bends back the way it came.
+        const length = 70 + 90 * Math.min(1, cometNear);
+        const tail = [];
+        let reach = 0;
+        for (let i = 1; i <= 8; i++) {
+            const f = i / 8;
+            const was = onScreen(cometInPlane(time - 0.9 * f));
+            const ax = was.x - cx, ay = was.y - cy;
+            const al = Math.max(1e-3, Math.hypot(ax, ay));
+            const x = 0.4 * (was.x - head.x) + length * f * ax / al;
+            const y = 0.4 * (was.y - head.y) + length * f * ay / al;
+            tail.push(x, y);
+            reach = Math.max(reach, Math.hypot(x, y));
+        }
+        cometTail01 = Qt.vector4d(tail[0], tail[1], tail[2], tail[3]);
+        cometTail23 = Qt.vector4d(tail[4], tail[5], tail[6], tail[7]);
+        cometTail45 = Qt.vector4d(tail[8], tail[9], tail[10], tail[11]);
+        cometTail67 = Qt.vector4d(tail[12], tail[13], tail[14], tail[15]);
+        cometReach = reach;
         const m = Math.abs(((time + cometLead) % cometCycle) - cometCycle / 2) / cometPace;
         cometShow = fade * Math.min(1, time / 2.5) * Math.max(0, Math.min(1, 4.2 - m));
     }
@@ -224,7 +248,7 @@ Item {
 
     // ── The comet, on its own small item that rides along with its head ──
     ShaderEffect {
-        readonly property real reach: tail * 1.45 + size * 6 + 4
+        readonly property real reach: root.cometReach * 1.3 + 16
         visible: root.cometShow > 0
         x: root.comet.x - reach
         y: root.comet.y - reach
@@ -238,10 +262,13 @@ Item {
             const l = Math.max(1e-3, Math.hypot(dx, dy));
             return Qt.point(dx / l, dy / l);
         }
-        property point back: root.cometBack
+        property vector4d tail01: root.cometTail01
+        property vector4d tail23: root.cometTail23
+        property vector4d tail45: root.cometTail45
+        property vector4d tail67: root.cometTail67
         property real size: 1.7 * (1 + 0.3 * root.cometDepth)
-        property real tail: 60 + 80 * Math.min(1, root.cometNear)
         property real k: root.cometShow
+        property real time: root.time
         property color cHead: root.hot
         property color cDust: Colors.mix(root.theme.text, root.gold, 0.25)
         property color cIon: root.theme.sky

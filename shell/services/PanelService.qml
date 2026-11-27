@@ -17,6 +17,7 @@ Singleton {
         clipboard: { label: "Clipboard", icon: "clipboard" },
         clock: { label: "Clock", icon: "calendar" },
         display: { label: "Displays", icon: "display" },
+        keyboard: { label: "Keyboard", icon: "keyboard" },
         media: { label: "Now playing", icon: "media" },
         microphone: { label: "Microphone", icon: "audio-input" },
         network: { label: "Network", icon: "wifi" },
@@ -47,6 +48,8 @@ Singleton {
             return FeatureSupport.supportsBluetooth;
         if (panel === "display")
             return HyprlandService.running;
+        if (panel === "keyboard")
+            return HyprlandService.keyboardLayouts > 1;
         if (panel === "media")
             return MediaService.player !== null;
         if (panel === "weather")
@@ -94,6 +97,8 @@ Singleton {
             return (AudioService.output.deviceLabel || "Volume") + ": " + AudioService.output.volumePercent + "%";
         if (panel === "microphone")
             return (AudioService.input.deviceLabel || "Mic") + ": " + AudioService.input.volumePercent + "%";
+        if (panel === "keyboard")
+            return "Keyboard: " + HyprlandService.keyboardLayout;
         if (panel === "display" && BrightnessService.available)
             return "Brightness: " + BrightnessService.percent + "%";
         if (panel === "network") {

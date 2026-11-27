@@ -15,7 +15,7 @@ default:
 
 # QML module directories under shell/, imported as `qs.<dir>`.
 modules := "bar components core panels services"
-python := "shell/system/speshell-system tests/*.py"
+python := "shell/system/speshell-system shell/services/dictation.py tests/*.py"
 
 # Lint every script, the Python, and every QML module and JavaScript file; any warning fails.
 lint:

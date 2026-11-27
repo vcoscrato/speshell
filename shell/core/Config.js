@@ -338,7 +338,9 @@ function build(document, errors) {
             ocrLanguages: languagesValue(document, "Tools", "ocrLanguages", "eng", /^[A-Za-z0-9_]+$/, "+", errors),
             dictationLanguages: languagesValue(document, "Tools", "dictationLanguages", "", /^[a-z]{2,3}$/, ",", errors),
             dictationVocabulary: stringValue(document, "Tools", "dictationVocabulary", "", errors, true),
-            dictationModel: stringValue(document, "Tools", "dictationModel", "", errors, true)
+            dictationModel: stringValue(document, "Tools", "dictationModel", "", errors, true),
+            // Minutes the speech model stays loaded after a dictation; 0 unloads it at once.
+            dictationIdleMinutes: integerValue(document, "Tools", "dictationIdleMinutes", 5, 0, 1440, errors)
         }
     };
 }

@@ -9,7 +9,8 @@ import qs.services
 // open (`bar`) and once with each panel in SHOTS open, the launcher (`launcher`), the
 // theme gallery at its themes (`themes`) or the theme's wallpapers (`wallpapers`), or the
 // OSD (`osd`) at the level SHOT_OSD names (`output`, `input`, `brightness`, `keyboard`)
-// or, for anything else, at a state, or three toasts (`toasts`).
+// or, for anything else, at a state, three toasts (`toasts`), or dictation's card while it
+// listens (`dictation`) and with its text (`dictated`).
 // shot.sh copies this file to the root of a copy of the tree, so `qs.*` and the shipped
 // themes resolve. For each shot it saves OUT/<name>.png and logs the area to keep as
 // "crop <name> x y w h".
@@ -34,6 +35,9 @@ ShellRoot {
     property Item toastList: null
     // The OSD's card, moved into the scene.
     property Item osdCard: null
+    property var dictation: null
+    // Dictation's card, moved into the scene.
+    property Item dictationCard: null
     property int waits: 0
 
     function create(path, properties) {
@@ -112,6 +116,8 @@ ShellRoot {
             shell.showOsd();
         } else if (name === "toasts") {
             shell.showToasts();
+        } else if (name === "dictation" || name === "dictated") {
+            shell.showDictation(name === "dictated");
         } else if (name !== "bar") {
             const button = shell.bar.buttonFor(name);
             // The weather's button shows once the forecast arrives.
@@ -151,6 +157,27 @@ ShellRoot {
         card.y = Qt.binding(() => scene.height - Theme.osdMargin - card.height);
     }
 
+    // Dictation's card where it docks with the bar at the top: under the bar's right end.
+    function showDictation(ready) {
+        const before = scene.children.length;
+        shell.dictation = shell.create("core/DictationWindow.qml", {});
+        const card = scene.children.slice(before).find(item => shell.find(item, child => "pinnedContent" in child));
+        const bar = ConfigService.settings.bar;
+        card.x = Qt.binding(() => scene.width - card.width - Math.max(Theme.spacingSmall,
+            Math.round(scene.width * (100 - bar.width) / 200)));
+        card.y = Qt.binding(() => bar.margin + bar.height + bar.gap + Theme.spacingSmall);
+        shell.dictationCard = card;
+        if (ready) {
+            DictationService.text = "Let's move the review to Thursday afternoon, and I'll send the updated slides before then.";
+            DictationService.phase = "ready";
+        } else {
+            DictationService.settled = "Let's move the review to Thursday afternoon, and I'll send";
+            DictationService.pending = "the updated slides";
+            DictationService.level = 0.5;
+            DictationService.phase = "listening";
+        }
+    }
+
     // The toasts where they show on a screen with the bar at the top: in the bottom right
     // corner, the oldest nearest it.
     function showToasts() {
@@ -180,6 +207,10 @@ ShellRoot {
             const margin = Theme.spacingLarge;
             area = Qt.rect(list.x - margin, list.y + list.height - list.contentHeight - margin,
                 list.width + margin * 2, list.contentHeight + margin * 2);
+        } else if (name === "dictation" || name === "dictated") {
+            const card = shell.dictationCard;
+            const margin = Theme.spacingLarge;
+            area = Qt.rect(card.x - margin * 4, 0, scene.width - card.x + margin * 4, card.y + card.height + margin);
         } else if (name === "osd") {
             const card = shell.osdCard;
             const margin = Theme.spacingLarge;
@@ -203,6 +234,13 @@ ShellRoot {
                 shell.toasts.destroy();
                 shell.toasts = null;
                 shell.toastList = null;
+            }
+            if (shell.dictation) {
+                DictationService.reset();
+                DictationService.phase = "idle";
+                shell.dictation.destroy();
+                shell.dictation = null;
+                shell.dictationCard = null;
             }
             if (shell.osd) {
                 shell.osd.destroy();

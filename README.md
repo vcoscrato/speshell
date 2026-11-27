@@ -66,7 +66,7 @@ The first run seeds `~/.config/speshell/config.ini`; upgrades never touch it or 
 
 ## The bar
 
-The Speshell mark at the left opens the launcher, followed by the screen's workspaces. The clock sits in the middle and opens the clock panel; the playing track sits before it, its cover opening the player, and the weather, your timers, and what's running after, opening the forecast and each timer. A dictation or a screen recording shows there as a chip with its running time: click it to finish, and right-click a dictation to discard it. The tray and the panel buttons fill the right. Scroll over the speaker, microphone, or display button to change the volume or brightness, and right-click the speaker or microphone to switch devices.
+The Speshell mark at the left opens the launcher, followed by the screen's workspaces. The clock sits in the middle and opens the clock panel; the playing track sits before it, its cover opening the player, and the weather, your timers, and what's running after, opening the forecast and each timer. A dictation or a screen recording shows there as a chip with its running time: click it to stop, and a stopped dictation's to type it; right-click a dictation to discard it. The tray and the panel buttons fill the right. Scroll over the speaker, microphone, or display button to change the volume or brightness, and right-click the speaker or microphone to switch devices.
 
 `speshell panel open|toggle NAME` opens a panel from a keybinding; `speshell panel list` names them.
 
@@ -103,14 +103,16 @@ Its Timer row puts a new timer in the bar and opens it there: name it if you lik
 
 | Tool | Does | Needs |
 |---|---|---|
-| Dictation | Records until run again, then types and copies what you said | `pipewire-audio`, `whisper-cpp`, `wtype`, `wl-clipboard`, `curl` (model download) |
+| Dictation | Shows what you say as you say it, then types it into the focused window or copies it | `pipewire-audio`, `whisper-cpp`, `wtype`, optionally `wl-clipboard` (Copy) |
 | Copy text | Copies the text in an area | `grim`, `slurp`, `tesseract` and a `tesseract-data-*` per language, `wl-clipboard` |
 | Screenshot | Saves an area or the screen to Pictures/Screenshots and copies it; Annotate opens it in Swappy | `grim`, `slurp`, `wl-clipboard`, optionally `swappy` |
 | Record | Records an area or the screen, with sound, to Videos/Recordings until run again | `wf-recorder`, `slurp` |
 | Scan code | Copies a QR code or barcode, offering to open links | `grim`, `slurp`, `zbar`, `wl-clipboard` |
 | Pick color | Copies a pixel's hex color | `hyprpicker`, `wl-clipboard` |
 
-`[Tools]` in the config sets the OCR and dictation languages, dictation vocabulary, and Whisper model. Bind them with `speshell tool`:
+Dictation opens a card under the bar's right end and shows your words as Whisper hears them, the last few dimmer until they settle. Run it again to stop listening, and the card holds the text: click it to fix a word, then Type puts it into the focused window and Copy puts it on the clipboard. Nothing goes to either until you ask, so it doesn't matter where you were when you started. Run it a third time to type it, as soon as you let go of the keys. Drag the card anywhere and it stays there, or back under the bar to dock it. The first dictation downloads the model; it then stays loaded for a few minutes after each one, so the next starts at once.
+
+`[Tools]` in the config sets the OCR and dictation languages, dictation vocabulary, the Whisper model, and how long it stays loaded. Bind them with `speshell tool`:
 
 ```lua
 hl.bind("SUPER + D", hl.dsp.exec_cmd("speshell tool dictate"))
@@ -119,6 +121,12 @@ hl.bind("Print", hl.dsp.exec_cmd("speshell tool screenshot"))
 hl.bind("SHIFT + Print", hl.dsp.exec_cmd("speshell tool ocr"))
 hl.bind("SUPER + R", hl.dsp.exec_cmd("speshell tool record"))
 hl.bind("SUPER + SHIFT + R", hl.dsp.exec_cmd("speshell tool record screen"))
+```
+
+Dictation types through `wtype`'s virtual keyboard, and first waits for the keys that ran it to come up, since a Super still held down would turn the typed letters into shortcuts. This rule rules that out for good:
+
+```lua
+hl.device({ name = "hl-virtual-keyboard-wtype", keybinds = false, share_states = 0 })
 ```
 
 ## Power

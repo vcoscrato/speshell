@@ -210,4 +210,6 @@ Scope {
     OsdWindow {}
 
     NotificationToastWindow {}
+
+    DictationWindow {}
 }

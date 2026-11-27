@@ -3,9 +3,9 @@ pragma Singleton
 import QtQuick
 import Quickshell
 
-// What's running, for the bar's chips: the tools' activities, which ToolsService finds,
+// What's running, for the bar's chips: the tools' activities, which ToolsService gathers,
 // and those published with `speshell activity`, which stand in for a tool's of the same
-// id (as dictation's model download does for dictation).
+// id.
 Singleton {
     id: root
 
@@ -40,9 +40,10 @@ Singleton {
         };
     }
 
-    // ToolsService's activities, replacing the last unless they're the same.
+    // ToolsService's activities, replacing the last unless they show the same.
     function setTools(supplied) {
-        const key = list => list.map(activity => activity.id + ":" + activity.state).join(",");
+        const key = list => JSON.stringify(list.map(activity => root.entry(activity, null))
+            .map(shown => [shown.id, shown.state, shown.label, shown.detail, shown.iconName, shown.tone, shown.actions]));
         if (key(supplied) === key(root.toolActivities))
             return;
         const previous = {};

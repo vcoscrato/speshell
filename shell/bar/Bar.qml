@@ -50,13 +50,13 @@ PanelWindow {
     readonly property string openPanel: dropdown.panel
     readonly property Item dropdownButton: dropdown.button
     readonly property bool dropdownOpen: root.openPanel !== ""
-    // A tray item's or the keyboard layouts' menu is open.
+    // A tray item's menu is open.
     readonly property bool menuOpen: {
         for (let i = 0; i < trayRepeater.count; i++) {
             if ((trayRepeater.itemAt(i) as TrayItem)?.menuOpen)
                 return true;
         }
-        return layoutButton.menuOpen;
+        return false;
     }
     readonly property bool overlayOpen: root.dropdownOpen || root.menuOpen
 
@@ -110,6 +110,8 @@ PanelWindow {
             return clockButton;
         if (panel === "weather")
             return weatherButton.visible ? weatherButton : null;
+        if (panel === "keyboard")
+            return layoutButton.visible ? layoutButton : null;
         if (panel === "media")
             return media.visible ? media.coverButton : null;
         // The newest timer.
@@ -431,10 +433,22 @@ PanelWindow {
                     }
                 }
 
-                KeyboardLayoutButton {
+                // The layout typing, as "BR"; scrolling steps through them, and the
+                // panel picks one. Follows switches made elsewhere, as by xkb's shortcut.
+                BarButton {
                     id: layoutButton
+                    readonly property var layouts: HyprlandService.keyboardLayoutList
+                    readonly property int active: HyprlandService.keyboardLayoutIndex
+
                     size: root.itemSize
                     labelAbove: !root.atTop
+                    visible: PanelService.isSupported("keyboard")
+                    open: root.dropdownButton === layoutButton
+                    label: PanelService.status("keyboard")
+                    text: active >= 0 && active < layouts.length ? layouts[active].code : ""
+                    fontWeight: Font.DemiBold
+                    onClicked: pointer => root.toggleDropdown("keyboard", layoutButton, pointer)
+                    onScrolled: direction => HyprlandService.stepKeyboardLayout(-direction)
                 }
 
                 Repeater {

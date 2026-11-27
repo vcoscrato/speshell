@@ -6,10 +6,10 @@ import qs.services
 import "../components/Format.js" as Format
 
 // A new timer, set in the bar, and the installed capture and input tools. A click on a
-// tool closes the dropdown and runs it: dictation starts listening and types into the
-// focused window, the others take an area the user drags out, or the whole screen from
-// the row's screen button. A running dictation or recording shows in its row, and
-// another click finishes it.
+// tool closes the dropdown and runs it: dictation listens, in its card, the others take
+// an area the user drags out, or the whole screen from the row's screen button. A running
+// dictation or recording shows in its row, and another click stops it, or types the
+// dictation into the focused window.
 Card {
     id: root
 
@@ -48,20 +48,22 @@ Card {
 
             required property var modelData
 
-            readonly property var dictation: row.modelData.id === "dictate" ? ToolsService.dictation : null
+            readonly property var dictation: row.modelData.id === "dictate" ? DictationService.activity : null
             readonly property var recording: row.modelData.id === "record" ? ToolsService.recording : null
 
             width: parent.width
             flat: true
-            iconName: row.recording !== null ? "record-stop" : (row.busy ? "loader" : row.modelData.iconName)
-            busy: row.dictation !== null && !ToolsService.listening
+            iconName: row.recording !== null ? "record-stop"
+                : (row.dictation !== null ? row.dictation.iconName : row.modelData.iconName)
+            busy: row.dictation !== null && row.dictation.state === "busy"
             tone: row.recording !== null ? "error" : "accent"
             active: row.recording !== null || row.dictation !== null
             label: row.recording !== null ? "Recording · " + Format.clock((root.now - row.recording.startedAt) / 1000)
                 : (row.dictation !== null ? row.dictation.detail : row.modelData.label)
             detail: row.recording !== null ? "Click to stop and save"
-                : (ToolsService.listening && row.dictation !== null ? "Click to type it out"
-                : (row.dictation !== null ? "Typing into the focused window next" : row.modelData.detail))
+                : DictationService.phase === "listening" && row.dictation !== null ? "Click to stop"
+                : DictationService.phase === "ready" && row.dictation !== null ? "Click to type it out"
+                : (row.dictation !== null ? "" : row.modelData.detail)
             secondaryIcon: row.dictation !== null ? "close"
                 : (row.modelData.screenMode && row.recording === null ? "display" : "")
             secondaryText: row.dictation !== null ? "Discard" : "Whole screen"

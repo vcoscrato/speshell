@@ -58,13 +58,15 @@ Singleton {
         root.backendState = (status && status.BackendState) || "";
     }
 
-    // Signed out, logging in also brings it up.
+    // Brings up the current profile, and prints its login page when it's signed out.
+    // Never "tailscale login": that switches tailscaled to a new, empty profile, which
+    // has no operator.
     function connect() {
         if (root.busyAction !== "")
             return;
         root.busyAction = "up";
         root.errorText = "";
-        switchProc.command = ["tailscale", root.backendState === "Stopped" ? "up" : "login"];
+        switchProc.command = ["tailscale", "up"];
         switchProc.running = true;
     }
 

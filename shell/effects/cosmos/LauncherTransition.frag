@@ -198,10 +198,8 @@ void main() {
 
     acc = twinkles(acc, p);
 
-    // Orbit lines, faint and a little heavier on the near side, brightening along
-    // the trail each planet leaves behind it.
+    // Orbit lines, faint and a little heavier on the near side.
     vec2 q = rot(p - u.center, -TILT);
-    float th = atan(q.y, q.x);
     for (int i = 0; i < 5; i++) {
         vec3 pp = planetParams(i);
         float A = pp.x * u.scale;
@@ -211,10 +209,8 @@ void main() {
         if (abs(dl) > 2.5)
             continue;
         float near = smoothstep(-1.0, 1.0, q.y / e.y);
-        float behind = mod(pp.z - th, TAU) / (TAU * 0.3);
-        float trail = behind < 1.0 ? (1.0 - behind) * (1.0 - behind) : 0.0;
-        float line = 1.0 - smoothstep(0.35 + 0.35 * near + 0.4 * trail, 1.4 + 0.3 * near + 0.5 * trail, abs(dl));
-        acc = over(acc, u.cOrbit.rgb, line * u.cOrbit.a * ((0.2 + 0.25 * near) + 1.6 * trail));
+        float line = 1.0 - smoothstep(0.35 + 0.35 * near, 1.4 + 0.3 * near, abs(dl));
+        acc = over(acc, u.cOrbit.rgb, line * u.cOrbit.a * (0.2 + 0.25 * near));
     }
     acc = over(acc, u.cDust.rgb, belt(p, vec2(q.x, q.y / RATIO)));
     acc *= u.fade;
