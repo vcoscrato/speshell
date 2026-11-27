@@ -8,6 +8,7 @@ steps that need root go through sudo; apply and update ask things, so a terminal
 README.md beside it describes the format.
 """
 
+import contextlib
 import fcntl
 import fnmatch
 import grp
@@ -119,13 +120,17 @@ def write_atomically(path, text, like=None):
     path = Path(os.path.realpath(path))
     path.parent.mkdir(parents=True, exist_ok=True)
     handle, temporary = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
-    with os.fdopen(handle, "w") as file:
-        file.write(text)
-    if like and os.path.exists(like):
-        shutil.copymode(like, temporary)
-    else:
-        os.chmod(temporary, 0o644)
-    os.replace(temporary, path)
+    try:
+        with os.fdopen(handle, "w") as file:
+            file.write(text)
+        if like and os.path.exists(like):
+            shutil.copymode(like, temporary)
+        else:
+            os.chmod(temporary, 0o644)
+        os.replace(temporary, path)
+    except BaseException:
+        os.unlink(temporary)
+        raise
 
 
 def link_atomically(source, target):
@@ -194,6 +199,15 @@ def step(text):
         print(f"\n\033[1m:: {text}\033[0m", flush=True)
     else:
         print(f"\n:: {text}", flush=True)
+
+
+def confirmed(question):
+    """Whether the answer to QUESTION is yes, its default; input that ends, as at Ctrl+D, is no."""
+    try:
+        return input(question).strip().lower() in ("", "y", "yes")
+    except EOFError:
+        print()
+        return False
 
 
 def plural(count, word):
@@ -919,27 +933,21 @@ class Apply:
         for item in steps:
             target, placed = item.subject, self.plan.files.get(item.subject)
             print(f"  {item.text}", flush=True)
+            changes = item.changes
             if item.keep and self.keep(target):
                 kept.add(target)
             if item.kind == "link":
                 link_atomically(placed.source, target)
             elif item.kind == "copy":
-                if (
-                    run(
-                        ["cmp", "-s", "--", str(placed.source), target],
-                        root=True,
-                        check=False,
-                        stderr=subprocess.DEVNULL,
-                    ).returncode
-                    == 0
-                ):
+                source = str(placed.source)
+                compared = run(["cmp", "-s", "--", source, target], root=True, check=False, stderr=subprocess.DEVNULL)
+                if compared.returncode == 0:
                     # Only its owner or mode differed from the module's.
                     self.own(target, item.mode)
-                    continue
-                run(
-                    ["install", "-D", "-m", item.mode, "-o", "root", "-g", "root", "--", str(placed.source), target],
-                    root=True,
-                )
+                    changes = False
+                else:
+                    owned = ["-m", item.mode, "-o", "root", "-g", "root"]
+                    run(["install", "-D", *owned, "--", source, target], root=True)
             elif item.kind == "mode":
                 self.own(target, item.mode)
             elif item.kind == "unlink":
@@ -950,29 +958,42 @@ class Apply:
                 self.restore(target)
             elif item.kind == "reinstate":
                 self.reinstate(target, item.detail)
-            # A forgotten file stays as it is, and the state below no longer has it.
-            if item.changes:
+            # A forgotten file stays as it is, and the state no longer has it.
+            if changes:
                 self.changed.append(target)
-        files = {}
-        for target, placed in self.plan.files.items():
-            if target.startswith(f"{HOME}/"):
-                if linked(target, placed.source):
-                    files[target] = {"module": placed.module, "kind": "link"}
-                continue
-            record = {"module": placed.module, "kind": "copy", "sha": sha(placed.source), "size": None, "mtime": None}
-            if os.path.exists(target):
-                stat = os.stat(target)
-                record.update(size=stat.st_size, mtime=int(stat.st_mtime))
-            elif not hidden(target):
-                continue
-            # A record from before originals were kept doesn't say whether its copy replaced one,
-            # and keeps not saying, so its file stays when its line goes.
-            previous = self.state["files"].get(target)
-            if target in kept or not previous or "original" in previous:
-                record["original"] = target in kept or bool(previous and previous.get("original"))
-            files[target] = record
-        self.state["files"] = files
+            # Kept as each lands, so an apply stopped partway knows what it placed: a copy
+            # into an empty path, taken for an original on the next apply, would come back
+            # rather than go when its line does.
+            self.record(target, kept)
+            save_state(self.state)
+        for target in list(dict.fromkeys([*self.state["files"], *self.plan.files])):
+            self.record(target, kept)
         save_state(self.state)
+
+    def record(self, target, kept):
+        """Notes in the state what TARGET is now: its module's file linked or copied there,
+        or nothing when no line places it or it isn't there. KEPT are the targets whose
+        original this apply kept."""
+        files = self.state["files"]
+        previous = files.pop(target, None)
+        placed = self.plan.files.get(target)
+        if not placed:
+            return
+        if target.startswith(f"{HOME}/"):
+            if linked(target, placed.source):
+                files[target] = {"module": placed.module, "kind": "link"}
+            return
+        record = {"module": placed.module, "kind": "copy", "sha": sha(placed.source), "size": None, "mtime": None}
+        if os.path.exists(target):
+            stat = os.stat(target)
+            record.update(size=stat.st_size, mtime=int(stat.st_mtime))
+        elif not hidden(target):
+            return
+        # A record from before originals were kept doesn't say whether its copy replaced one,
+        # and keeps not saying, so its file stays when its line goes.
+        if target in kept or not previous or "original" in previous:
+            record["original"] = target in kept or bool(previous and previous.get("original"))
+        files[target] = record
 
     def own(self, target, mode):
         run(["chown", "root:root", "--", target], root=True)
@@ -1071,7 +1092,8 @@ def run_command(hold, body, last=True):
     if hold and (failed or last):
         if failed:
             print("\nspeshell system: stopped by the error above; the steps after it did not run.")
-        input("\nPress Enter to close. ")
+        with contextlib.suppress(EOFError):
+            input("\nPress Enter to close. ")
     if failed:
         sys.exit(1)
 
@@ -1101,7 +1123,7 @@ def apply(args):
         if not plan.steps:
             return
         ask = not yes and (plan.leaves() or not after_update)
-        if ask and input("\nApply? [Y/n] ").strip().lower() not in ("", "y", "yes"):
+        if ask and not confirmed("\nApply? [Y/n] "):
             return
         if plan.needs_root():
             run(["-v"], root=True)
@@ -1153,7 +1175,7 @@ def add(args):
     if len(args) < 2:
         usage()
     module = known(Config(), args[0])
-    names = [valid(name) for name in args[1:]]
+    names = list(dict.fromkeys(valid(name) for name in args[1:]))
     for name in names:
         if name in module.packages:
             raise Stop(f"{module.id} already has {name}")

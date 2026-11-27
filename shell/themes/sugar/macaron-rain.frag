@@ -8,8 +8,9 @@
 // shell and filling. They land in a lake of milk between banks of strawberry and
 // pistachio cream: rings spread where they drop, some float, and the banks are dotted
 // with the ones that came down before, sprinkles lying round them. In front, on a bank
-// of cream with puddles of milk in its hollows, three have landed in a stack and one stands on its edge against another. Far off,
-// small clouds rain on soft hills, all of it mirrored in the milk.
+// of cream with puddles of milk in its hollows, three have landed in a stack and one
+// stands on its edge against another. Far off, small clouds rain on soft hills, all of
+// it mirrored in the milk.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {

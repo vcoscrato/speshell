@@ -65,21 +65,15 @@ Singleton {
     }
 
     function popupById(popupId) {
-        for (let i = 0; i < root.activePopups.length; i++) {
-            if (root.activePopups[i].popupId === popupId)
-                return root.activePopups[i];
-        }
-        return null;
+        return root.activePopups.find(popup => popup.popupId === popupId) || null;
     }
 
+    // A notification that closes after its toast went, as one expired or dismissed
+    // here, finds none.
     function removePopup(popupId) {
-        const current = root.activePopups.slice();
-        for (let i = 0; i < current.length; i++) {
-            if (current[i].popupId === popupId) {
-                current.splice(i, 1);
-                break;
-            }
-        }
+        const current = root.activePopups.filter(popup => popup.popupId !== popupId);
+        if (current.length === root.activePopups.length)
+            return;
         root.activePopups = current;
         // The last toast gone, nothing is left under the pointer.
         if (current.length === 0)

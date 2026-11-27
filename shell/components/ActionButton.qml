@@ -26,7 +26,7 @@ Item {
     readonly property bool danger: root.kind === "danger"
     readonly property bool flat: root.kind === "flat"
     readonly property real padding: root.compact ? Theme.spacingSmall : Theme.spacingMedium
-    readonly property color labelColor: root.primary ? Theme.onAccent
+    readonly property color labelColor: root.primary ? Theme.textOnAccent
         : root.danger ? Theme.error
         : root.checked || root.hovered ? Theme.accent
         : Theme.text

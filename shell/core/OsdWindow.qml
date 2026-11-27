@@ -41,7 +41,6 @@ PanelWindow {
         }
         if (root.shown)
             return;
-        root.targetScreen = HyprlandService.focusedScreen();
         root.shown = true;
         entrance.play();
     }

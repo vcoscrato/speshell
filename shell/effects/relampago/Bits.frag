@@ -27,6 +27,7 @@ layout(std140, binding = 0) uniform buf {
     vec4 cSmokeShade;
 } u;
 #include "../common/common.glsl"
+#include "Star.glsl"
 
 // The outline's width for a particle of radius R.
 float ink(float R) {
@@ -37,12 +38,6 @@ float ink(float R) {
 vec4 inked(vec4 under, float d, vec3 fill, float ow, float a) {
     vec4 c = over(under, u.cRubber.rgb, cover(ow - d) * a);
     return over(c, fill, cover(-d) * a);
-}
-
-// Pops out past full size and settles, 0..1 over the first `t` of its life.
-float pop(float t) {
-    float k = clamp(u.age / t, 0.0, 1.0);
-    return 1.0 + 2.7 * (k - 1.0) * (k - 1.0) * (k - 1.0) + 1.7 * (k - 1.0) * (k - 1.0);
 }
 
 vec4 spark(vec2 p, float R) {
@@ -64,7 +59,7 @@ vec4 smoke(vec2 p, float R) {
     // A cartoon puff: lumps heaped round a bigger middle one swell out and rise, then
     // drift apart and shrink away each at its own time, lit from above in flat tones
     // and outlined in a darker smoke, so it billows rather than sits like a stone.
-    float grow = mix(0.35, 1.0, pop(0.4));
+    float grow = mix(0.35, 1.0, backOut(u.age / 0.4));
     vec2 q = p + vec2(0.0, R * 0.22 * u.age);
     float apart = 0.2 * smoothstep(0.35, 1.0, u.age);
     float d = 1e3;
@@ -93,36 +88,10 @@ vec4 smoke(vec2 p, float R) {
     return over(c, col, cover(-d)) * 0.94;
 }
 
-// Signed distance to a star of n spikes, valleys at radius ri, each spike reaching an
-// uneven radius from ro * 0.7 to ro.
-float starDist(vec2 p, float n, float ri, float ro, float seed) {
-    float a = atan(p.y, p.x) / TAU * n;
-    float k = floor(a);
-    float d = 1e3;
-    float inside = 0.0;
-    for (int j = -1; j <= 1; j++) {
-        float c = k + float(j);
-        float v0 = c * TAU / n, v1 = (c + 1.0) * TAU / n, vt = (c + 0.5) * TAU / n;
-        float rt = ro * mix(0.7, 1.0, hash(vec2(mod(c, n), seed)));
-        vec2 a0 = vec2(cos(v0), sin(v0)) * ri;
-        vec2 a1 = vec2(cos(v1), sin(v1)) * ri;
-        vec2 tip = vec2(cos(vt), sin(vt)) * rt;
-        d = min(d, min(sdSeg(p, a0, tip), sdSeg(p, tip, a1)));
-        if (j == 0) {
-            // Inside this spike's sector when on the inner side of both its edges.
-            vec2 e0 = tip - a0, e1 = a1 - tip;
-            float s0 = e0.x * (p.y - a0.y) - e0.y * (p.x - a0.x);
-            float s1 = e1.x * (p.y - tip.y) - e1.y * (p.x - tip.x);
-            inside = (s0 > 0.0 && s1 > 0.0) || length(p) < ri ? 1.0 : 0.0;
-        }
-    }
-    return inside > 0.5 ? -d : d;
-}
-
 // A comic impact: a red star of spikes, a yellow one inside it turned half a spike,
 // and a hot core, popping out and shrinking away.
 vec4 starburst(vec2 p, float R, float age, float seed) {
-    float s = mix(0.2, 1.0, pop(0.18)) * (1.0 - smoothstep(0.55, 1.0, age));
+    float s = mix(0.2, 1.0, backOut(age / 0.18)) * (1.0 - smoothstep(0.55, 1.0, age));
     if (s < 0.02)
         return vec4(0.0);
     float n = R > 40.0 ? 11.0 : 8.0;
@@ -240,7 +209,7 @@ vec4 arc(vec2 p, float R) {
 
 vec4 glint(vec2 p, float R) {
     // A four-pointed twinkle with concave sides, popping out and shrinking.
-    float s = R * pop(0.25) * (1.0 - smoothstep(0.4, 1.0, u.age));
+    float s = R * backOut(u.age / 0.25) * (1.0 - smoothstep(0.4, 1.0, u.age));
     if (s < 0.5)
         return vec4(0.0);
     vec2 q = abs(rot(p, 0.6 * u.age)) / s;

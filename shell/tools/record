@@ -2,7 +2,7 @@
 # Usage: record [region|screen]
 # Records an area the user drags out (region, the default) or the focused
 # monitor (screen), with audio, to Videos/Recordings. While its recording runs,
-# any call stops it.
+# any call stops it; while its area is being picked, any call leaves it be.
 set -euo pipefail
 # shellcheck source=lib.sh
 source "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")/lib.sh"
@@ -15,6 +15,11 @@ if [[ "$pid" =~ ^[0-9]+$ && "$(ps -o comm= -p "$pid" 2>/dev/null)" == wf-recorde
   refresh_activity
   exit 0
 fi
+
+# Held from here until the recording ends, so a call while the area is being picked,
+# before there is a pid to stop, doesn't pick another; wf-recorder doesn't keep it.
+exec {lock}>"$runtime_dir/record.lock"
+flock -n "$lock" || exit 0
 
 case "${1:-region}" in
   region)
@@ -33,13 +38,16 @@ esac
 
 file="$(timestamped_file VIDEOS Recordings Recording).mp4"
 log="$runtime_dir/record.log"
-refresh_activity
+# Detached, so it mustn't keep the lock past the recording.
+refresh_activity {lock}>&-
 status=0
 (
+  exec {lock}>&-
   printf '%s\n' "$BASHPID" >"$pid_file"
   exec wf-recorder "${target[@]}" --audio -f "$file"
 ) >"$log" 2>&1 </dev/null || status=$?
 rm -f -- "$pid_file"
+exec {lock}>&-
 refresh_activity
 
 if [[ ! -s "$file" ]]; then

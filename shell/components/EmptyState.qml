@@ -2,7 +2,7 @@ import QtQuick
 import qs.services
 
 // What a panel shows when it has nothing to list: an icon disc, a title, a hint, and
-// optionally the one action that would fill it.
+// optionally the one action that would fill it. `busy` spins the disc while it loads.
 Item {
     id: root
 

@@ -1,4 +1,6 @@
 pragma ComponentBehavior: Bound
+// Quickshell's type info marks PanelWindow uncreatable, though QML creates it.
+// qmllint disable uncreatable-type
 import QtQuick
 import QtQml.Models
 import Quickshell
@@ -114,9 +116,11 @@ PanelWindow {
         if (panel === "timer")
             return timerChips.count > 0 ? timerChips.itemAt(timerChips.count - 1) : null;
         for (let i = 0; i < panelButtons.count; i++) {
-            const button = (panelButtons.itemAt(i) as Row).buttonFor(panel);
-            if (button)
-                return button;
+            for (const child of panelButtons.itemAt(i).children) {
+                const button = child as BarButton;
+                if (button?.panel === panel)
+                    return button.visible ? button : null;
+            }
         }
         return null;
     }
@@ -443,15 +447,6 @@ PanelWindow {
                         required property var modelData
                         required property int index
 
-                        function buttonFor(panel) {
-                            for (let i = 0; i < groupButtons.count; i++) {
-                                const button = groupButtons.itemAt(i) as BarButton;
-                                if (button.panel === panel)
-                                    return button.visible ? button : null;
-                            }
-                            return null;
-                        }
-
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: Theme.spacingTiny
 
@@ -461,7 +456,6 @@ PanelWindow {
                         }
 
                         Repeater {
-                            id: groupButtons
                             model: group.modelData
 
                             delegate: DelegateChooser {

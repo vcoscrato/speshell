@@ -38,6 +38,14 @@ Card {
     }
 
     onQueryChanged: root.select(0)
+    // Once the history empties, the search hides, forgetting its text, and there is
+    // nothing left to clear.
+    onHistoryChanged: {
+        if (root.history.length === 0) {
+            root.query = "";
+            root.confirmingClear = false;
+        }
+    }
     Component.onCompleted: ClipboardService.setViewPresented(true)
     Component.onDestruction: ClipboardService.setViewPresented(false)
 
@@ -52,7 +60,7 @@ Card {
     // The search stays put while the history scrolls under it.
     pinnedContent: [
         Notice {
-            visible: root.confirmingClear && root.history.length > 0
+            visible: root.confirmingClear
             iconName: "trash"
             toneColor: Theme.error
             detail: "Clear all " + root.history.length + (root.history.length === 1 ? " item?" : " items?")

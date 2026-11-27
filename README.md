@@ -14,7 +14,7 @@ This is Speshell, pronounced *special*. My [Quickshell](https://quickshell.outfo
 - A bar on every screen: workspaces, the clock with the weather and your timers, the playing track, the tray, and a button for each panel
 - Clock panel: a clock face in the theme's style beside the month, and a button that opens your calendar in the browser (`[Clock] calendarUrl`)
 - Weather panel: the conditions now, the next hours, and the week
-- Panels for audio output and input, displays and brightness, network (Wi-Fi, and NetworkManager's VPN and WireGuard profiles), Bluetooth, battery, notifications with Do Not Disturb, media, power, Markdown notes, clipboard history, and tools
+- Panels for audio output and input, displays and brightness, network (Wi-Fi, NetworkManager's VPN and WireGuard profiles, and Tailscale), Bluetooth, battery, notifications with Do Not Disturb, media, power, Markdown notes, clipboard history, and tools
 - On a laptop: the battery's charge in the bar, low-battery warnings, dimming, locking, and sleeping on idle, hibernating, a lower brightness on battery, locking before the lid sleeps it, the laptop's display off while docked with the lid closed, and an OSD for brightness, the keyboard backlight, the microphone, the touchpad, and airplane mode (see [Laptops](#laptops))
 - Launcher: apps, open windows and apps hidden in the tray, a calculator, web searches and your own bangs
 - Theme gallery: every theme over its wallpaper, previewed full screen in its own colors with its clock face, then its wallpapers to pick from
@@ -28,9 +28,9 @@ Panels for missing hardware or tools hide themselves. Speshell runs on any Wayla
 
 ## Requirements
 
-Quickshell ≥ 0.3, PipeWire/WirePlumber, NetworkManager, BlueZ, libnotify, UPower, polkit, jq, sudo.
+Quickshell ≥ 0.3, PipeWire/WirePlumber, NetworkManager, BlueZ, libnotify, UPower, polkit, jq, sudo, and Python with pyalpm (`speshell system`).
 
-Optional: Hyprland (workspaces, the Displays panel), `brightnessctl`, `openconnect` (OpenConnect VPN logins), `libsecret` (remembering VPN passwords in the keyring), `greetd` (the login screen), `paru` or `yay` (AUR packages in `speshell system`), `power-profiles-daemon` (power profiles), `matugen` (app themes), `cliphist`, `wl-clipboard`, `xdg-utils`, and the tools' programs below.
+Optional: Hyprland (workspaces, the Displays panel), `hyprsunset` (night light), `hyprshutdown` (closing apps gracefully on logging out of Hyprland), `tailscale` (Tailscale in the Network panel), `brightnessctl`, `openconnect` (OpenConnect VPN logins), `libsecret` (remembering VPN passwords in the keyring), `greetd` (the login screen), `paru` or `yay` (AUR packages in `speshell system`), `power-profiles-daemon` (power profiles), `matugen` (app themes), `cliphist`, `wl-clipboard`, `xdg-utils`, and the tools' programs below.
 
 ## Install
 
@@ -72,7 +72,7 @@ The Speshell mark at the left opens the launcher, followed by the screen's works
 
 ## Configuration
 
-Options are in `~/.config/speshell/config.ini`, opened from the Power panel's header, and documented by [`config.example.ini`](config.example.ini). Edits apply on save; an invalid file keeps the previous settings and shows the error.
+Options are in `~/.config/speshell/config.ini`, opened from the Power panel's header, and documented by [`config.example.ini`](shell/config.example.ini). Edits apply on save; an invalid file keeps the previous settings and shows the error.
 
 The weather, on with `[Weather] enabled`, comes from [Open-Meteo](https://open-meteo.com/) for `[Weather] location`, or, left empty, for where [ipinfo.io](https://ipinfo.io/) places your IP address. Click the place in the weather panel's header to change it. Units follow your locale's measurement system.
 
@@ -87,7 +87,6 @@ The weather, on with `[Weather] enabled`, comes from [Open-Meteo](https://open-m
 | `!yt query` | A bang from `[Launcher.Bangs]` |
 | `? query` | Search with `[Launcher] searchUrl` |
 | `!theme`, or "themes" | Open the theme gallery |
-| a theme's name, as "fire" | Open the theme gallery at that theme |
 | `!wallpaper`, or "wallpapers" | Pick another wallpaper of the current theme |
 | `!mirror` | Mirror the displays, or extend them again |
 | `!apply`, `!update` | Apply your system modules, or update the system and then apply them, in a terminal |
@@ -104,7 +103,7 @@ Its Timer row puts a new timer in the bar and opens it there: name it if you lik
 
 | Tool | Does | Needs |
 |---|---|---|
-| Dictation | Records until run again, then types and copies what you said | `pipewire`, `whisper.cpp`, `wtype`, `wl-clipboard`, `curl` (model download) |
+| Dictation | Records until run again, then types and copies what you said | `pipewire-audio`, `whisper-cpp`, `wtype`, `wl-clipboard`, `curl` (model download) |
 | Copy text | Copies the text in an area | `grim`, `slurp`, `tesseract` and a `tesseract-data-*` per language, `wl-clipboard` |
 | Screenshot | Saves an area or the screen to Pictures/Screenshots and copies it; Annotate opens it in Swappy | `grim`, `slurp`, `wl-clipboard`, optionally `swappy` |
 | Record | Records an area or the screen, with sound, to Videos/Recordings until run again | `wf-recorder`, `slurp` |
@@ -249,7 +248,7 @@ speshell lock
 speshell panel list | open NAME | toggle NAME | close
 speshell theme list | get | set ID | shuffle [ID] | rescan | open | close | toggle
 speshell wallpaper get | set PATH | open | toggle
-speshell system [status] | apply | update | add MODULE PACKAGE | remove PACKAGE | help
+speshell system [status] | apply | update | init | add MODULE PACKAGE... | remove PACKAGE... | enable MODULE | disable MODULE | adopt FILE | restore FILE | help
 speshell tool list | dictate [cancel] | ocr | screenshot [region|screen] | record [region|screen] | qr | color
 speshell timer get | start LENGTH [NAME] | add LENGTH [NAME] | pause|resume|toggle|stop [NAME]
 speshell activity set ID STATE LABEL [DETAIL] [ICON] [TONE]

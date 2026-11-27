@@ -32,6 +32,8 @@ EffectScene {
         width: 540
         height: 330
         theme: root.swatch
+        // Gone with the launcher, as LauncherOverlay hides its window once the exit finishes.
+        visible: root.opened || root.presenting
     }
 
     // Like Speshell, destroy the transition as soon as it reports the exit finished,

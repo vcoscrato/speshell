@@ -17,7 +17,7 @@ just check                               # every effect in every scene but picks
 just bench fire                          # GPU time per frame at 1080p, phase by phase
 just bench -a HEAD earth                 # the same, against the last commit
 just shot fire                           # the real bar with each panel open, and a contact sheet
-just shot earth network notes            # only those panels (or `launcher`, `osd`, `toasts`)
+just shot earth network notes            # only those panels (or `launcher`, `themes`, `wallpapers`, `osd`, `toasts`)
 ```
 
 Scenes drive `EffectClock` with virtual time, 1/60 s per frame, so captures match real playback, and every scene draws in the colors of the theme named like the effect. The wallpaper scene hosts this checkout's `shell/core/WallpaperView.qml`. The clock scene shows the face over the backdrop, at the clock panel's size and at twice it, ticking from 10:09:30 and keeping still from 3 s, as in power saver. The controls scene plays a script on mock controls in those colors: a slider dragged and let go twice, another stepped by the wheel, an audio device and a segment picked, a switch turned on and off, and a square button picked. Env knobs:
@@ -31,4 +31,4 @@ Scenes drive `EffectClock` with virtual time, 1/60 s per frame, so captures matc
 
 `just clean` removes compiled shaders and everything in `~/.cache/speshell-preview/`.
 
-**Try it in the real shell.** Quickshell reloads QML when its files change, but Qt keeps every shader it has loaded until the process exits. Restart Speshell after a shader change, including after `just local-package-install`.
+**Try it in the real shell.** Speshell doesn't reload when its files change, and Qt keeps every shader it has loaded until the process exits, so restart it after a change (Relaunch, in the Power panel's header), including after `just local-package-install`.

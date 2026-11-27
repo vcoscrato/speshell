@@ -106,7 +106,7 @@ Card {
                 busy: root.isBusy(deviceRow.modelData)
                 primaryEnabled: false
                 actions: root.deviceActions(deviceRow.modelData)
-                opacity: root.anyBusy && !deviceRow.busy ? 0.5 : 1.0
+                opacity: root.anyBusy && !deviceRow.busy ? Theme.disabledOpacity : 1.0
                 onActionTriggered: actionId => {
                     if (actionId === "connect" || actionId === "disconnect")
                         BluetoothService.connectDevice(deviceRow.modelData, actionId === "connect");

@@ -1,4 +1,5 @@
-// Shared helpers for element shaders. Coordinates are screen pixels unless noted.
+// Helpers the effects' shaders and the themes' paintings share. Coordinates are pixels
+// unless noted.
 
 const float PI = 3.1415927;
 const float TAU = 6.2831853;
@@ -31,6 +32,13 @@ float zig(float x, float seed) {
 vec2 rot(vec2 v, float a) {
     float c = cos(a), s = sin(a);
     return vec2(c * v.x - s * v.y, s * v.x + c * v.y);
+}
+
+// Easing that overshoots and settles, as x runs 0..1 (clamped): from 0 it swings about
+// a tenth past 1, then comes back to 1.
+float backOut(float x) {
+    float j = clamp(x, 0.0, 1.0) - 1.0;
+    return 1.0 + 2.7 * j * j * j + 1.7 * j * j;
 }
 
 // Divergence-free swirl: the curl of a scalar noise potential.
@@ -181,6 +189,24 @@ float voronoiEdge(vec2 p, float size, float jitter) {
             edge = min(edge, dot((a + b) * 0.5 - p, normalize(b - a)));
         }
     return edge;
+}
+
+// For Voronoi cells of `size` px, each site anywhere in its square: at p, the second
+// nearest site's distance less the nearest's, and the third's less the nearest's. The
+// first is zero along the cell borders and the second only where three cells meet, so
+// caustics drawn from them swell where their lines meet.
+vec2 voronoiGaps(vec2 p, float size) {
+    vec2 g = floor(p / size);
+    float d1 = 1e9, d2 = 1e9, d3 = 1e9;
+    for (int y = -1; y <= 1; y++)
+        for (int x = -1; x <= 1; x++) {
+            vec2 cell = g + vec2(x, y);
+            float d = length(p - (cell + hash2(cell)) * size);
+            if (d < d1) { d3 = d2; d2 = d1; d1 = d; }
+            else if (d < d2) { d3 = d2; d2 = d; }
+            else d3 = min(d3, d);
+        }
+    return vec2(d2 - d1, d3 - d1);
 }
 
 // Arc length along the border of a rounded rect (half size `h`, corner radius `r`)

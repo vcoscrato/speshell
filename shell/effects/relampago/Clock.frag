@@ -69,7 +69,6 @@ void main() {
     float outer = dialR * 0.97;
     float tick = max(abs(tq.x) - tickW, abs(tq.y - (outer - tickLen * 0.5)) - tickLen * 0.5);
     vec3 tickCol = mix(u.cDim.rgb, u.cTick.rgb, isHour);
-    tickCol = mix(tickCol, u.cTick.rgb, step(50.0 / 60.0, turn) * 0.0);
     o = over(o, tickCol, cover(-tick));
 
     // ── The bolt: struck from the cap to the second's tick, crackling till the next ──

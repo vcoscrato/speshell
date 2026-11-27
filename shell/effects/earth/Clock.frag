@@ -59,8 +59,7 @@ vec3 gem(vec2 q, float r) {
 vec2 obelisk(vec2 q, float len, float w) {
     float y = clamp(q.y, -w, len);
     float halfWidth = q.y < 0.0 ? w : w * (1.0 - 0.75 * y / len);
-    float tip = q.y - len - halfWidth * 0.0;
-    float d = max(abs(q.x) - halfWidth, max(-q.y - w, tip));
+    float d = max(abs(q.x) - halfWidth, max(-q.y - w, q.y - len));
     // A pointed tip: cut by two slopes.
     d = max(d, (abs(q.x) * 1.6 + q.y) - len);
     return vec2(d, sign(q.x));
@@ -123,7 +122,7 @@ void main() {
     // ── Jade at the hours ──
     float k = floor(turn * 12.0 + 0.5);
     float quarter = step(mod(k, 3.0), 0.5);
-    vec2 g = rot(p - at(k / 12.0, R * 0.85), 0.0);
+    vec2 g = p - at(k / 12.0, R * 0.85);
     float gr = mix(R * 0.03, R * 0.052, quarter);
     float hex = sdHexagon(rot(g, k / 12.0 * TAU), gr);
     float diamond = (abs(g.x) + abs(g.y)) * 0.75 - gr * 0.72;

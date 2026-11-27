@@ -146,11 +146,12 @@ Singleton {
             root.copy(entry.id, Shell.script("clipboard.sh", ["copy", String(entry.id)]), "");
     }
 
-    // Through stdin, where a large text fits.
+    // Through stdin, where a large text fits, and through the script, so a missing
+    // wl-copy fails as a copy rather than never starting.
     function copyText(text) {
         const value = String(text || "");
         if (value !== "")
-            root.copy("", ["wl-copy"], value);
+            root.copy("", Shell.script("clipboard.sh", ["text"]), value);
     }
 
     function finishCopy(exitCode) {

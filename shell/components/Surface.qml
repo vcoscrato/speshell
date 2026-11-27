@@ -9,10 +9,6 @@ Item {
     id: root
 
     property bool backdrop: false
-    // Paint the backdrop at least this tall and show its top. Backdrops keep their busy
-    // parts low, below where text sits on a tall surface, so a short surface full of
-    // text, like the bar or the launcher, shows their calm top.
-    property real backdropHeight: Theme.backdropHeight
     property int radius: Theme.surfaceRadius
     // Every corner, for a surface away from the screen's edges.
     property bool rounded: false
@@ -31,7 +27,10 @@ Item {
         id: material
 
         width: root.width
-        height: Math.max(root.height, root.backdropHeight)
+        // At least the backdrop's own height, showing its top. Backdrops keep their busy
+        // parts low, below where text sits on a tall surface, so a short surface full of
+        // text, like the bar or the launcher, shows their calm top.
+        height: Math.max(root.height, Theme.backdropHeight)
         visible: root.backdrop && backdropLoader.status === Loader.Ready
 
         Rectangle {

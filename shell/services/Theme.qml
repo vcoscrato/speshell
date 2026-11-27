@@ -60,7 +60,7 @@ QtObject {
 
     readonly property color accent:    _p.accent
     // Text on the accent: the base or the text color, whichever reads better on it.
-    readonly property color onAccent:  ThemeProvider.readableOn(String(_p.accent), String(_p.crust), String(_p.text))
+    readonly property color textOnAccent:  ThemeProvider.readableOn(String(_p.accent), String(_p.crust), String(_p.text))
 
     readonly property color pink:      _p.pink
 

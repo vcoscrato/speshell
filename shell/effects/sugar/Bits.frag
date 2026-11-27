@@ -34,14 +34,8 @@ vec4 inked(vec4 under, float d, vec3 fill, float ow, float a) {
     return over(c, fill, cover(-d) * a);
 }
 
-// Pops out past full size and settles, 0..1 over the first `t` of its life.
-float pop(float t) {
-    float k = clamp(u.age / t, 0.0, 1.0);
-    return 1.0 + 2.7 * (k - 1.0) * (k - 1.0) * (k - 1.0) + 1.7 * (k - 1.0) * (k - 1.0);
-}
-
 vec4 sparkle(vec2 p, float R) {
-    float s = R * pop(0.25) * (1.0 - smoothstep(0.4, 1.0, u.age));
+    float s = R * backOut(u.age / 0.25) * (1.0 - smoothstep(0.4, 1.0, u.age));
     if (s < 0.5)
         return vec4(0.0);
     vec2 q = abs(rot(p, 0.8 * u.age + u.seed)) / s;
@@ -81,7 +75,7 @@ vec4 sift(vec2 p, float R) {
 }
 
 vec4 puff(vec2 p, float R) {
-    float grow = mix(0.3, 1.0, pop(0.3)) * (1.0 - 0.8 * smoothstep(0.4, 1.0, u.age));
+    float grow = mix(0.3, 1.0, backOut(u.age / 0.3)) * (1.0 - 0.8 * smoothstep(0.4, 1.0, u.age));
     vec2 q = p + vec2(0.0, R * 0.2 * u.age);
     float d = 1e3;
     vec2 lc = vec2(0.0);

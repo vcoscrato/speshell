@@ -21,8 +21,10 @@ ShellRoot {
     readonly property string stateDir: "/var/lib/speshell"
     // { name, label } for each person's account.
     property var users: []
-    // { id, name, command, desktop } for each Wayland session.
+    // { id, name, command, desktop } for each Wayland session, and whether sessions.sh
+    // has listed them yet.
     property var sessions: []
+    property bool sessionsRead: false
     property string user: ""
     property string session: ""
     // What was picked last time, until the accounts and sessions are known.
@@ -44,6 +46,12 @@ ShellRoot {
     property int failures: 0
 
     readonly property var current: root.sessions.find(entry => entry.id === root.session) || null
+    // Why no one can log in, once the accounts and the sessions are read; "" while they
+    // load, or when there is someone to log in and something to start.
+    readonly property string unavailable: !passwd.loaded || !root.sessionsRead ? ""
+        : root.users.length === 0 ? "No account here can log in."
+        : root.sessions.length === 0 ? "No Wayland session is installed."
+        : ""
 
     function pickDefaults() {
         if (root.users.length > 0 && !root.users.some(entry => entry.name === root.user))
@@ -150,6 +158,7 @@ ShellRoot {
                 entry.hidden = true;
         }
         root.sessions = found.filter(entry => !entry.hidden && entry.command.length > 0);
+        root.sessionsRead = true;
         root.pickDefaults();
     }
 
@@ -216,6 +225,7 @@ ShellRoot {
     }
 
     FileView {
+        id: passwd
         path: "/etc/passwd"
         onLoaded: root.readUsers(text())
     }
@@ -320,8 +330,8 @@ ShellRoot {
                     prompt: root.prompt
                     promptVisible: root.promptVisible
                     checkingText: "Logging in…"
-                    message: root.message
-                    messageIsError: root.messageIsError
+                    message: root.unavailable || root.message
+                    messageIsError: root.unavailable !== "" || root.messageIsError
                     onDraftEdited: text => root.draft = text
                     onAccepted: root.submit()
                 }

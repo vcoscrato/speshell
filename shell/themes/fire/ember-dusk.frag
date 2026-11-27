@@ -7,8 +7,8 @@
 // valley toward the viewer, crusted with drifting plates. Across the valley a
 // temple of tiered crimson roofs stands on its cliff against the low sun, drawn in
 // rings through a sky banded from crimson to gold; lanterns mark the stair up to
-// it. Crags frame the foreground, rimmed by the river's light, lava
-// fountains from the crater, and embers drift up at every depth.
+// it. Crags frame the foreground, rimmed by the river's light, lava fountains from
+// the crater, and embers drift up at every depth.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {

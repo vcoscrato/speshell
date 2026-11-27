@@ -29,6 +29,7 @@ layout(binding = 1) uniform sampler2D source;
 layout(binding = 2) uniform sampler2D tear;     // WallpaperTransition.tear.frag
 layout(binding = 3) uniform sampler2D embers;   // WallpaperTransition.embers.frag
 #include "../common/common.glsl"
+#include "Star.glsl"
 #include "Tear.glsl"
 
 const float STRIKE = 0.08;      // the bolt reaching the bottom
@@ -50,31 +51,6 @@ vec4 traits(float i) {
 }
 
 float span(float x, float a, float b) { return clamp((x - a) / (b - a), 0.0, 1.0); }
-
-// Signed distance to a star of n spikes, valleys at radius ri, each spike reaching an
-// uneven radius from ro * 0.7 to ro.
-float starDist(vec2 p, float n, float ri, float ro, float seed) {
-    float a = atan(p.y, p.x) / TAU * n;
-    float k = floor(a);
-    float d = 1e3;
-    float inside = 0.0;
-    for (int j = -1; j <= 1; j++) {
-        float c = k + float(j);
-        float v0 = c * TAU / n, v1 = (c + 1.0) * TAU / n, vt = (c + 0.5) * TAU / n;
-        float rt = ro * mix(0.7, 1.0, hash(vec2(mod(c, n), seed)));
-        vec2 a0 = vec2(cos(v0), sin(v0)) * ri;
-        vec2 a1 = vec2(cos(v1), sin(v1)) * ri;
-        vec2 tip = vec2(cos(vt), sin(vt)) * rt;
-        d = min(d, min(sdSeg(p, a0, tip), sdSeg(p, tip, a1)));
-        if (j == 0) {
-            vec2 e0 = tip - a0, e1 = a1 - tip;
-            float s0 = e0.x * (p.y - a0.y) - e0.y * (p.x - a0.x);
-            float s1 = e1.x * (p.y - tip.y) - e1.y * (p.x - tip.x);
-            inside = (s0 > 0.0 && s1 > 0.0) || length(p) < ri ? 1.0 : 0.0;
-        }
-    }
-    return inside > 0.5 ? -d : d;
-}
 
 void main() {
     vec2 p = qt_TexCoord0 * u.resolution;
@@ -206,8 +182,7 @@ void main() {
     // ── A comic starburst where it lands, popping out and shrinking away ──
     float kb = span(t, STRIKE * 0.9, 0.5);
     if (kb > 0.0 && kb < 1.0) {
-        float pk = clamp(kb / 0.25, 0.0, 1.0);
-        float sc = (1.0 + 2.7 * pow(pk - 1.0, 3.0) + 1.7 * pow(pk - 1.0, 2.0)) * (1.0 - smoothstep(0.5, 1.0, kb));
+        float sc = backOut(kb / 0.25) * (1.0 - smoothstep(0.5, 1.0, kb));
         float R = H * 0.3 * max(sc, 0.01);
         vec2 q = rot(p - vec2(tearX(H), H), 0.4 * kb);
         if (length(q) < R * 1.05) {

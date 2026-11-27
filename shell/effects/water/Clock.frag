@@ -44,23 +44,6 @@ vec2 current(vec2 q, float len, float w) {
     return vec2(d, q.x / halfWidth);
 }
 
-// Caustic lines from cells of `size` px: (gap between the nearest two sites'
-// distances, gap between the nearest and the third). The first is zero along the
-// cell borders, the second only where three cells meet, where the light gathers.
-vec2 causticGap(vec2 p, float size) {
-    vec2 g = floor(p / size);
-    float d1 = 1e9, d2 = 1e9, d3 = 1e9;
-    for (int y = -1; y <= 1; y++)
-        for (int x = -1; x <= 1; x++) {
-            vec2 cell = g + vec2(x, y);
-            float d = length(p - (cell + hash2(cell)) * size);
-            if (d < d1) { d3 = d2; d2 = d1; d1 = d; }
-            else if (d < d2) { d3 = d2; d2 = d; }
-            else d3 = min(d3, d);
-        }
-    return vec2(d2 - d1, d3 - d1);
-}
-
 void main() {
     vec2 p = (qt_TexCoord0 - 0.5) * u.area;
     float R = min(u.area.x, u.area.y) * 0.5 - 1.5;
@@ -81,8 +64,8 @@ void main() {
     vec2 cq = p + R * 0.05 * vec2(sin(p.y / (R * 0.17) + tm * 0.7), cos(p.x / (R * 0.15) - tm * 0.6)) + warp * R * 0.25;
     // A finer warp at the cells' own scale rounds them, as light through ripples is.
     cq += (vec2(vnoise(cq / (R * 0.15) + tm * 0.2), vnoise(cq / (R * 0.15) + 17.0 - tm * 0.2)) - 0.5) * R * 0.05;
-    vec2 c1 = causticGap(cq + vec2(tm * 3.0, -tm * 2.0), R * 0.26);
-    vec2 c2 = causticGap(rot(cq, 1.1) - vec2(tm * 2.0, tm * 2.6) + 50.0, R * 0.19);
+    vec2 c1 = voronoiGaps(cq + vec2(tm * 3.0, -tm * 2.0), R * 0.26);
+    vec2 c2 = voronoiGaps(rot(cq, 1.1) - vec2(tm * 2.0, tm * 2.6) + 50.0, R * 0.19);
     float px = max(R / 100.0, 0.7);
     float on1 = mix(0.25, 1.0, smoothstep(0.3, 0.7, vnoise(cq / (R * 0.22) + 3.0 + tm * 0.05)));
     float on2 = smoothstep(0.4, 0.75, vnoise(cq / (R * 0.18) - 7.0 - tm * 0.04));
@@ -118,7 +101,7 @@ void main() {
         float d = length(p - landed);
         for (int i = 0; i < 3; i++) {
             float age = u.sinceTick + float(i);
-            float radius = age * R * 0.2 + float(i) * 0.0;
+            float radius = age * R * 0.2;
             float fade = clamp(1.0 - age / 2.6, 0.0, 1.0);
             vec2 from = at(u.secondTurn - float(i) / 60.0, rS);
             float ring = abs(length(p - from) - radius);

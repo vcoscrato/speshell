@@ -27,6 +27,9 @@ Singleton {
     property double scannedAtMs: 0
     property double nowMs: Date.now()
     readonly property bool isScanning: scanProc.running
+    // Why the last scan failed, as nmcli says it, until the next succeeds; the list it
+    // would have replaced stays.
+    property string scanError: ""
 
     // What the user is doing with the network `name`, or null: { kind, name, network,
     // secured, error }. `kind` is "password" (its row asks for one, `error` saying why
@@ -40,6 +43,8 @@ Singleton {
     readonly property string connectError: root.operation && root.operation.error ? root.operation.error : ""
 
     readonly property bool wifiOn: Networking.wifiEnabled
+    // Untyped: Quickshell's type info leaves the model's values out.
+    readonly property var deviceModel: Networking.devices
     readonly property var wifiDevice: root.findWifiDevice()
     readonly property var wiredDevice: root.findWiredDevice()
     readonly property var connectedWifi: root.wifiNetworks(network => network.connected)[0] || null
@@ -69,31 +74,17 @@ Singleton {
     }
 
     function findWifiDevice() {
-        for (let i = 0; i < Networking.devices.values.length; i++) {
-            const dev = Networking.devices.values[i];
-            if (dev.type === DeviceType.Wifi) return dev;
-        }
-        return null;
+        return root.deviceModel.values.find(device => device.type === DeviceType.Wifi) || null;
     }
 
     function findWiredDevice() {
-        for (let i = 0; i < Networking.devices.values.length; i++) {
-            const dev = Networking.devices.values[i];
-            if (dev.type === DeviceType.Wired && dev.connected) return dev;
-        }
-        return null;
+        return root.deviceModel.values.find(device => device.type === DeviceType.Wired && device.connected) || null;
     }
 
     // The networks Quickshell lists that pass `test`: without its scanner, the saved
     // ones and the connected one.
     function wifiNetworks(test) {
-        const result = [];
-        const networks = root.wifiDevice ? root.wifiDevice.networks.values : [];
-        for (let i = 0; i < networks.length; i++) {
-            if (test(networks[i]))
-                result.push(networks[i]);
-        }
-        return result;
+        return root.wifiDevice ? root.wifiDevice.networks.values.filter(test) : [];
     }
 
     function signalPercent(value) {
@@ -124,13 +115,6 @@ Singleton {
         return byName;
     }
 
-    function listOf(byName) {
-        const result = [];
-        for (const name in byName)
-            result.push(byName[name]);
-        return result;
-    }
-
     // A scan's list replaces what was there; a look at NetworkManager's list adds to it,
     // since NetworkManager forgets networks a few minutes after a scan.
     function takeList(text, scanned) {
@@ -143,7 +127,7 @@ Singleton {
                     found[known.name] = known;
             }
         }
-        root.accessPoints = root.listOf(found);
+        root.accessPoints = Object.values(found);
         if (scanned)
             root.scannedAtMs = now;
         root.nowMs = now;
@@ -200,6 +184,8 @@ Singleton {
     function nearbyStatusText() {
         if (root.isScanning)
             return "Scanning…";
+        if (root.scanError !== "")
+            return "Scan failed";
         if (root.scannedAtMs > 0)
             return "Scanned " + Format.ago(root.scannedAtMs, root.nowMs);
         return "";
@@ -361,6 +347,7 @@ Singleton {
         if (!root.wifiOn) {
             root.accessPoints = [];
             root.scannedAtMs = 0;
+            root.scanError = "";
             if (root.joiningName === "")
                 root.operation = null;
         }
@@ -370,6 +357,7 @@ Singleton {
         if (!root.wifiDevice) {
             root.accessPoints = [];
             root.scannedAtMs = 0;
+            root.scanError = "";
         }
     }
 
@@ -385,11 +373,14 @@ Singleton {
         }
     }
 
+    // A look that fails leaves the list as it was.
     QueuedProcess {
         id: listProc
         command: root.listCommand(false)
-        stdout: StdioCollector {
-            onStreamFinished: if (root.wifiOn) root.takeList(text, false)
+        stdout: StdioCollector { id: listOutput }
+        onExited: exitCode => {
+            if (exitCode === 0 && root.wifiOn)
+                root.takeList(listOutput.text, false);
         }
     }
 
@@ -397,8 +388,15 @@ Singleton {
     Process {
         id: scanProc
         command: root.listCommand(true)
-        stdout: StdioCollector {
-            onStreamFinished: if (root.wifiOn) root.takeList(text, true)
+        stdout: StdioCollector { id: scanOutput }
+        stderr: StdioCollector { id: scanErrors }
+        onExited: exitCode => {
+            if (!root.wifiOn)
+                return;
+            root.scanError = exitCode === 0 ? ""
+                : scanErrors.text.trim().split("\n").pop().replace(/^Error: /, "") || "NetworkManager could not scan.";
+            if (exitCode === 0)
+                root.takeList(scanOutput.text, true);
         }
     }
 

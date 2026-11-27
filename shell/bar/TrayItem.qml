@@ -24,17 +24,11 @@ Item {
     // The icon by name from the icon theme, and, when the app names a folder of its own
     // (`?path=`), the file there, tried once the theme has no such icon.
     readonly property string iconSource: root.modelData.icon ? root.modelData.icon.toString() : ""
-    readonly property string iconPath: {
-        const pi = root.iconSource.indexOf("?path=");
-        return pi !== -1 ? root.iconSource.substring(0, pi) : root.iconSource;
-    }
-    readonly property string iconFile: {
-        const pi = root.iconSource.indexOf("?path=");
-        if (pi === -1)
-            return "";
-        const name = root.iconPath.substring(root.iconPath.lastIndexOf("/") + 1);
-        return "file://" + decodeURIComponent(root.iconSource.substring(pi + 6)) + "/" + name;
-    }
+    readonly property int folderAt: root.iconSource.indexOf("?path=")
+    readonly property string iconPath: root.folderAt !== -1 ? root.iconSource.substring(0, root.folderAt) : root.iconSource
+    readonly property string iconFile: root.folderAt === -1 ? ""
+        : "file://" + decodeURIComponent(root.iconSource.substring(root.folderAt + 6)) + "/"
+            + root.iconPath.substring(root.iconPath.lastIndexOf("/") + 1)
     property bool themeMissing: false
     onIconSourceChanged: root.themeMissing = false
 

@@ -186,7 +186,6 @@ Item {
         // than lifting off it.
         douse: exiting ? 1 - root.fuel : 0
         layered: true
-        core: root.core
     }
 
     // Embers and smoke off the crown, over the flames; gone quickly once it closes.

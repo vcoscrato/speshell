@@ -93,30 +93,30 @@ function parsePrimary(state) {
     throw new Error("Expected a number, constant, function, or parenthesized expression.");
 }
 
+// A sign binds looser than a power, as -2^2 is -4, and an exponent may carry its own.
 function parseUnary(state) {
     if (take(state, "+")) return parseUnary(state);
     if (take(state, "-")) return -parseUnary(state);
-    return parsePrimary(state);
+    return parsePower(state);
 }
 
+// Right to left: 2^3^2 is 2^9.
 function parsePower(state) {
-    let value = parseUnary(state);
-    if (take(state, "^"))
-        value = Math.pow(value, parsePower(state));
-    return value;
+    const base = parsePrimary(state);
+    return take(state, "^") ? Math.pow(base, parseUnary(state)) : base;
 }
 
 function parseTerm(state) {
-    let value = parsePower(state);
+    let value = parseUnary(state);
     while (true) {
         if (take(state, "*")) {
-            value *= parsePower(state);
+            value *= parseUnary(state);
         } else if (take(state, "/")) {
-            const divisor = parsePower(state);
+            const divisor = parseUnary(state);
             if (divisor === 0) throw new Error("Division by zero.");
             value /= divisor;
         } else if (take(state, "%")) {
-            const modulus = parsePower(state);
+            const modulus = parseUnary(state);
             if (modulus === 0) throw new Error("Modulo by zero.");
             value %= modulus;
         } else {

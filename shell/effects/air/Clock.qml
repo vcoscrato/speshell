@@ -16,6 +16,5 @@ Face {
     property color cDim: root.theme.subtext
     property color cAccent: root.theme.accent
     property color cLeaf: root.theme.peach
-    property color cSkyBlue: root.theme.sky
     fragmentShader: Qt.resolvedUrl("qsb/Clock.qsb")
 }

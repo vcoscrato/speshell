@@ -99,19 +99,12 @@ Singleton {
     }
 
     function tool(id) {
-        for (let i = 0; i < root.catalog.length; i++) {
-            if (root.catalog[i].id === id)
-                return root.catalog[i];
-        }
-        return null;
+        return root.catalog.find(tool => tool.id === id) || null;
     }
 
     // slurp's #rrggbbaa.
     function selectionColor(color, alpha) {
-        function hex(value) {
-            const digits = Math.round(value * 255).toString(16);
-            return digits.length < 2 ? "0" + digits : digits;
-        }
+        const hex = value => Math.round(value * 255).toString(16).padStart(2, "0");
         return "#" + hex(color.r) + hex(color.g) + hex(color.b) + hex(alpha);
     }
 

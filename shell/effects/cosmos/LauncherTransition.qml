@@ -40,7 +40,7 @@ Item {
     property bool flaring: true
     property real tail: 0
     property bool exitDone: false
-    property real time: 0
+    readonly property real time: clock.clock
 
     // Orbit periods (seconds) and angles of the five planets, and the moon's.
     readonly property var periods: [8, 10.5, 13.5, 16.5, 26]
@@ -93,8 +93,9 @@ Item {
 
     onActiveChanged: {
         if (active) {
+            // Reopened while the star fades, it flares again from as bright as it is.
+            flare = open === 0 ? (flaring ? flare : 1) * (1 - tail / tailTime) : 0;
             flaring = open === 0;
-            flare = 0;
             tail = 0;
             exitDone = false;
         }
@@ -156,8 +157,8 @@ Item {
     }
 
     EffectClock {
+        id: clock
         onAdvanced: dt => {
-            root.time += dt;
             root.follow(dt);
             root.orbit(dt);
             root.moveComet();
@@ -293,7 +294,8 @@ Item {
                 return root.flaring ? root.flare : Math.max(0, 1 - root.open * 2.5);
             if (root.open > 0)
                 return Math.max(0, (0.35 - root.open) / 0.35);
-            return 1 - root.tail / root.tailTime;
+            // Closed before it finished flaring, it fades from as bright as it got.
+            return (root.flaring ? root.flare : 1) * (1 - root.tail / root.tailTime);
         }
     }
 }

@@ -35,7 +35,6 @@ layout(std140, binding = 0) uniform buf {
 #include "../common/common.glsl"
 #include "Bag.glsl"
 
-
 // Frosting shaded as a round thing lit from the upper left: `v` runs -1 (lit) to 1
 // across it.
 vec3 frostTone(vec3 base, vec3 lite, vec3 shade, float v) {

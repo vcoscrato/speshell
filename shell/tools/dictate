@@ -111,6 +111,12 @@ if [[ "${1:-}" == "cancel" ]]; then
   exit 0
 fi
 
+# Another call is stopping the recording, downloading the model, or transcribing or typing
+# it out: let it finish rather than start over the file it reads.
+if pgrep -A -f "^bash (.*/)?dictate$" >/dev/null 2>&1; then
+  exit 0
+fi
+
 if ! pgrep -f "pw-record.*$audio_file" >/dev/null 2>&1; then
   rm -f "$audio_file"
   setsid -f pw-record --channels=1 --rate=16000 "$audio_file" </dev/null >/dev/null 2>&1
@@ -145,6 +151,8 @@ if ((${#languages[@]} > 1)) && [[ -n "$detected" && " ${languages[*]} " != *" $d
   transcription="$(transcribe "$retry")" || failed=1
   detected="$detected->$retry"
 fi
+# Cancelled meanwhile: the recording is gone, and whisper with it.
+[[ -f "$audio_file" ]] || exit 0
 
 # One line: whisper's leading newline would make wtype press Enter.
 text="$(printf '%s' "$transcription" | tr '\r\n' ' ' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/[[:space:]]\+/ /g')"

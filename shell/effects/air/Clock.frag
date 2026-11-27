@@ -25,7 +25,6 @@ layout(std140, binding = 0) uniform buf {
     vec4 cDim;
     vec4 cAccent;
     vec4 cLeaf;
-    vec4 cSkyBlue;
 } u;
 #include "../common/common.glsl"
 
@@ -91,7 +90,6 @@ void main() {
     float star = abs(pq.x) * reach / width + pq.y - reach;
     star = max(star, -pq.y);
     vec3 roseCol = mix(mix(u.cCloudLight.rgb, u.cWind.rgb, 0.25), u.cCloud.rgb, step(0.0, pq.x));
-    roseCol = mix(roseCol, mix(u.cAccent.rgb, u.cLeaf.rgb, step(0.0, pq.x) * 0.6), long_ * step(0.5, 1.0 - abs(quadrant / 8.0 - 0.0)) * 0.0);
     o = over(o, u.cDeep.rgb, 0.8 * cover(1.2 - star));
     o = over(o, roseCol, 0.75 * cover(-star));
 

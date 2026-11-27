@@ -117,7 +117,8 @@ check: shaders
         for scene in launcher wallpaper controls clock; do
             preview/preview.sh "$effect" "$scene" >/dev/null 2>&1
             log="$PREVIEW_OUT/$effect-$scene.log"
-            problems=$(grep -E "rror|WARN" "$log" | grep -v "window masks")
+            # Quickshell's warning that Qt was updated under it is about the machine, not the effect.
+            problems=$(grep -E "rror|WARN" "$log" | grep -v -e "window masks" -e "was built against Qt")
             if [ -n "$problems" ]; then
                 printf 'FAIL %s %s:\n%s\n' "$effect" "$scene" "$problems"
                 status=1

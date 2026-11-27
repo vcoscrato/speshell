@@ -40,8 +40,9 @@ void main() {
     vec3 col = vec3(0.0);
     float a = 0.0;
     // Nothing over the panel itself.
-    float off = cover(sdRoundRect(rel, h, u.radius) - 3.0);
-    if (sdRoundRect(rel, h, u.radius) < 1.0) {
+    float dp = sdRoundRect(rel, h, u.radius);
+    float off = cover(dp - 3.0);
+    if (dp < 1.0) {
         fragColor = vec4(0.0);
         return;
     }

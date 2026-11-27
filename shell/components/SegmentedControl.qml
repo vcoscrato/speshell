@@ -109,10 +109,7 @@ Rectangle {
             Accessible.role: Accessible.RadioButton
             Accessible.name: String(segment.modelData.label)
             Accessible.checked: segment.selected
-            Accessible.onPressAction: {
-                if (root.enabled)
-                    root.valueSelected(segment.modelData.value);
-            }
+            Accessible.onPressAction: if (root.enabled) root.pick(segment.index, segment, null)
 
             Label {
                 anchors.fill: parent

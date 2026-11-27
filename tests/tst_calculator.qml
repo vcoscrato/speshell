@@ -16,6 +16,12 @@ TestCase {
         compare(Calculator.evaluate("round(pi * 100) / 100").result, "3.14");
     }
 
+    function test_signsBindLooserThanPowers() {
+        compare(Calculator.evaluate("-2 ^ 2").result, "-4");
+        compare(Calculator.evaluate("2 ^ -1").result, "0.5");
+        compare(Calculator.evaluate("2 ^ 3 ^ 2").result, "512");
+    }
+
     function test_hidesFloatingPointNoise() {
         compare(Calculator.evaluate("0.1 + 0.2").result, "0.3");
     }

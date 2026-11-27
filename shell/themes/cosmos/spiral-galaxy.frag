@@ -3,11 +3,10 @@
 // Spiral galaxy: a tilted two-armed galaxy in Gruvbox golds and plums, its bulge
 // glowing in rings, dust lanes trailing inside its arms and knots of young
 // stars strung along them. A banded nebula streams through it, its steps lit on
-// the side toward the galaxy. A
-// globular cluster and a young open cluster shine nearby, two far galaxies show
-// the distance, and stars of every size and color fill the dark. In the lower
-// left a banded gas giant rises, lit from behind, its ring crossing in front of
-// it and passing through its shadow, with its small moon.
+// the side toward the galaxy. A globular cluster and a young open cluster shine
+// nearby, two far galaxies show the distance, and stars of every size and color
+// fill the dark. In the lower left a banded gas giant rises, lit from behind, its
+// ring crossing in front of it and passing through its shadow, with its small moon.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {

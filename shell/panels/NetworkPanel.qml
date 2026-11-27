@@ -23,7 +23,9 @@ Card {
             iconName: "refresh"
             visible: root.wifiReady
             busy: NetworkService.isScanning
-            tooltipText: NetworkService.isScanning ? "Scanning for Wi-Fi networks…" : "Scan for Wi-Fi networks"
+            tooltipText: NetworkService.isScanning ? "Scanning for Wi-Fi networks…"
+                : NetworkService.scanError !== "" ? "Scan again: " + NetworkService.scanError
+                : "Scan for Wi-Fi networks"
             onClicked: NetworkService.scan()
         },
 
@@ -301,8 +303,6 @@ Card {
                         masked: true
                         confirmText: "Connect"
                         autoFocus: true
-                        // The draft goes with the prompt.
-                        onVisibleChanged: if (!visible) text = ""
                         onAccepted: NetworkService.connectWithPassword(networkRow.modelData, text)
                         onCancelled: NetworkService.cancelPasswordPrompt()
                     }
@@ -322,7 +322,8 @@ Card {
             Label {
                 visible: NetworkService.displayedNetworks.length === 0 && !NetworkService.isScanning
                 width: parent.width
-                text: NetworkService.scannedAtMs > 0 ? "Nothing else is in range."
+                text: NetworkService.scanError !== "" ? "Could not scan: " + NetworkService.scanError
+                    : NetworkService.scannedAtMs > 0 ? "Nothing else is in range."
                     : "Scan from the header to see the networks around you."
                 color: Theme.subtext
                 wrapMode: Text.WordWrap

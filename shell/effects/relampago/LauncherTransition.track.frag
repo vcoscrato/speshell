@@ -29,7 +29,7 @@ layout(std140, binding = 0) uniform buf {
     vec2 fireSpan;      // px, x where the trail starts and the tires are now
     float trackY;       // px, y of the tire tracks (the panel's bottom edge)
     vec4 hitA;          // two bolts striking the border: where (px), s since they
-    vec4 hitB;          // landed (&lt; 0 before), and a seed
+    vec4 hitB;          // landed (< 0 before), and a seed
     vec4 cLine;
     vec4 cCore;
     vec4 cGlow;
@@ -38,6 +38,7 @@ layout(std140, binding = 0) uniform buf {
     vec4 cRubber;
 } u;
 #include "../common/common.glsl"
+#include "Star.glsl"
 
 // One depth of comic speed lines streaming left, in rows: lines of uneven lengths
 // and gaps, each tapering from a round head on its right to a point, coming in gusts
@@ -87,31 +88,6 @@ vec4 arcOver(vec4 col, float d, float w, float on) {
     return over(col, u.cCore.rgb, cover(w - d) * on);
 }
 
-// Signed distance to a star of n spikes, valleys at radius ri, each spike reaching an
-// uneven radius from ro * 0.7 to ro.
-float starDist(vec2 p, float n, float ri, float ro, float seed) {
-    float a = atan(p.y, p.x) / TAU * n;
-    float k = floor(a);
-    float d = 1e3;
-    float inside = 0.0;
-    for (int j = -1; j <= 1; j++) {
-        float c = k + float(j);
-        float v0 = c * TAU / n, v1 = (c + 1.0) * TAU / n, vt = (c + 0.5) * TAU / n;
-        float rt = ro * mix(0.7, 1.0, hash(vec2(mod(c, n), seed)));
-        vec2 a0 = vec2(cos(v0), sin(v0)) * ri;
-        vec2 a1 = vec2(cos(v1), sin(v1)) * ri;
-        vec2 tip = vec2(cos(vt), sin(vt)) * rt;
-        d = min(d, min(sdSeg(p, a0, tip), sdSeg(p, tip, a1)));
-        if (j == 0) {
-            vec2 e0 = tip - a0, e1 = a1 - tip;
-            float s0 = e0.x * (p.y - a0.y) - e0.y * (p.x - a0.x);
-            float s1 = e1.x * (p.y - tip.y) - e1.y * (p.x - tip.x);
-            inside = (s0 > 0.0 && s1 > 0.0) || length(p) < ri ? 1.0 : 0.0;
-        }
-    }
-    return inside > 0.5 ? -d : d;
-}
-
 // Where a bolt struck the border: a comic starburst popping out of the border and
 // shrinking away, and a charge racing off along the border both ways from it, its
 // arcs trailing the fronts and dying out.
@@ -123,8 +99,7 @@ vec4 hitOver(vec4 col, vec4 hit, vec2 p, vec2 c, vec2 h, float sd, float s, floa
     float lq = length(q);
     if (lq < 60.0 && age < 0.34) {
         float k = clamp(age / 0.3, 0.0, 1.0);
-        float pk = clamp(k / 0.3, 0.0, 1.0);
-        float sc = (1.0 + 2.7 * pow(pk - 1.0, 3.0) + 1.7 * pow(pk - 1.0, 2.0)) * (1.0 - smoothstep(0.45, 1.0, k));
+        float sc = backOut(k / 0.3) * (1.0 - smoothstep(0.45, 1.0, k));
         if (sc > 0.02) {
             vec2 r = rot(q, hit.w * 6.0 + k * 0.5) / sc;
             float d0 = starDist(r, 9.0, 18.0, 48.0, hit.w);

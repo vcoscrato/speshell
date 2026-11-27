@@ -13,14 +13,14 @@ Every effect here has these files; a part that draws with a shader another part 
 ├── Interactions.qml/.frag        the effects on Speshell's controls
 ├── Knob.qml/.frag                the thumb of Speshell's sliders and switches
 ├── Clock.qml/.frag               the clock panel's face
-├── <Part>.qml/.frag              pieces the transitions use (Flames, Wind, Whip, ...)
-├── <Name>.glsl                   GLSL the shaders of one part share: uniforms, placement, constants
-├── <Name>.js                     color recipes several parts share (Cosmos, Flame, Water, Stone, Bolt, Sugar)
+├── <Part>.qml/.frag              pieces the parts use (Flames, Wind, Whip, Bits, ...)
+├── <Name>.glsl                   GLSL several shaders include: uniforms, placement, constants, shapes
+├── <Name>.js                     color recipes several parts share (Cosmos, Flame, Water, Stone, Bolt, Sugar, Christmas)
 ├── common -> ../common           symlink that gives QML `import "common"` (the types below) and `common/Colors.js`
 └── qsb/                          git-ignored: `just shaders` compiles each `<Name>.frag` to `qsb/<Name>.qsb`, and each `<Name>.vert` to `qsb/<Name>.vert.qsb`
 ```
 
-A QML file that draws more than one shader names the others `<Qml>.<piece>.frag` (`LauncherTransition.ground.frag`); a shader several parts share is named for what it draws (`Portal.frag`, `Burn.frag`). Shaders include the shared library by relative path: `#include "../common/common.glsl"`, which defines `PI` and `TAU`, noise, distances, and a clock face's angles (`at`, `turnOf`, `handFrame`). A part loads its shader as `Qt.resolvedUrl("qsb/<Name>.qsb")`. A vertex shader defines `VERTEX_SHADER` before its includes, which leaves out the helpers that need derivatives (`band`, `cover`).
+A QML file that draws more than one shader names the others `<Qml>.<piece>.frag` (`LauncherTransition.ground.frag`); a shader several parts share is named for what it draws (`Portal.frag`, `Burn.frag`). GLSL that a vertex shader and its fragment shaders share is named for them (`Boulders.glsl`, `LauncherTransition.ground.glsl`), and GLSL that shaders of several parts or pieces share for what it holds (`Star.glsl`, `Bag.glsl`, `Shatter.glsl`). Shaders include the shared library by relative path: `#include "../common/common.glsl"`, which defines `PI` and `TAU`, noise, distances, an ease that overshoots and settles (`backOut`), and a clock face's angles (`at`, `turnOf`, `handFrame`). A part loads its shader as `Qt.resolvedUrl("qsb/<Name>.qsb")`. A vertex shader defines `VERTEX_SHADER` before its includes, which leaves out the helpers that need derivatives (`band`, `cover`).
 
 Speshell must run smoothly on an integrated GPU, so a shader that fills the screen must not loop over every piece of the effect for every pixel. Work that does not depend on the pixel goes where it runs once:
 
@@ -66,9 +66,9 @@ QtObject {
 | `active` | `false` once the launcher closes; `true` again if it reopens during the exit. |
 | `theme` | The active palette. |
 
-Emit `closingFinished()` when the exit is done; Speshell hides the launcher anyway after 2.5 s. Input is ignored during the exit.
+Emit `closingFinished()` when the exit is done; Speshell hides the launcher anyway after 2.5 s at normal speed (longer at slower `launcherTransitionSpeed`). Input is ignored during the exit.
 
-The lock and login screens play the same transition on their password card, the panel then: it comes in as the screen appears, plays round the card while it shows, and leaves once the password is accepted, the session unlocking or starting when it emits `closingFinished()` (after 2.5 s at most). The card is smaller than the launcher, about as wide as a panel and a few rows tall, so the transition must look right on any `panelRect`.
+The lock and login screens play the same transition on their password card, the panel then: it comes in as the screen appears, plays round the card while it shows, and leaves once the password is accepted, the session unlocking or starting when it emits `closingFinished()`, or after the same timeout. The card is smaller than the launcher, about as wide as a panel and a few rows tall, so the transition must look right on any `panelRect`.
 
 **Wallpaper transition.** Created once the new wallpaper has loaded, filling the screen above both images:
 
@@ -78,7 +78,7 @@ The lock and login screens play the same transition on their password card, the 
 | `incoming` | The new image, already showing beneath. |
 | `theme` | The active palette, already the new wallpaper's theme. |
 
-Emit `finished()` when done; Speshell removes it after 5 s otherwise. Without a wallpaper transition the old image fades out. The theme gallery plays it too, whenever it previews the theme, often several in a row, each over the last cut short; capture `outgoing` once, as it starts.
+Emit `finished()` when done; Speshell removes it after 5 s at normal speed otherwise. Without a wallpaper transition the old image fades out. The theme gallery plays it too, whenever it previews the theme, often several in a row, each over the last cut short; capture `outgoing` once, as it starts.
 
 **Backdrop.** Painted over the theme's base color and clipped to each surface's rounded shape, behind the bar, its dropdowns, and the launcher; the panels and text sit on it. Speshell paints it at least 1050 px tall (`Theme.backdropHeight`) and shows its top, so a short surface such as the bar or the launcher gets the top band of the painting: keep the busy parts low, below where text sits on a tall dropdown, and the top calm enough for a 28 px bar across a whole screen. It receives `theme`. Speshell renders it once into a texture and redraws it only when its properties change, so it must not animate. Keep it within a few percent of `theme.bg` wherever text may land: it sits behind every panel, including the calendar and the notes.
 

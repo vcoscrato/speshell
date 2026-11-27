@@ -21,6 +21,8 @@ Scope {
     readonly property int volumePercent: endpoint.audio ? endpoint.clampPercent(endpoint.audio.volume * 100) : 0
     readonly property bool muted: endpoint.audio ? endpoint.audio.muted : false
     readonly property string deviceLabel: endpoint.node ? endpoint.labelOf(endpoint.node) : ""
+    // Untyped: Quickshell's type info leaves the model's values out.
+    readonly property var nodeModel: Pipewire.nodes
 
     function setVolumePercent(percent) {
         if (!endpoint.audio)
@@ -72,7 +74,7 @@ Scope {
     // one in use.
     function devices() {
         const result = [];
-        for (const node of Pipewire.nodes.values) {
+        for (const node of endpoint.nodeModel.values) {
             if (!node || node.isStream || (endpoint.isOutput ? !node.isSink : !endpoint.isSourceNode(node)))
                 continue;
             let index = endpoint.quickSwitchIndex(node);

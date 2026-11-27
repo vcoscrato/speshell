@@ -16,29 +16,17 @@ Singleton {
     readonly property bool playing: root.player !== null
         && root.player.playbackState === MprisPlaybackState.Playing
 
+    // Untyped: Quickshell's type info leaves the model's values out.
+    readonly property var playerModel: Mpris.players
+
     function players() {
-        return Mpris.players && Mpris.players.values ? Mpris.players.values : [];
+        return root.playerModel && root.playerModel.values ? root.playerModel.values : [];
     }
 
     function refreshPlayer() {
-        const values = root.players();
-        let selected = null;
-        for (let i = 0; i < values.length; i++) {
-            if (values[i] && values[i].playbackState === MprisPlaybackState.Playing) {
-                selected = values[i];
-                break;
-            }
-        }
-        if (!selected && root.player && values.indexOf(root.player) >= 0)
-            selected = root.player;
-        if (!selected) {
-            for (let j = 0; j < values.length; j++) {
-                if (values[j]) {
-                    selected = values[j];
-                    break;
-                }
-            }
-        }
+        const values = root.players().filter(player => !!player);
+        const selected = values.find(player => player.playbackState === MprisPlaybackState.Playing)
+            ?? (values.indexOf(root.player) >= 0 ? root.player : values[0] ?? null);
         if (root.player !== selected)
             root.player = selected;
         root.displayedPosition = root.player ? Number(root.player.position) || 0 : 0;
@@ -71,10 +59,9 @@ Singleton {
         if (root.viewPresented === next)
             return;
         root.viewPresented = next;
-        if (next)
-            root.refreshPlayer();
     }
 
+    // Starting reads the position at once.
     Timer {
         interval: 1000
         repeat: true

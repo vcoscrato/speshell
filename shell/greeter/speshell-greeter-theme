@@ -5,7 +5,7 @@
 # reads the user's files as the user.
 set -euo pipefail
 user=${1:?usage: speshell-greeter-theme USER}
-home=$(getent passwd "$user" | cut -d: -f6)
+home=$(getent passwd "$user" | cut -d: -f6) || { echo "speshell-greeter-theme: no user $user" >&2; exit 1; }
 cd /
 as_user() { setpriv --reuid="$user" --regid="$(id -g "$user")" --init-groups -- "$@"; }
 
@@ -13,8 +13,7 @@ as_user() { setpriv --reuid="$user" --regid="$(id -g "$user")" --init-groups -- 
 # than ten seconds.
 theme_file=$home/.local/share/speshell/theme.json
 as_user test -f "$theme_file" || { echo "speshell-greeter-theme: no $theme_file" >&2; exit 1; }
-state=$(timeout 10 setpriv --reuid="$user" --regid="$(id -g "$user")" --init-groups -- \
-    head -c $((1024 * 1024)) -- "$theme_file")
+state=$(as_user timeout 10 head -c $((1024 * 1024)) -- "$theme_file")
 out=/var/lib/speshell/theme/$user
 install -d -m 0755 "$out"
 tmp=$(mktemp -d "$out/.next.XXXXXX")
@@ -30,8 +29,7 @@ limit=$((64 * 1024 * 1024))
 case "$ext" in
     jpg|jpeg|png|webp)
         if as_user test -f "$wallpaper" \
-            && timeout 60 setpriv --reuid="$user" --regid="$(id -g "$user")" --init-groups -- \
-                head -c $((limit + 1)) -- "$wallpaper" > "$tmp/wallpaper.$ext" \
+            && as_user timeout 60 head -c $((limit + 1)) -- "$wallpaper" > "$tmp/wallpaper.$ext" \
             && [ "$(stat -c %s -- "$tmp/wallpaper.$ext")" -le "$limit" ]; then
             shown=$out/wallpaper.$ext
         else
@@ -44,6 +42,7 @@ jq --arg wallpaper "$shown" '{ theme: .theme, colors: (.snapshot.colors // null)
     <<<"$state" > "$tmp/theme.json"
 chmod 0644 "$tmp"/*
 
-find "$out" -maxdepth 1 -name 'wallpaper.*' ! -name "wallpaper.$ext" -delete
+# The wallpaper shown, and no other: none when it was left out.
+find "$out" -maxdepth 1 -name 'wallpaper.*' ! -path "$shown" -delete
 [ -z "$shown" ] || mv -f "$tmp/wallpaper.$ext" "$shown"
 mv -f "$tmp/theme.json" "$out/theme.json"

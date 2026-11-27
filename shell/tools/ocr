@@ -10,7 +10,7 @@ region="$(select_region)"
 
 languages="${SPESHELL_OCR_LANGUAGES:-eng}"
 error_file="$runtime_dir/ocr.log"
-if ! text="$(grim -g "$region" -t png - | tesseract stdin stdout -l "$languages" --psm 6 2>"$error_file")"; then
+if ! text="$({ grim -g "$region" -t png - | tesseract stdin stdout -l "$languages" --psm 6; } 2>"$error_file")"; then
   notify "Couldn't read the text" "$(preview "$(grep -m1 -i 'error\|failed' "$error_file" || tail -n1 "$error_file")")"
   exit 1
 fi

@@ -83,7 +83,7 @@ Item {
             selectByMouse: true
             color: Theme.text
             selectionColor: Theme.accent
-            selectedTextColor: Theme.onAccent
+            selectedTextColor: Theme.textOnAccent
             font.pixelSize: root.large || root.heading ? Theme.fontSizeLarge : Theme.fontSizeSmall
             font.weight: root.heading ? Font.DemiBold : Font.Normal
             font.family: Theme.fontFamily

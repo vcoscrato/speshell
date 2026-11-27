@@ -33,7 +33,8 @@ Scope {
                 failures: LockService.failures
                 footnote: HyprlandService.keyboardLayouts > 1 ? HyprlandService.keyboardLayout : ""
                 leaving: LockService.phase === "unlocking"
-                onDeparted: LockService.unlock()
+                // Each screen's gate departs; the first one unlocks.
+                onDeparted: if (LockService.phase === "unlocking") LockService.unlock()
 
                 Label {
                     role: "title"

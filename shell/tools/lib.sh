@@ -12,9 +12,10 @@ fi
 runtime_dir="$XDG_RUNTIME_DIR/speshell"
 mkdir -m 0700 "$runtime_dir" 2>/dev/null || [[ -d "$runtime_dir" ]]
 
-# Prints the area the user drags out, as "X,Y WxH", or nothing when they cancel.
+# Prints the area the user drags out, as "X,Y WxH", or nothing when they cancel or
+# another tool's selection is already open, so a second call doesn't open another.
 select_region() {
-  slurp -b "${SPESHELL_SELECT_SHADE:-#00000066}" -c "${SPESHELL_SELECT_BORDER:-#ffffffff}" \
+  flock -n "$runtime_dir/select.lock" slurp -b "${SPESHELL_SELECT_SHADE:-#00000066}" -c "${SPESHELL_SELECT_BORDER:-#ffffffff}" \
     -s "${SPESHELL_SELECT_FILL:-#ffffff22}" -B "${SPESHELL_SELECT_BOXES:-#ffffff22}" -w 2 2>/dev/null || true
 }
 

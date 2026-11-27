@@ -17,7 +17,6 @@ ShaderEffect {
     property color cIce: Christmas.ice(root.theme)
     property color cSnow: Christmas.snow(root.theme)
     property color cSnowShade: Christmas.snowShade(root.theme)
-    property color cPine: Christmas.pineDeep(root.theme)
     property color cGold: Christmas.gold(root.theme)
     property color cGlow: Christmas.glow(root.theme)
     property color cBerry: Christmas.berry(root.theme)

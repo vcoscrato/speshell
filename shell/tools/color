@@ -4,7 +4,8 @@ set -euo pipefail
 # shellcheck source=lib.sh
 source "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")/lib.sh"
 
-color="$(hyprpicker -f hex 2>/dev/null || true)"
+# Under the selection lock, so a second call while it picks doesn't open another picker.
+color="$(flock -n "$runtime_dir/select.lock" hyprpicker -f hex 2>/dev/null || true)"
 [[ -n "$color" ]] || exit 0
 printf '%s' "$color" | wl-copy
 notify "Color copied" "$color"

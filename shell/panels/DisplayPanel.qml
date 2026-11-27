@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.components
 import qs.services
+import "../components/Keyboard.js" as Keyboard
 
 // The displays: each one's mode, and on and off, their layout and position, applied
 // on request and kept or reverted.
@@ -321,6 +322,7 @@ Card {
                 height: Theme.controlHeightSmall
                 radius: Theme.borderRadius
                 opacity: root.busy ? Theme.disabledOpacity : 1.0
+                activeFocusOnTab: !root.busy
                 color: Theme.alpha(pillColor,
                     selected ? Theme.tintStrong : Theme.tintSubtle)
                 border.width: Theme.borderWidth
@@ -330,7 +332,13 @@ Card {
                 Accessible.role: Accessible.Button
                 Accessible.name: "Select " + displayPill.modelData.name
                 Accessible.description: displayPill.modelData.disabled ? "Display off" : "Display on"
-                Accessible.onPressAction: DisplayService.setSelected(displayPill.modelData.name)
+                Accessible.onPressAction: if (!root.busy) DisplayService.setSelected(displayPill.modelData.name)
+                Keys.onPressed: event => {
+                    if (!root.busy && Keyboard.presses(event)) {
+                        event.accepted = true;
+                        DisplayService.setSelected(displayPill.modelData.name);
+                    }
+                }
 
                 Row {
                     id: pillContent
@@ -365,6 +373,8 @@ Card {
                     cursorShape: root.busy ? Qt.ArrowCursor : Qt.PointingHandCursor
                     onClicked: DisplayService.setSelected(displayPill.modelData.name)
                 }
+
+                FocusRing {}
             }
         }
     }

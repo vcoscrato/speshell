@@ -211,14 +211,7 @@ Singleton {
     }
 
     function scan() {
-        if (scanProc.running) {
-            scanProc.queued = true;
-            return;
-        }
-        scanProc.dirs = root.scanDirs;
-        scanProc.command = Shell.script("theme.sh", ["scan", root.shippedThemesDir, root.themesDir, "--",
-            root.shippedEffectsDir, root.userEffectsDir]);
-        scanProc.running = true;
+        scanProc.request();
     }
 
     function finishScan(text) {
@@ -273,13 +266,9 @@ Singleton {
     function exportPalette() {
         if (root.palettePath === "" || !root.appPalette)
             return;
-        if (paletteProc.running) {
-            paletteProc.queued = true;
-            return;
-        }
         paletteProc.command = Shell.script("theme.sh", ["palette", root.palettePath,
             JSON.stringify(root.appPalette, null, 2), root.appPalette.mode]);
-        paletteProc.running = true;
+        paletteProc.request();
     }
 
     // Tell the user once about problems in the active theme's theme.ini.
@@ -293,25 +282,27 @@ Singleton {
             theme.errors.join("\n"));
     }
 
-    Process {
+    // A scan asked for during one, as when the config's folders arrive, scans again
+    // after it, and only that one's result counts.
+    QueuedProcess {
         id: scanProc
-        property bool queued: false
+        // The user folders this run covers.
         property string dirs: ""
+        command: Shell.script("theme.sh", ["scan", root.shippedThemesDir, root.themesDir, "--",
+            root.shippedEffectsDir, root.userEffectsDir])
         stdout: StdioCollector {
             id: scanOutput
         }
+        onStarted: scanProc.dirs = root.scanDirs
         onExited: {
-            root.finishScan(scanOutput.text);
-            if (scanProc.queued) {
-                scanProc.queued = false;
-                root.scan();
-            }
+            if (!scanProc.queued)
+                root.finishScan(scanOutput.text);
         }
     }
 
-    Process {
+    // A palette changed during an export is written once it's done.
+    QueuedProcess {
         id: paletteProc
-        property bool queued: false
         stderr: StdioCollector {
             id: paletteErrors
         }
@@ -319,10 +310,6 @@ Singleton {
             if (exitCode !== 0)
                 NotificationService.addInternalNotification("app-themes", "Apps did not take the theme",
                     paletteErrors.text.replace(/\x1b\[[0-9;]*m/g, "").trim() || "matugen exited with " + exitCode);
-            if (paletteProc.queued) {
-                paletteProc.queued = false;
-                root.exportPalette();
-            }
         }
     }
 

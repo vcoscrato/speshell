@@ -111,6 +111,10 @@ ipc_call() {
     start_instance frozen
   elif config_invalid; then
     return 1
+  elif (( status == 3 )); then
+    # It runs, and its targets come once its config has loaded: wait for them below
+    # rather than start it over.
+    :
   elif [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
     printf 'speshell: Speshell is not running, and there is no display to start it on\n' >&2
     return 1
@@ -125,7 +129,15 @@ ipc_call() {
     sleep 0.05
   done
 
-  config_invalid || printf 'speshell: failed to contact IPC target %s\n' "${1:-unknown}" >&2
+  if config_invalid; then
+    return 1
+  fi
+  # One with a valid config but without the target was started before an update.
+  if (( status == 3 )) && [[ "$(ipc_try config status)" == valid ]]; then
+    printf 'speshell: the running Speshell has no %s target; restart it if it predates an update\n' "$1" >&2
+  else
+    printf 'speshell: failed to contact IPC target %s\n' "${1:-unknown}" >&2
+  fi
   return 1
 }
 

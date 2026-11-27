@@ -41,11 +41,6 @@ mat2 rot(float a) {
     return mat2(cs, sn, -sn, cs);
 }
 
-float backOut(float x) {
-    float c = 1.7;
-    return 1.0 + (c + 1.0) * pow(x - 1.0, 3.0) + c * pow(x - 1.0, 2.0);
-}
-
 // ── Dust bands: ribbons trailing round the panel far out ──
 
 // Band j's rounded rect round the panel center (half size and corner radius), its
@@ -102,7 +97,7 @@ vec2 boulder(int i, out float size, out float seed, out float rise, out float dr
     seed = hash(vec2(fi, 7.7)) * 6.2831853;
     rest.y += 7.0 * sin(u.time * 1.7 + seed) * (size / 26.0 + 0.4);
     rest.x += 4.0 * sin(u.time * 0.55 + seed * 2.0);
-    rise = backOut(clamp(u.lift * 1.6 - 0.1 * fi, 0.0, 1.0));
+    rise = backOut(u.lift * 1.6 - 0.1 * fi);
     drop = clamp(u.fall * 1.5 - 0.08 * fi, 0.0, 1.0);
     vec2 from = vec2(rest.x, u.ground + size * 1.3);
     vec2 pos = mix(from, rest, rise);
@@ -125,6 +120,20 @@ vec4 mote(float fi, out float alpha) {
 }
 
 #ifndef VERTEX_SHADER
+// A small five-sided chip at o from its center, tumbling at `ang`, the half toward
+// `light` in the `lit` tone and the rest in `shade`, edged: its color, and its coverage.
+vec4 chip(vec2 o, float size, float ang, float seed, vec2 light, vec3 lit, vec3 shade) {
+    vec2 lp = rot(ang) * o;
+    float d = -1e3;
+    for (int k = 0; k < 5; k++) {
+        float fk = float(k);
+        float th = (fk + 0.4 * hash(vec2(seed, fk))) * 1.2566371;
+        d = max(d, dot(lp, vec2(cos(th), sin(th))) - size * (0.8 + 0.35 * hash(vec2(fk, seed))));
+    }
+    vec3 c = mix(shade, lit, cover(dot(o, light) / max(size, 1.0) + 0.1));
+    return vec4(mix(u.cEdge.rgb, c, cover(-d - 1.0)), cover(-d + 0.6));
+}
+
 // Premultiplied "over" of a flat color with coverage k.
 void over(inout vec3 col, inout float a, vec3 c, float k) {
     col = mix(col, c, k);

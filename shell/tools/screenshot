@@ -31,7 +31,9 @@ wl-copy --type image/png <"$file"
 
 saved="Saved as $(basename -- "$file")"
 if command -v swappy >/dev/null 2>&1; then
-  [[ "$(notify "Screenshot copied" "$saved" "edit=Annotate")" == edit ]] && exec swappy -f "$file" -o "$file"
+  if [[ "$(notify "Screenshot copied" "$saved" "edit=Annotate")" == edit ]]; then
+    exec swappy -f "$file" -o "$file"
+  fi
 else
   notify_open "Screenshot copied" "$saved" "$file"
 fi

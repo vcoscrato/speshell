@@ -54,7 +54,7 @@ Card {
                     source: root.player && root.player.trackArtUrl ? root.player.trackArtUrl : ""
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
-                    visible: source !== ""
+                    visible: artImage.status === Image.Ready
                 }
 
                 AppIcon {
@@ -95,9 +95,7 @@ Card {
                     Label {
                         id: artistText
                         text: root.player
-                            ? [root.player.trackArtist, root.player.trackAlbum].filter(part => {
-                                return !!part;
-                            }).join(" · ")
+                            ? [root.player.trackArtist, root.player.trackAlbum].filter(Boolean).join(" · ")
                             : ""
                         color: Theme.subtext
                         width: parent.width
@@ -144,7 +142,7 @@ Card {
         Column {
             width: parent.width
             spacing: Theme.spacingMicro
-            visible: root.player && root.player.length > 0
+            visible: root.player !== null && root.player.length > 0
 
             // A drag seeks where it lets go; the wheel by five seconds.
             StyledSlider {

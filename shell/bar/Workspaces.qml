@@ -33,6 +33,13 @@ Row {
                 ?? { id: workspace.modelData, name: "", active: false, occupied: false, title: "" }
             property bool pointerInside: false
 
+            // `pointer`: the MouseArea clicked, or null from the keyboard.
+            function show(pointer) {
+                if (!workspace.info.active)
+                    EffectsService.picked(workspace, pointer);
+                WorkspaceService.focus(workspace.modelData);
+            }
+
             anchors.verticalCenter: parent.verticalCenter
             width: Math.max(root.itemSize, nameText.implicitWidth + Theme.spacingMedium * 2)
             height: Math.min(Theme.controlHeightSmall + Theme.spacingTiny, root.itemSize)
@@ -46,11 +53,11 @@ Row {
 
             Accessible.role: Accessible.Button
             Accessible.name: "Workspace " + workspace.info.name
-            Accessible.onPressAction: WorkspaceService.focus(workspace.modelData)
+            Accessible.onPressAction: workspace.show(null)
             Keys.onPressed: event => {
                 if (Keyboard.presses(event)) {
                     event.accepted = true;
-                    WorkspaceService.focus(workspace.modelData);
+                    workspace.show(null);
                 }
             }
 
@@ -65,7 +72,7 @@ Row {
             }
 
             Tooltip {
-                visible: workspace.pointerInside && workspace.info.title !== ""
+                visible: (workspace.pointerInside || workspace.activeFocus) && workspace.info.title !== ""
                 text: workspace.info.title
                 below: !root.labelAbove
                 // At once, as the bar is glanced over.
@@ -84,11 +91,7 @@ Row {
                 }
                 onExited: workspace.pointerInside = false
                 onCanceled: workspace.pointerInside = false
-                onClicked: {
-                    if (!workspace.info.active)
-                        EffectsService.picked(workspace, workspaceMouse);
-                    WorkspaceService.focus(workspace.modelData);
-                }
+                onClicked: workspace.show(workspaceMouse)
             }
 
             FocusRing {}

@@ -38,7 +38,7 @@ Item {
     Accessible.description: root.subtitle
     Accessible.onPressAction: if (root.primaryEnabled) root.primaryTriggered()
     Keys.onPressed: event => {
-        if (Keyboard.presses(event)) {
+        if (root.primaryEnabled && Keyboard.presses(event)) {
             event.accepted = true;
             if (!root.current)
                 EffectsService.picked(iconDisc, null);

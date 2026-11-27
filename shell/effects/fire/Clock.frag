@@ -20,7 +20,6 @@ layout(std140, binding = 0) uniform buf {
     vec4 cAsh;
     vec4 cIron;
     vec4 cRim;
-    vec4 cText;
     vec4 cCore;
     vec4 cMid;
     vec4 cOuter;

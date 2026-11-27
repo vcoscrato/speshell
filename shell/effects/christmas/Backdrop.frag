@@ -17,7 +17,6 @@ layout(std140, binding = 0) uniform buf {
     vec4 cIce;
     vec4 cSnow;
     vec4 cSnowShade;
-    vec4 cPine;
     vec4 cGold;
     vec4 cGlow;
     vec4 cBerry;

@@ -48,7 +48,7 @@ void main() {
     float fadeOut = 1.0 - t;
     acc = over(acc, u.cDust.rgb, 0.16 * fadeOut * band(dust, 0.03));
     acc = over(acc, u.cDust.rgb, 0.22 * fadeOut * band(dust, 0.3));
-    acc = over(acc, mix(u.cDust.rgb, u.cHead.rgb, 0.5), 0.35 * fadeOut * band(dust, 0.55) * band(0.4, t));
+    acc = over(acc, mix(u.cDust.rgb, u.cHead.rgb, 0.5), 0.35 * fadeOut * band(dust, 0.55) * band(0.4 - t, 0.0));
 
     // The coma in soft rings round a small bright head.
     float d = length(o);

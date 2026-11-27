@@ -383,5 +383,17 @@ class Planning(SystemTest):
         self.assertEqual(self.kinds(self.plan(Machine(), {"ran": ["make it"]})), [("run", "make it so")])
 
 
+class Applying(SystemTest):
+    def test_an_apply_stopped_partway_keeps_what_it_placed(self):
+        write("base.conf", "file ~/placed\nfile ~/blocked/file\n")
+        write("files/base/placed", "a")
+        write("files/base/file", "b")
+        (HOME / "blocked").write_text("in the way")
+        plan = self.plan(Machine())
+        with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(OSError):
+            system.Apply(plan).files()
+        self.assertEqual(system.load_state()["files"], {str(HOME / "placed"): {"module": "base", "kind": "link"}})
+
+
 if __name__ == "__main__":
     unittest.main()

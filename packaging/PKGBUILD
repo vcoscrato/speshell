@@ -60,9 +60,7 @@ source=("speshell::git+${url}.git")
 sha256sums=('SKIP')
 
 pkgver() {
-  if [ -d speshell ]; then
-    cd speshell
-  fi
+  cd speshell
   printf 'r%s.g%s' \
     "$(git rev-list --count HEAD)" \
     "$(git rev-parse --short=7 HEAD)"

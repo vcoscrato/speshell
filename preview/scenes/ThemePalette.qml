@@ -37,7 +37,7 @@ QtObject {
     readonly property color subtext: c.subtext0
     readonly property color subtextBright: c.subtext1
     readonly property color accent: c.accent
-    readonly property color onAccent: palette.contrast(c.accent, c.crust) >= palette.contrast(c.accent, c.text) ? c.crust : c.text
+    readonly property color textOnAccent: palette.contrast(c.accent, c.crust) >= palette.contrast(c.accent, c.text) ? c.crust : c.text
     readonly property color pink: c.pink
     readonly property color success: c.green
     readonly property color warning: c.yellow

@@ -551,15 +551,19 @@ ModalWindow {
                     width: parent.width
                     spacing: Theme.spacingSmall
 
+                    // Where the selection is in the step's row; none while nothing matches.
                     Label {
+                        id: placeLabel
+
+                        readonly property int index: root.atWallpapers ? root.wallpaperIndex : root.selectedIndex
+                        readonly property int count: root.atWallpapers ? root.wallpapers.length : root.themes.length
                         readonly property bool inUse: root.atWallpapers ? root.applied : root.selectedActive
 
+                        visible: placeLabel.index >= 0
                         role: "section"
-                        color: inUse ? Theme.accent : Theme.subtext
-                        text: (root.atWallpapers
-                                ? "Wallpaper " + (root.wallpaperIndex + 1) + " of " + root.wallpapers.length
-                                : "Theme " + (root.selectedIndex + 1) + " of " + root.themes.length)
-                            + (inUse ? "  ·  In use" : "")
+                        color: placeLabel.inUse ? Theme.accent : Theme.subtext
+                        text: (root.atWallpapers ? "Wallpaper " : "Theme ") + (placeLabel.index + 1) + " of " + placeLabel.count
+                            + (placeLabel.inUse ? "  ·  In use" : "")
                     }
 
                     Label {
@@ -791,7 +795,8 @@ ModalWindow {
             anchors.centerIn: dock
             role: "title"
             color: Theme.subtext
-            text: (root.atWallpapers ? "No wallpaper" : "No theme") + " matches “" + filterInput.text.trim() + "”"
+            text: root.query === "" ? (root.atWallpapers ? "No wallpapers" : "No themes")
+                : (root.atWallpapers ? "No wallpaper" : "No theme") + " matches “" + filterInput.text.trim() + "”"
             visible: root.atWallpapers ? root.wallpapers.length === 0 : root.themes.length === 0
         }
 

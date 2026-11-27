@@ -16,8 +16,10 @@ Singleton {
     // (the name of the display it mirrors, or ""), mode (its mode's key, or "preferred"),
     // and modes (the keys of the ones it has, largest first) }.
     property var monitors: []
-    // The displays as the panel edits them, until applied.
+    // The displays as the panel edits them, until applied, and as read when the draft
+    // last took them in.
     property var draftMonitors: []
+    property var draftBase: []
     // What the draft changes; "" when there is no draft.
     property string pendingSummary: ""
     property string selectedName: ""
@@ -169,7 +171,35 @@ Singleton {
 
     function resetDraft() {
         root.draftMonitors = root.monitors;
+        root.draftBase = root.monitors;
         root.pendingSummary = "";
+        root.ensureSelected();
+    }
+
+    // The draft over a new read, as when a display came or went: what it changed on each
+    // display still there carries over, and a display that came is as read. It goes when
+    // nothing it changed is left, or when it would leave no display on.
+    function carryDraft() {
+        const edited = ["disabled", "mode", "width", "height", "x", "y", "mirrorOf"];
+        const names = root.monitors.map(monitor => monitor.name);
+        const carried = root.monitors.map(monitor => {
+            const before = root.draftBase.find(other => other.name === monitor.name);
+            const drafted = root.draftMonitors.find(other => other.name === monitor.name);
+            if (!before || !drafted)
+                return monitor;
+            const next = Object.assign({}, monitor);
+            edited.filter(key => drafted[key] !== before[key]).forEach(key => next[key] = drafted[key]);
+            if (!names.includes(next.mirrorOf))
+                next.mirrorOf = "";
+            return next;
+        });
+        const changed = carried.some((monitor, index) => edited.some(key => monitor[key] !== root.monitors[index][key]));
+        if (!changed || carried.every(monitor => monitor.disabled)) {
+            root.resetDraft();
+            return;
+        }
+        root.draftMonitors = root.sorted(carried);
+        root.draftBase = root.monitors;
         root.ensureSelected();
     }
 
@@ -412,7 +442,7 @@ Singleton {
     }
 
     function queueRefresh() {
-        if (!root.hasPending && !root.busy)
+        if (!root.busy)
             refreshDebounce.restart();
     }
 
@@ -427,10 +457,14 @@ Singleton {
             const names = {};
             raw.forEach(monitor => names[String(monitor.id)] = String(monitor.name || ""));
             root.monitors = root.sorted(raw.map(monitor => root.monitor(monitor, names)));
-            if (root.hasPending)
-                root.ensureSelected();
-            else
+            // A read during a change of Speshell's own, or with a newer one to follow, may
+            // catch the displays halfway; the draft waits for the one after.
+            if (!root.hasPending)
                 root.resetDraft();
+            else if (root.phase === "idle" && !monitorsProc.queued)
+                root.carryDraft();
+            else
+                root.ensureSelected();
             root.readError = exitCode !== 0 ? errors.trim() || "Could not read displays." : "";
         } else {
             root.readError = "Could not read displays.";

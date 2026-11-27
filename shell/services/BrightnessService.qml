@@ -36,7 +36,6 @@ Singleton {
     readonly property int batteryPercent: ConfigService.settings.backlight.batteryPercent
     property int pluggedPercent: -1
 
-
     function clampPercent(value) {
         return Math.max(root.minimumPercent, Math.min(100, Math.round(Number(value) || 0)));
     }
@@ -97,9 +96,12 @@ Singleton {
             return;
 
         const pct = Math.max(0, Math.min(100, Math.round((current / max) * 100)));
-        root.percent = pct;
-        if (!writeProc.running && !writeProc.queued && !writeDebounce.running)
+        // A level read while a newer one waits to be written would pull a dragged slider
+        // back; the read after the last write settles it.
+        if (!writeProc.running && !writeProc.queued && !writeDebounce.running) {
+            root.percent = pct;
             root.pendingPercent = pct;
+        }
         if (OsdService.changed("brightness", pct))
             OsdService.showLevel("brightness");
     }

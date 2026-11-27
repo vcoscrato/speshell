@@ -21,29 +21,14 @@ layout(location = 0) out vec4 fragColor;
 const vec3 LIGHT3 = vec3(-0.42, -0.62, 0.66);
 const int FACES = 14;
 
-// A small five-sided chip at `lp` (its own frame): signed distance, < 0 inside.
-float chip(vec2 lp, float size, float seed) {
-    float d = -1e3;
-    for (int k = 0; k < 5; k++) {
-        float fk = float(k);
-        float th = (fk + 0.4 * hash(vec2(seed, fk))) * 1.2566371;
-        d = max(d, dot(lp, vec2(cos(th), sin(th))) - size * (0.8 + 0.35 * hash(vec2(fk, seed))));
-    }
-    return d;
-}
-
 // Draws a chip at `pos`, tumbling at `ang`, lit from `light`, in the given tones.
 void drawChip(inout vec3 col, inout float a, vec2 p, vec2 pos, float size, float ang, float seed,
               vec2 light, vec3 lit, vec3 shade, float alpha) {
     vec2 o = p - pos;
     if (dot(o, o) > size * size * 2.5)
         return;
-    vec2 lp = rot(ang) * o;
-    float d = chip(lp, size, seed);
-    // Top-lit: the half facing the light is the light tone.
-    vec3 c = mix(shade, lit, cover(dot(o, light) / max(size, 1.0) + 0.1));
-    vec3 withEdge = mix(u.cEdge.rgb, c, cover(-d - 1.0));
-    over(col, a, withEdge, cover(-d + 0.6) * alpha);
+    vec4 c = chip(o, size, ang, seed, light, lit, shade);
+    over(col, a, c.rgb, c.a * alpha);
 }
 
 vec3 hash3(float x) {

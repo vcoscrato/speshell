@@ -87,7 +87,6 @@ WallpaperStage {
         fieldScale: root.fieldScale
         clearBehind: false
         trail: 50 + 0.08 * root.frontSpeed
-        core: root.core
     }
 
     // The controls' ember, larger.

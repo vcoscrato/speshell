@@ -12,6 +12,8 @@ Card {
 
     property bool syncingFromService: false
     property bool previewMode: true
+    // Whether the keyboard opened the editor, so finishing goes back to the note for it.
+    property bool keyboardEditing: false
     property bool creatingNote: false
     property string renderedMarkdown: ""
 
@@ -40,26 +42,32 @@ Card {
         root.renderedMarkdown = Markdown.render(notesInput.text, Math.round(Theme.fontSizeSmall / 3));
     }
 
+    // Focus that left for another control stays there; Enter and Escape hand it back to
+    // the note when the keyboard opened the editor, and to no control otherwise.
     function exitEditMode() {
-        if (!root.previewMode) {
-            root.previewMode = true;
-            focusSink.forceActiveFocus();
-            NotesService.flush(false);
-        }
+        if (root.previewMode)
+            return;
+        const refocus = notesInput.activeFocus;
+        root.previewMode = true;
+        if (refocus)
+            (root.keyboardEditing ? notePreview : focusSink).forceActiveFocus();
+        NotesService.flush(false);
     }
 
+    // At the click, or at the end from the keyboard.
     function beginEditMode(clickX, clickY) {
         if (!NotesService.loaded || NotesService.mutating)
             return;
+        const clicked = typeof clickX === "number" && typeof clickY === "number";
+        root.keyboardEditing = !clicked;
+        // Off the note before it hides; focus dropped with it would read as leaving the
+        // editor, and close it as it opens.
+        focusSink.forceActiveFocus();
         root.previewMode = false;
         Qt.callLater(() => {
             notesInput.forceActiveFocus();
-            if (typeof clickX === "number" && typeof clickY === "number") {
-                const position = notesInput.positionAt(clickX, clickY);
-                notesInput.cursorPosition = position >= 0
-                    ? position
-                    : notesInput.text.length;
-            }
+            const position = clicked ? notesInput.positionAt(clickX, clickY) : -1;
+            notesInput.cursorPosition = position >= 0 ? position : notesInput.text.length;
         });
     }
 
@@ -312,7 +320,7 @@ Card {
                 padding: 0
                 color: Theme.text
                 selectionColor: Theme.accent
-                selectedTextColor: Theme.onAccent
+                selectedTextColor: Theme.textOnAccent
                 font.pixelSize: Theme.fontSizeSmall
                 font.family: Theme.fontFamily
                 enabled: NotesService.loaded && !NotesService.mutating
@@ -353,10 +361,20 @@ Card {
                 }
             }
 
+            // Tab stops at the note, and Enter or Space opens it for editing.
             Item {
+                id: notePreview
                 visible: root.previewMode
                 width: notesFlickable.contentWidth
                 height: Math.max(markdownText.implicitHeight, notesFlickable.height)
+                activeFocusOnTab: true
+
+                Keys.onPressed: event => {
+                    if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
+                        root.beginEditMode();
+                        event.accepted = true;
+                    }
+                }
 
                 // A TextEdit, not a Text: under Qt 6.12, scrolling a Text over 10,000
                 // characters that holds a Markdown table segfaults the scene graph
@@ -399,6 +417,10 @@ Card {
                     }
                 }
             }
+        }
+
+        FocusRing {
+            control: notePreview
         }
     }
 }

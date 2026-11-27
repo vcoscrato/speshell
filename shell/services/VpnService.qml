@@ -18,9 +18,7 @@ Singleton {
     id: root
 
     property var connections: [] // [{uuid, name, type, state}]
-    readonly property bool active: root.connections.some(item => {
-        return item.state === "activated";
-    })
+    readonly property bool active: root.connections.some(item => item.state === "activated")
 
     // The profile this service is bringing up or down, or null: { uuid, kind: "connect"
     // or "disconnect" }.
@@ -45,11 +43,7 @@ Singleton {
     })
 
     function find(uuid) {
-        for (let i = 0; i < root.connections.length; i++) {
-            if (root.connections[i].uuid === uuid)
-                return root.connections[i];
-        }
-        return null;
+        return root.connections.find(item => item.uuid === uuid) || null;
     }
 
     function promptFor(uuid) {
@@ -95,9 +89,7 @@ Singleton {
                 name: fields.slice(3).join(":").replace(/\\(.)/g, "$1")
             });
         }
-        return result.sort((a, b) => {
-            return a.name.localeCompare(b.name);
-        });
+        return result.sort((a, b) => a.name.localeCompare(b.name));
     }
 
     // vpn.data prints as "key = value, key = value".
@@ -120,7 +112,7 @@ Singleton {
         root.prompt = null;
         root.session = { uuid: uuid, fresh: !!fresh };
         prepareProc.command = Shell.script("vpn.sh", ["prepare", uuid]);
-        prepareProc.running = true;
+        prepareProc.request();
     }
 
     function disconnect(uuid) {
@@ -420,13 +412,14 @@ Singleton {
         onTriggered: root.refresh()
     }
 
-    Process {
+    // A connect while it runs, as after a cancel, prepares again after it; this run's
+    // answer is then for another attempt, and left alone.
+    QueuedProcess {
         id: prepareProc
-        stdout: StdioCollector {
-            onStreamFinished: {
-                if (root.session && root.operation)
-                    root.finishPrepare(text);
-            }
+        stdout: StdioCollector { id: prepareOutput }
+        onExited: {
+            if (!prepareProc.queued && root.session && root.operation)
+                root.finishPrepare(prepareOutput.text);
         }
     }
 

@@ -30,7 +30,7 @@ float S;
 const vec2 LIGHT = vec2(-0.6, -0.8);     // toward the light, up and to the left
 
 vec3 scatter(sampler2D img, vec2 uv, float lod) {
-    vec2 o = vec2(3.0, 2.0) * S / u.resolution * exp2(lod - 3.0);
+    vec2 o = vec2(3.0, 2.0) / u.resolution * exp2(lod - 3.0);
     return 0.5 * (textureLod(img, uv + o, lod).rgb + textureLod(img, uv - o, lod).rgb);
 }
 
@@ -55,7 +55,8 @@ void main() {
     // frosts over, so no thin patch is left. The image behind turns once it is thick.
     float thick = age + 2.0 * max(t - 0.7, 0.0);
     float swap = smoothstep(0.5, 0.72, thick);
-    float lod = 4.2 + log2(max(S * u.resolution.y / 1080.0, 1.0));
+    // As blurred on any screen as on a 1080 px tall one.
+    float lod = 4.2 + log2(S);
     vec3 behind = mix(scatter(outgoing, uv, lod), scatter(incoming, uv, lod), swap);
     vec3 sharp = swap < 1.0 ? texture(outgoing, uv).rgb : vec3(0.0);
 

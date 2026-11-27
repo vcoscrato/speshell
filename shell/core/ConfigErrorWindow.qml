@@ -88,7 +88,7 @@ ModalWindow {
                     wrapMode: TextEdit.Wrap
                     color: Theme.text
                     selectionColor: Theme.accent
-                    selectedTextColor: Theme.onAccent
+                    selectedTextColor: Theme.textOnAccent
                     font.family: "monospace"
                     font.pixelSize: Theme.fontSizeSmall
                 }

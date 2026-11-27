@@ -14,7 +14,6 @@ layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {
     mat4 qt_Matrix;
     float qt_Opacity;
-    float time;
     vec2 resolution;
     vec2 origin;       // px, this item's top-left on screen
     vec2 center;

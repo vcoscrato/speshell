@@ -329,7 +329,7 @@ void main() {
     float pop = span(L, 0.4, 0.53);
     if (pop > 0.0) {
         // Popping up a little past its size, then settling.
-        float s = 1.0 + 2.7 * pow(pop - 1.0, 3.0) + 1.7 * pow(pop - 1.0, 2.0);
+        float s = backOut(pop);
         float K = clamp(min(h.x, h.y) * 0.55, 36.0, 84.0) * max(s, 0.01);
         vec2 b = rot(k - cr, 0.25 * (1.0 - pop)) / K;
         if (abs(b.x) < 1.2 && b.y > -0.9 && b.y < 1.2)

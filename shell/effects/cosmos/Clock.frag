@@ -127,7 +127,6 @@ void main() {
     float front = step(0.0, rq.y);
     o = over(o, u.cDim.rgb, ring * (1.0 - front));
     o = planet(o, p, minuteAt, rMp, u.cMinute.rgb, u.cMinuteBand.rgb, u.minuteTurn * TAU * 2.0);
-    o = over(o, u.cDeep.rgb, ring * front * cover(1.6 - ringD + 1.0) * 0.0);
     o = over(o, u.cDim.rgb, ring * front);
 
     // ── The hour's planet ──

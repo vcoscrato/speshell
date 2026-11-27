@@ -21,6 +21,11 @@ Scope {
         return apply(state === "toggle" ? !current : state === "on") !== false ? "" : "error: could not change " + name;
     }
 
+    // A switch's IPC `get`: on or off, or the error `set` gives where there is none.
+    function switchState(name, available, on) {
+        return !available ? "error: no " + name + " switch here" : on ? "on" : "off";
+    }
+
     NotificationServer {
         actionsSupported: true
         imageSupported: true
@@ -72,7 +77,7 @@ Scope {
         function set(state: string): string {
             return root.setSwitch("awake", true, IdleService.keepAwake, state, on => IdleService.setKeepAwake(on));
         }
-        function get(): string { return IdleService.keepAwake ? "on" : "off"; }
+        function get(): string { return root.switchState("awake", true, IdleService.keepAwake); }
     }
 
     IpcHandler {
@@ -82,7 +87,7 @@ Scope {
             return root.setSwitch("touchpad", InputService.available, InputService.touchpadEnabled, state,
                 on => InputService.setFromKey(on));
         }
-        function get(): string { return InputService.available ? (InputService.touchpadEnabled ? "on" : "off") : ""; }
+        function get(): string { return root.switchState("touchpad", InputService.available, InputService.touchpadEnabled); }
     }
 
     IpcHandler {
@@ -92,7 +97,7 @@ Scope {
             return root.setSwitch("airplane", RadioService.available, RadioService.airplaneMode, state,
                 on => RadioService.setAirplaneMode(on, true));
         }
-        function get(): string { return RadioService.available ? (RadioService.airplaneMode ? "on" : "off") : ""; }
+        function get(): string { return root.switchState("airplane", RadioService.available, RadioService.airplaneMode); }
     }
 
     IpcHandler {
@@ -102,6 +107,8 @@ Scope {
             return root.setSwitch("nightlight", NightLightService.available, NightLightService.enabled, state,
                 on => NightLightService.setFromKey(on));
         }
-        function get(): string { return NightLightService.available ? (NightLightService.enabled ? "on" : "off") : ""; }
+        function get(): string {
+            return root.switchState("nightlight", NightLightService.available, NightLightService.enabled);
+        }
     }
 }

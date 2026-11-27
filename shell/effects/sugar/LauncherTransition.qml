@@ -6,9 +6,9 @@ import "Sugar.js" as Sugar
 // piping bag comes in at its top-left corner and slowly pipes a shell border of
 // frosting round it, just outside its edge; done, it lifts away, and glacé cherries
 // are set on the border one by one, at its corners and the middles of its long sides,
-// now and then catching the light. Closing, it is
-// eaten: bites chomp in from its edges, showing the sponge inside and throwing
-// crumbs, until a last big bite takes the rest.
+// now and then catching the light. Closing, it is eaten: bites chomp in from its
+// edges, showing the sponge inside and throwing crumbs, until a last big bite takes
+// the rest.
 LauncherStage {
     id: root
 
@@ -23,7 +23,7 @@ LauncherStage {
 
     // open: seconds open, which paces the decorating; leave: 0..1 over the bites.
     property real open: 0
-    // Bites already taken, so each throws its crumbs once.
+    // Bites taken, so each throws its crumbs once; one undone by a reopen counts again.
     property int bitten: 0
     // Where the bites land: (x, y) on the panel, relative to its top-left, as a
     // fraction of its size; z the bite's size as a fraction of the panel's shorter side.
@@ -112,7 +112,8 @@ LauncherStage {
     }
 
     onAdvanced: dt => {
-        if (root.active && root.leave === 0)
+        // `open` stops once the cherries are set, since nothing it paces moves after that.
+        if (root.active && root.leave === 0 && !root.cherriesSet)
             root.open += dt;
         if (!root.active && root.leave > 0) {
             while (root.bitten < root.biteAt.length && root.leave >= root.biteAt[root.bitten]) {
@@ -120,7 +121,8 @@ LauncherStage {
                 root.bitten++;
             }
         } else {
-            root.bitten = 0;
+            while (root.bitten > 0 && root.leave <= root.biteAt[root.bitten - 1])
+                root.bitten--;
         }
         // Once the cherries are set, now and then one catches the light.
         if (root.active && root.leave === 0 && root.cherriesSet) {
@@ -175,18 +177,18 @@ LauncherStage {
         // The bag coming in, and lifting away when done.
         property real arrive: root.span(root.open, 0, root.pipeStart + 0.15)
         property real lift: root.span(root.open, root.pipeEnd, root.pipeEnd + root.liftTime)
-        property vector4d cherry0: { root.open; return root.cherry(0); }
-        property vector4d cherry1: { root.open; return root.cherry(1); }
-        property vector4d cherry2: { root.open; return root.cherry(2); }
-        property vector4d cherry3: { root.open; return root.cherry(3); }
-        property vector4d cherry4: { root.open; return root.cherry(4); }
-        property vector4d cherry5: { root.open; return root.cherry(5); }
-        property vector4d cherry6: { root.open; return root.cherry(6); }
-        property vector4d cherry7: { root.open; return root.cherry(7); }
-        property vector4d bite0: { root.leave; return root.biteUniform(0); }
-        property vector4d bite1: { root.leave; return root.biteUniform(1); }
-        property vector4d bite2: { root.leave; return root.biteUniform(2); }
-        property vector4d bite3: { root.leave; return root.biteUniform(3); }
+        property vector4d cherry0: root.cherry(0)
+        property vector4d cherry1: root.cherry(1)
+        property vector4d cherry2: root.cherry(2)
+        property vector4d cherry3: root.cherry(3)
+        property vector4d cherry4: root.cherry(4)
+        property vector4d cherry5: root.cherry(5)
+        property vector4d cherry6: root.cherry(6)
+        property vector4d cherry7: root.cherry(7)
+        property vector4d bite0: root.biteUniform(0)
+        property vector4d bite1: root.biteUniform(1)
+        property vector4d bite2: root.biteUniform(2)
+        property vector4d bite3: root.biteUniform(3)
         property color cFrost: Sugar.frosting(root.theme)
         property color cFrostLight: Sugar.frostingLight(root.theme)
         property color cFrostShade: Sugar.frostingShade(root.theme)

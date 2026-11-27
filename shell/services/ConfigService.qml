@@ -214,7 +214,7 @@ Singleton {
         if (copyReportProc.running || root.errorReport === "")
             return;
         root.clearFeedback();
-        copyReportProc.command = ["wl-copy", "--", root.errorReport];
+        copyReportProc.input = root.errorReport;
         copyReportProc.running = true;
     }
 
@@ -259,8 +259,10 @@ Singleton {
         }
     }
 
-    Process {
+    // Through ClipboardService's script, so a missing wl-copy fails rather than never starting.
+    QueuedProcess {
         id: copyReportProc
+        command: Shell.script("clipboard.sh", ["text"])
         onExited: exitCode => root.setFeedback(exitCode === 0
             ? "Error report copied." : "Could not copy the report; select the text manually.",
             exitCode === 0 ? "success" : "error")

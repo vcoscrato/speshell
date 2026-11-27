@@ -11,7 +11,6 @@ Face {
     property color cAsh: root.theme.mantle
     property color cIron: root.theme.cardHover
     property color cRim: root.theme.surface2
-    property color cText: root.theme.text
     property color cCore: Flame.core(root.theme)
     property color cMid: Flame.mid(root.theme)
     property color cOuter: Flame.outer(root.theme)
